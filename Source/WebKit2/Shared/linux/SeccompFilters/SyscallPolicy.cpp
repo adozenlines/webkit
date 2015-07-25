@@ -28,6 +28,7 @@
 
 #if ENABLE(SECCOMP_FILTERS)
 
+#include "PluginSearchPath.h"
 #include "WebProcessCreationParameters.h"
 #include <libgen.h>
 #include <string.h>
@@ -96,21 +97,38 @@ bool SyscallPolicy::hasPermissionForPath(const char* path, Permission permission
     free(basePath);
     free(canonicalPath);
 
-    return (permission & policy->value) == permission;
+    if ((permission & policy->value) == permission)
+        return true;
+
+    // Don't warn if the file doesn't exist at all.
+    if (!access(path, F_OK) || errno != ENOENT)
+        fprintf(stderr, "Blocked impermissible %s access to %s\n", SyscallPolicy::permissionToString(permission), path);
+    return false;
+}
+
+static String canonicalizeFileName(const String& path)
+{
+    char* canonicalizedPath = canonicalize_file_name(path.utf8().data());
+    if (canonicalizedPath) {
+        String result = String::fromUTF8(canonicalizedPath);
+        free(canonicalizedPath);
+        return result;
+    }
+    return path;
 }
 
 void SyscallPolicy::addFilePermission(const String& path, Permission permission)
 {
     ASSERT(!path.isEmpty() && path.startsWith('/')  && !path.endsWith('/') && !path.contains("//"));
 
-    m_filePermission.set(path, permission);
+    m_filePermission.set(canonicalizeFileName(path), permission);
 }
 
 void SyscallPolicy::addDirectoryPermission(const String& path, Permission permission)
 {
     ASSERT(path.startsWith('/') && !path.contains("//") && (path.length() == 1 || !path.endsWith('/')));
 
-    m_directoryPermission.set(path, permission);
+    m_directoryPermission.set(canonicalizeFileName(path), permission);
 }
 
 void SyscallPolicy::addDefaultWebProcessPolicy(const WebProcessCreationParameters& parameters)
@@ -141,6 +159,14 @@ void SyscallPolicy::addDefaultWebProcessPolicy(const WebProcessCreationParameter
     addDirectoryPermission(ASCIILiteral("/usr/lib32"), Read);
     addDirectoryPermission(ASCIILiteral("/usr/lib64"), Read);
     addDirectoryPermission(ASCIILiteral("/usr/share"), Read);
+
+    // Support for alternative install prefixes, e.g. /usr/local.
+    addDirectoryPermission(ASCIILiteral(DATADIR), Read);
+    addDirectoryPermission(ASCIILiteral(LIBDIR), Read);
+
+    // Plugin search path
+    for (String& path : pluginsDirectories())
+        addDirectoryPermission(path, Read);
 
     // SSL Certificates.
     addDirectoryPermission(ASCIILiteral("/etc/ssl/certs"), Read);
@@ -234,6 +260,34 @@ void SyscallPolicy::addDefaultWebProcessPolicy(const WebProcessCreationParameter
     // Needed by NVIDIA proprietary graphics driver
     if (homeDir)
         addDirectoryPermission(String::fromUTF8(homeDir) + "/.nv", ReadAndWrite);
+
+#if ENABLE(DEVELOPER_MODE) && defined(SOURCE_DIR)
+    // Developers using build-webkit expect some libraries to be loaded
+    // from the build root directory and they also need access to layout test
+    // files.
+    char* sourceDir = canonicalize_file_name(SOURCE_DIR);
+    if (sourceDir) {
+        addDirectoryPermission(String::fromUTF8(sourceDir), SyscallPolicy::ReadAndWrite);
+        free(sourceDir);
+    }
+#endif
+}
+
+const char* SyscallPolicy::permissionToString(Permission permission)
+{
+    switch (permission) {
+    case Read:
+        return "read";
+    case Write:
+        return "write";
+    case ReadAndWrite:
+        return "read/write";
+    case NotAllowed:
+        return "disallowed";
+    }
+
+    ASSERT_NOT_REACHED();
+    return "unknown action";
 }
 
 } // namespace WebKit

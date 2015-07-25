@@ -109,7 +109,7 @@ my $nullableInit = "bool isNull = false;";
 my $exceptionInit = "WebCore::ExceptionCode ec = 0;";
 my $jsContextSetter = "WebCore::JSMainThreadNullState state;";
 my $exceptionRaiseOnError = "WebCore::raiseOnDOMError(ec);";
-my $assertMainThread = "{ DOM_ASSERT_MAIN_THREAD(); WebCoreThreadViolationCheckRoundOne(); }";
+my $threadViolationCheck = "WebCoreThreadViolationCheckRoundOne();";
 
 my %conflictMethod = (
     # FIXME: Add C language keywords?
@@ -536,6 +536,8 @@ sub SkipFunction
 
     return 1 if $codeGenerator->GetSequenceType($function->signature->type);
     return 1 if $codeGenerator->GetArrayType($function->signature->type);
+
+    return 1 if $function->signature->type eq "Promise";
 
     foreach my $param (@{$function->parameters}) {
         return 1 if $codeGenerator->GetSequenceType($param->type);
@@ -1676,7 +1678,7 @@ sub GenerateImplementation
     if ($parentImplClassName eq "Object") {        
         push(@implContent, "$className *kit($implType* value)\n");
         push(@implContent, "{\n");
-        push(@implContent, "    $assertMainThread;\n");
+        push(@implContent, "    $threadViolationCheck\n");
         push(@implContent, "    if (!value)\n");
         push(@implContent, "        return nil;\n");
         push(@implContent, "    if ($className *wrapper = getDOMWrapper(value))\n");
@@ -1696,7 +1698,7 @@ sub GenerateImplementation
     } else {
         push(@implContent, "$className *kit($implType* value)\n");
         push(@implContent, "{\n");
-        push(@implContent, "    $assertMainThread;\n");
+        push(@implContent, "    $threadViolationCheck\n");
         push(@implContent, "    return static_cast<$className*>(kit(static_cast<WebCore::$baseClass*>(value)));\n");
         push(@implContent, "}\n");
     }

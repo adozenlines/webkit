@@ -27,7 +27,7 @@ WebInspector.ScriptContentView = function(script)
 {
     WebInspector.ContentView.call(this, script);
 
-    this.element.classList.add(WebInspector.ScriptContentView.StyleClassName);
+    this.element.classList.add("script");
 
     // Append a spinner while waiting for _contentWillPopulate.
     var spinner = new WebInspector.IndeterminateProgressSpinner;
@@ -48,15 +48,9 @@ WebInspector.ScriptContentView = function(script)
     this._textEditor.addEventListener(WebInspector.SourceCodeTextEditor.Event.ContentWillPopulate, this._contentWillPopulate, this);
     this._textEditor.addEventListener(WebInspector.SourceCodeTextEditor.Event.ContentDidPopulate, this._contentDidPopulate, this);
 
-    var curleyBracesImage;
-    if (WebInspector.Platform.isLegacyMacOS)
-        curleyBracesImage = {src: "Images/Legacy/NavigationItemCurleyBraces.svg", width: 16, height: 16};
-    else
-        curleyBracesImage = {src: "Images/NavigationItemCurleyBraces.svg", width: 13, height: 13};
-
     var toolTip = WebInspector.UIString("Pretty print");
     var activatedToolTip = WebInspector.UIString("Original formatting");
-    this._prettyPrintButtonNavigationItem = new WebInspector.ActivateButtonNavigationItem("pretty-print", toolTip, activatedToolTip, curleyBracesImage.src, curleyBracesImage.width, curleyBracesImage.height);
+    this._prettyPrintButtonNavigationItem = new WebInspector.ActivateButtonNavigationItem("pretty-print", toolTip, activatedToolTip, "Images/NavigationItemCurleyBraces.svg", 13, 13);
     this._prettyPrintButtonNavigationItem.addEventListener(WebInspector.ButtonNavigationItem.Event.Clicked, this._togglePrettyPrint, this);
     this._prettyPrintButtonNavigationItem.enabled = false; // Enabled when the text editor is populated with content.
 
@@ -68,8 +62,6 @@ WebInspector.ScriptContentView = function(script)
 
     WebInspector.showJavaScriptTypeInformationSetting.addEventListener(WebInspector.Setting.Event.Changed, this._showJavaScriptTypeInformationSettingChanged, this);
 };
-
-WebInspector.ScriptContentView.StyleClassName = "script";
 
 WebInspector.ScriptContentView.prototype = {
     constructor: WebInspector.ScriptContentView,
@@ -118,6 +110,8 @@ WebInspector.ScriptContentView.prototype = {
 
     closed: function()
     {
+        WebInspector.showJavaScriptTypeInformationSetting.removeEventListener(null, null, this);
+
         this._textEditor.close();
     },
 

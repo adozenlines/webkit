@@ -40,7 +40,7 @@ SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, QuickLook, QLTypeCopyBestMimeTypeForURLAn
 SOFT_LINK_FUNCTION_FOR_HEADER(WebCore, QuickLook, QLTypeCopyUTIForURLAndMimeType, NSString *, (NSURL *url, NSString *mimeType), (url, mimeType))
 #define QLTypeCopyUTIForURLAndMimeType softLink_QuickLook_QLTypeCopyUTIForURLAndMimeType
 
-SOFT_LINK_CONSTANT_FOR_HEADER(WebCore, QuickLook, QLPreviewScheme, NSString *)
+SOFT_LINK_POINTER_FOR_HEADER(WebCore, QuickLook, QLPreviewScheme, NSString *)
 #define QLPreviewScheme get_QuickLook_QLPreviewScheme()
 
 #endif // USE(QUICK_LOOK)

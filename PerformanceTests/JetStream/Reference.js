@@ -1,4 +1,4 @@
-// Copyright (C) 2014 Apple Inc. All rights reserved.
+// Copyright (C) 2014, 2015 Apple Inc. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,7 +25,6 @@ JetStream.addReferences({
     "3d-cube": 7.3,
     "3d-raytrace": 8.05,
     "base64": 4.2,
-    "cordic": 3,
     "crypto-aes": 6.6,
     "crypto-md5": 3,
     "crypto-sha1": 2.05,
@@ -54,16 +53,17 @@ JetStream.addReferences({
     "earley-boyer": 2.5795868328750444,
     "regexp-2010": 61.82352941176467,
     "splay": 0.9286376274328075,
-    "splay-latency": 32.399999999999984,
+    "splay-latency": 40,
     "navier-stokes": 9.653846153846146,
     "pdfjs": 88.4166666666666,
     "mandreel": 157.14285714285708,
-    "mandreel-latency": 0.5129999999999998,
+    "mandreel-latency": 10,
     "gbemu": 135.9999999999998,
     "code-first-load": 2.3249465349251905,
     "box2d": 28.416666666666636,
     "zlib": 887.666666666666,
     "typescript": 1149.9999999999993,
     "lua": 29858,
+    "cdjs": 20,
     "geomean": 31.556451704472156,
 });

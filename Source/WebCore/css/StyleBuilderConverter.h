@@ -29,6 +29,7 @@
 
 #include "BasicShapeFunctions.h"
 #include "CSSCalculationValue.h"
+#include "CSSContentDistributionValue.h"
 #include "CSSFontFeatureValue.h"
 #include "CSSFunctionValue.h"
 #include "CSSGridLineNamesValue.h"
@@ -48,7 +49,6 @@
 #include "StyleResolver.h"
 #include "StyleScrollSnapPoints.h"
 #include "TransformFunctions.h"
-#include "WebKitCSSResourceValue.h"
 #include <wtf/Optional.h>
 
 namespace WebCore {
@@ -103,7 +103,6 @@ public:
     static Optional<float> convertPerspective(StyleResolver&, CSSValue&);
     static Optional<Length> convertMarqueeIncrement(StyleResolver&, CSSValue&);
     static Optional<FilterOperations> convertFilterOperations(StyleResolver&, CSSValue&);
-    static Vector<RefPtr<MaskImageOperation>> convertMaskImageOperations(StyleResolver&, CSSValue&);
 #if PLATFORM(IOS)
     static bool convertTouchCallout(StyleResolver&, CSSValue&);
 #endif
@@ -121,6 +120,8 @@ public:
     static float convertOpacity(StyleResolver&, CSSValue&);
     static String convertSVGURIReference(StyleResolver&, CSSValue&);
     static Color convertSVGColor(StyleResolver&, CSSValue&);
+    static StyleSelfAlignmentData convertSelfOrDefaultAlignmentData(StyleResolver&, CSSValue&);
+    static StyleContentAlignmentData convertContentAlignmentData(StyleResolver&, CSSValue&);
     static EGlyphOrientation convertGlyphOrientation(StyleResolver&, CSSValue&);
     static EGlyphOrientation convertGlyphOrientationOrAuto(StyleResolver&, CSSValue&);
     static Optional<Length> convertLineHeight(StyleResolver&, CSSValue&, float multiplier = 1.f);
@@ -929,9 +930,10 @@ inline GridAutoFlow StyleBuilderConverter::convertGridAutoFlow(StyleResolver&, C
 
 inline CSSToLengthConversionData StyleBuilderConverter::csstoLengthConversionDataWithTextZoomFactor(StyleResolver& styleResolver)
 {
-    if (auto* frame = styleResolver.document().frame())
-        return styleResolver.state().cssToLengthConversionData().copyWithAdjustedZoom(styleResolver.style()->effectiveZoom() * frame->textZoomFactor());
-
+    if (auto* frame = styleResolver.document().frame()) {
+        float textZoomFactor = styleResolver.style()->textZoom() != TextZoomReset ? frame->textZoomFactor() : 1.0f;
+        return styleResolver.state().cssToLengthConversionData().copyWithAdjustedZoom(styleResolver.style()->effectiveZoom() * textZoomFactor);
+    }
     return styleResolver.state().cssToLengthConversionData();
 }
 
@@ -1000,65 +1002,6 @@ inline Optional<FilterOperations> StyleBuilderConverter::convertFilterOperations
     if (styleResolver.createFilterOperations(value, operations))
         return operations;
     return Nullopt;
-}
-
-static inline WebKitCSSResourceValue* maskImageValueFromIterator(CSSValueList& maskImagesList, CSSValueList::iterator it)
-{
-    // May also be a CSSInitialValue.
-    if (it == maskImagesList.end() || !is<WebKitCSSResourceValue>(it->get()))
-        return nullptr;
-    return &downcast<WebKitCSSResourceValue>(it->get());
-}
-
-inline Vector<RefPtr<MaskImageOperation>> StyleBuilderConverter::convertMaskImageOperations(StyleResolver& styleResolver, CSSValue& value)
-{
-    Vector<RefPtr<MaskImageOperation>> operations;
-    RefPtr<WebKitCSSResourceValue> maskImageValue;
-    RefPtr<CSSValueList> maskImagesList;
-    CSSValueList::iterator listIterator;
-    if (is<WebKitCSSResourceValue>(value))
-        maskImageValue = &downcast<WebKitCSSResourceValue>(value);
-    else if (is<CSSValueList>(value)) {
-        maskImagesList = &downcast<CSSValueList>(value);
-        listIterator = maskImagesList->begin();
-        maskImageValue = maskImageValueFromIterator(*maskImagesList, listIterator);
-    }
-
-    while (maskImageValue.get()) {
-        RefPtr<CSSValue> maskInnerValue = maskImageValue->innerValue();
-
-        RefPtr<MaskImageOperation> newMaskImage;
-        if (is<CSSPrimitiveValue>(maskInnerValue.get())) {
-            RefPtr<CSSPrimitiveValue> primitiveValue = downcast<CSSPrimitiveValue>(maskInnerValue.get());
-            if (primitiveValue->isValueID() && primitiveValue->getValueID() == CSSValueNone)
-                newMaskImage = MaskImageOperation::create();
-            else {
-                String cssUrl = primitiveValue->getStringValue();
-                URL url = styleResolver.document().completeURL(cssUrl);
-
-                bool isExternalDocument = SVGURIReference::isExternalURIReference(cssUrl, styleResolver.document());
-                newMaskImage = MaskImageOperation::create(maskImageValue, cssUrl, url.fragmentIdentifier(), isExternalDocument, &styleResolver.document().cachedResourceLoader());
-                if (isExternalDocument)
-                    styleResolver.state().maskImagesWithPendingSVGDocuments().append(newMaskImage);
-            }
-        } else {
-            if (RefPtr<StyleImage> image = styleResolver.styleImage(CSSPropertyWebkitMaskImage, *maskInnerValue))
-                newMaskImage = MaskImageOperation::create(image);
-        }
-
-        // If we didn't get a valid value, use None so we keep the correct number and order of masks.
-        if (!newMaskImage)
-            newMaskImage = MaskImageOperation::create();
-
-        operations.append(newMaskImage);
-
-        if (maskImagesList)
-            maskImageValue = maskImageValueFromIterator(*maskImagesList, ++listIterator);
-        else
-            maskImageValue = nullptr;
-    }
-
-    return operations;
 }
 
 inline RefPtr<FontFeatureSettings> StyleBuilderConverter::convertFontFeatureSettings(StyleResolver&, CSSValue& value)
@@ -1168,6 +1111,36 @@ inline Color StyleBuilderConverter::convertSVGColor(StyleResolver& styleResolver
 {
     auto& svgColor = downcast<SVGColor>(value);
     return svgColor.colorType() == SVGColor::SVG_COLORTYPE_CURRENTCOLOR ? styleResolver.style()->color() : svgColor.color();
+}
+
+inline StyleSelfAlignmentData StyleBuilderConverter::convertSelfOrDefaultAlignmentData(StyleResolver&, CSSValue& value)
+{
+    StyleSelfAlignmentData alignmentData = RenderStyle::initialSelfAlignment();
+    auto& primitiveValue = downcast<CSSPrimitiveValue>(value);
+    if (Pair* pairValue = primitiveValue.getPairValue()) {
+        if (pairValue->first()->getValueID() == CSSValueLegacy) {
+            alignmentData.setPositionType(LegacyPosition);
+            alignmentData.setPosition(*pairValue->second());
+        } else {
+            alignmentData.setPosition(*pairValue->first());
+            alignmentData.setOverflow(*pairValue->second());
+        }
+    } else
+        alignmentData.setPosition(primitiveValue);
+    return alignmentData;
+}
+
+inline StyleContentAlignmentData StyleBuilderConverter::convertContentAlignmentData(StyleResolver&, CSSValue& value)
+{
+    StyleContentAlignmentData alignmentData = RenderStyle::initialContentAlignment();
+    auto& contentValue = downcast<CSSContentDistributionValue>(value);
+    if (contentValue.distribution()->getValueID() != CSSValueInvalid)
+        alignmentData.setDistribution(contentValue.distribution().get());
+    if (contentValue.position()->getValueID() != CSSValueInvalid)
+        alignmentData.setPosition(contentValue.position().get());
+    if (contentValue.overflow()->getValueID() != CSSValueInvalid)
+        alignmentData.setOverflow(contentValue.overflow().get());
+    return alignmentData;
 }
 
 inline EGlyphOrientation StyleBuilderConverter::convertGlyphOrientation(StyleResolver&, CSSValue& value)

@@ -29,7 +29,7 @@
 #include "FocusDirection.h"
 #include "FrameLoader.h"
 #include "GraphicsContext.h"
-#include "HTMLMediaElement.h"
+#include "HTMLMediaElementEnums.h"
 #include "HostWindow.h"
 #include "LayerFlushThrottleState.h"
 #include "MediaProducer.h"
@@ -44,6 +44,12 @@
 #include <runtime/ConsoleTypes.h>
 #include <wtf/Forward.h>
 #include <wtf/Vector.h>
+
+#if ENABLE(MEDIA_SESSION)
+namespace WebCore {
+struct MediaSessionMetadata;
+}
+#endif
 
 #if PLATFORM(IOS)
 #include "PlatformLayer.h"
@@ -84,6 +90,10 @@ class PopupMenuClient;
 class SecurityOrigin;
 class ViewportConstraints;
 class Widget;
+
+#if ENABLE(VIDEO) && USE(GSTREAMER)
+class MediaPlayerRequestInstallMissingPluginsCallback;
+#endif
 
 struct DateTimeChooserParameters;
 struct FrameLoadRequest;
@@ -136,11 +146,6 @@ public:
     virtual void setResizable(bool) = 0;
 
     virtual void addMessageToConsole(MessageSource, MessageLevel, const String& message, unsigned lineNumber, unsigned columnNumber, const String& sourceID) = 0;
-    // FIXME: Remove this MessageType variant once all the clients are updated.
-    virtual void addMessageToConsole(MessageSource source, MessageType, MessageLevel level, const String& message, unsigned lineNumber, unsigned columnNumber, const String& sourceID)
-    {
-        addMessageToConsole(source, level, message, lineNumber, columnNumber, sourceID);
-    }
 
     virtual bool canRunBeforeUnloadConfirmPanel() = 0;
     virtual bool runBeforeUnloadConfirmPanel(const String& message, Frame*) = 0;
@@ -151,10 +156,7 @@ public:
     virtual bool runJavaScriptConfirm(Frame*, const String&) = 0;
     virtual bool runJavaScriptPrompt(Frame*, const String& message, const String& defaultValue, String& result) = 0;
     virtual void setStatusbarText(const String&) = 0;
-    virtual bool shouldInterruptJavaScript() = 0;
     virtual KeyboardUIMode keyboardUIMode() = 0;
-
-    virtual IntRect windowResizerRect() const = 0;
 
     // Methods used by HostWindow.
     virtual bool supportsImmediateInvalidation() { return false; }
@@ -332,7 +334,7 @@ public:
 
     virtual bool supportsVideoFullscreen() { return false; }
 #if ENABLE(VIDEO)
-    virtual void enterVideoFullscreenForVideoElement(HTMLVideoElement&, HTMLMediaElement::VideoFullscreenMode) { }
+    virtual void enterVideoFullscreenForVideoElement(HTMLVideoElement&, HTMLMediaElementEnums::VideoFullscreenMode) { }
 #endif
     virtual void exitVideoFullscreenForVideoElement(WebCore::HTMLVideoElement&) { }
     virtual bool requiresFullscreenForVideoPlayback() { return false; } 
@@ -377,21 +379,15 @@ public:
     virtual bool selectItemAlignmentFollowsMenuWritingDirection() = 0;
     // Checks if there is an opened popup, called by RenderMenuList::showPopup().
     virtual bool hasOpenedPopup() const = 0;
-    virtual PassRefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const = 0;
-    virtual PassRefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const = 0;
+    virtual RefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const = 0;
+    virtual RefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const = 0;
 
     virtual void postAccessibilityNotification(AccessibilityObject*, AXObjectCache::AXNotification) { }
 
     virtual void notifyScrollerThumbIsVisibleInRect(const IntRect&) { }
     virtual void recommendedScrollbarStyleDidChange(ScrollbarStyle) { }
 
-    enum DialogType {
-        AlertDialog = 0,
-        ConfirmDialog = 1,
-        PromptDialog = 2,
-        HTMLDialog = 3
-    };
-    virtual bool shouldRunModalDialogDuringPageDismissal(const DialogType&, const String& dialogMessage, FrameLoader::PageDismissalType) const { UNUSED_PARAM(dialogMessage); return true; }
+    virtual WTF::Optional<ScrollbarOverlayStyle> preferredScrollbarOverlayStyle() { return ScrollbarOverlayStyleDefault; }
 
     virtual void wheelEventHandlersChanged(bool hasHandlers) = 0;
         
@@ -426,6 +422,11 @@ public:
 
     virtual void isPlayingMediaDidChange(MediaProducer::MediaStateFlags) { }
 
+#if ENABLE(MEDIA_SESSION)
+    virtual void hasMediaSessionWithActiveMediaElementsDidChange(bool) { }
+    virtual void mediaSessionMetadataDidChange(const WebCore::MediaSessionMetadata&) { }
+#endif
+
     virtual void setPageActivityState(PageActivityState::Flags) { }
 
 #if ENABLE(SUBTLE_CRYPTO)
@@ -450,6 +451,13 @@ public:
     virtual void removePlaybackTargetPickerClient(uint64_t /*contextId*/) { }
     virtual void showPlaybackTargetPicker(uint64_t /*contextId*/, const WebCore::IntPoint&, bool /* isVideo */) { }
     virtual void playbackTargetPickerClientStateDidChange(uint64_t /*contextId*/, MediaProducer::MediaStateFlags) { }
+#endif
+
+#if ENABLE(VIDEO)
+    virtual void mediaDocumentNaturalSizeChanged(const WebCore::IntSize&) { }
+#if USE(GSTREAMER)
+    virtual void requestInstallMissingMediaPlugins(const String& /*details*/, MediaPlayerRequestInstallMissingPluginsCallback&) { };
+#endif
 #endif
 
 protected:

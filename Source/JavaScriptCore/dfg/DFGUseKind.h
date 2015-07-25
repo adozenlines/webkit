@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -46,6 +46,7 @@ enum UseKind {
     KnownInt32Use,
     MachineIntUse,
     NumberUse,
+    RealNumberUse,
     BooleanUse,
     CellUse,
     KnownCellUse,
@@ -90,6 +91,8 @@ inline SpeculatedType typeFilterFor(UseKind useKind)
         return SpecInt32 | SpecInt52AsDouble;
     case NumberUse:
         return SpecBytecodeNumber;
+    case RealNumberUse:
+        return SpecBytecodeRealNumber;
     case DoubleRepUse:
         return SpecFullDouble;
     case DoubleRepRealUse:
@@ -158,6 +161,7 @@ inline bool isNumerical(UseKind kind)
     case Int32Use:
     case KnownInt32Use:
     case NumberUse:
+    case RealNumberUse:
     case Int52RepUse:
     case DoubleRepUse:
     case DoubleRepRealUse:
@@ -211,6 +215,17 @@ inline bool usesStructure(UseKind kind)
     default:
         return false;
     }
+}
+
+// Returns true if we've already guaranteed the type 
+inline bool alreadyChecked(UseKind kind, SpeculatedType type)
+{
+    // If the check involves the structure then we need to know more than just the type to be sure
+    // that the check is done.
+    if (usesStructure(kind))
+        return false;
+    
+    return !(type & ~typeFilterFor(kind));
 }
 
 inline UseKind useKindForResult(NodeFlags result)

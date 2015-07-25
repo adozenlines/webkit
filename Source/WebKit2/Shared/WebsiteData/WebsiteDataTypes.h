@@ -33,9 +33,15 @@ enum WebsiteDataTypes {
     WebsiteDataTypeDiskCache = 1 << 1,
     WebsiteDataTypeMemoryCache = 1 << 2,
     WebsiteDataTypeOfflineWebApplicationCache = 1 << 3,
-    WebsiteDataTypeLocalStorage = 1 << 4,
-    WebsiteDataTypeWebSQLDatabases = 1 << 5,
-    WebsiteDataTypeIndexedDBDatabases = 1 << 6,
+    WebsiteDataTypeSessionStorage = 1 << 4,
+    WebsiteDataTypeLocalStorage = 1 << 5,
+    WebsiteDataTypeWebSQLDatabases = 1 << 6,
+    WebsiteDataTypeIndexedDBDatabases = 1 << 7,
+    WebsiteDataTypeMediaKeys = 1 << 8,
+    WebsiteDataTypeHSTSCache = 1 << 9,
+#if ENABLE(NETSCAPE_PLUGIN_API)
+    WebsiteDataTypePlugInData = 1 << 10,
+#endif
 };
 
 };

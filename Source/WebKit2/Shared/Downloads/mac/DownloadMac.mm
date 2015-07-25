@@ -131,10 +131,6 @@ void Download::platformInvalidate()
     m_nsURLDownload = nullptr;
 }
 
-void Download::didDecideDestination(const String& destination, bool allowOverwrite)
-{
-}
-
 void Download::platformDidFinish()
 {
 }
@@ -265,7 +261,7 @@ static void dispatchOnMainThread(void (^block)())
             returnValue = YES;
     });
 
-    return returnValue;;
+    return returnValue;
 }
 
 - (void)download:(NSURLDownload *)download decideDestinationWithSuggestedFilename:(NSString *)filename

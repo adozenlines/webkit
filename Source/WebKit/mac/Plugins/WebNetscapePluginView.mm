@@ -1381,7 +1381,6 @@ static inline void getNPRect(const NSRect& nr, NPRect& npr)
 
 - (void)finalize
 {
-    ASSERT_MAIN_THREAD();
     ASSERT(!_isStarted);
 
     [self fini];
@@ -1804,7 +1803,7 @@ static inline void getNPRect(const NSRect& nr, NPRect& npr)
         } else {
             path = bufString;
         }
-        postData = [NSData dataWithContentsOfFile:[path _webkit_fixedCarbonPOSIXPath]];
+        postData = [NSData dataWithContentsOfFile:path];
         CFRelease(bufString);
         if (!postData) {
             return NPERR_FILE_NOT_FOUND;

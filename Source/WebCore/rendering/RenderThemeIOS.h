@@ -37,7 +37,7 @@ class GraphicsContext;
     
 class RenderThemeIOS final : public RenderTheme {
 public:
-    static PassRefPtr<RenderTheme> create();
+    static Ref<RenderTheme> create();
 
     virtual int popupInternalPaddingRight(RenderStyle&) const override;
 
@@ -102,7 +102,6 @@ protected:
     virtual Color platformTapHighlightColor() const override { return 0x4D1A1A1A; }
 #endif
 
-    virtual bool shouldShowPlaceholderWhenFocused() const override;
     virtual bool shouldHaveSpinButton(HTMLInputElement&) const override;
     virtual bool shouldHaveCapsLockIndicator(HTMLInputElement&) const override;
 
@@ -118,8 +117,12 @@ private:
     const Color& shadowColor() const;
     FloatRect addRoundedBorderClip(const RenderObject& box, GraphicsContext*, const IntRect&);
 
+    virtual Color systemColor(CSSValueID) const override;
+
     String m_mediaControlsScript;
     String m_mediaControlsStyleSheet;
+
+    mutable HashMap<int, Color> m_systemColorCache;
 };
 
 }

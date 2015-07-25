@@ -1,4 +1,4 @@
-Test to ensure that global constructors have the right attributes
+Test to ensure that global constructors (besides IndexedDB objects) have the right attributes
 
 On success, you will see a series of "PASS" messages, followed by "TEST COMPLETE".
 
@@ -803,6 +803,21 @@ PASS Object.getOwnPropertyDescriptor(global, 'Path2D').hasOwnProperty('get') is 
 PASS Object.getOwnPropertyDescriptor(global, 'Path2D').hasOwnProperty('set') is false
 PASS Object.getOwnPropertyDescriptor(global, 'Path2D').enumerable is false
 PASS Object.getOwnPropertyDescriptor(global, 'Path2D').configurable is true
+PASS Object.getOwnPropertyDescriptor(global, 'Performance').value is Performance
+PASS Object.getOwnPropertyDescriptor(global, 'Performance').hasOwnProperty('get') is false
+PASS Object.getOwnPropertyDescriptor(global, 'Performance').hasOwnProperty('set') is false
+PASS Object.getOwnPropertyDescriptor(global, 'Performance').enumerable is false
+PASS Object.getOwnPropertyDescriptor(global, 'Performance').configurable is true
+PASS Object.getOwnPropertyDescriptor(global, 'PerformanceNavigation').value is PerformanceNavigation
+PASS Object.getOwnPropertyDescriptor(global, 'PerformanceNavigation').hasOwnProperty('get') is false
+PASS Object.getOwnPropertyDescriptor(global, 'PerformanceNavigation').hasOwnProperty('set') is false
+PASS Object.getOwnPropertyDescriptor(global, 'PerformanceNavigation').enumerable is false
+PASS Object.getOwnPropertyDescriptor(global, 'PerformanceNavigation').configurable is true
+PASS Object.getOwnPropertyDescriptor(global, 'PerformanceTiming').value is PerformanceTiming
+PASS Object.getOwnPropertyDescriptor(global, 'PerformanceTiming').hasOwnProperty('get') is false
+PASS Object.getOwnPropertyDescriptor(global, 'PerformanceTiming').hasOwnProperty('set') is false
+PASS Object.getOwnPropertyDescriptor(global, 'PerformanceTiming').enumerable is false
+PASS Object.getOwnPropertyDescriptor(global, 'PerformanceTiming').configurable is true
 PASS Object.getOwnPropertyDescriptor(global, 'Plugin').value is Plugin
 PASS Object.getOwnPropertyDescriptor(global, 'Plugin').hasOwnProperty('get') is false
 PASS Object.getOwnPropertyDescriptor(global, 'Plugin').hasOwnProperty('set') is false
@@ -848,11 +863,6 @@ PASS Object.getOwnPropertyDescriptor(global, 'ReadableStream').hasOwnProperty('g
 PASS Object.getOwnPropertyDescriptor(global, 'ReadableStream').hasOwnProperty('set') is false
 PASS Object.getOwnPropertyDescriptor(global, 'ReadableStream').enumerable is false
 PASS Object.getOwnPropertyDescriptor(global, 'ReadableStream').configurable is true
-PASS Object.getOwnPropertyDescriptor(global, 'ReadableStreamReader').value is ReadableStreamReader
-PASS Object.getOwnPropertyDescriptor(global, 'ReadableStreamReader').hasOwnProperty('get') is false
-PASS Object.getOwnPropertyDescriptor(global, 'ReadableStreamReader').hasOwnProperty('set') is false
-PASS Object.getOwnPropertyDescriptor(global, 'ReadableStreamReader').enumerable is false
-PASS Object.getOwnPropertyDescriptor(global, 'ReadableStreamReader').configurable is true
 PASS Object.getOwnPropertyDescriptor(global, 'Rect').value is Rect
 PASS Object.getOwnPropertyDescriptor(global, 'Rect').hasOwnProperty('get') is false
 PASS Object.getOwnPropertyDescriptor(global, 'Rect').hasOwnProperty('set') is false
@@ -1573,6 +1583,16 @@ PASS Object.getOwnPropertyDescriptor(global, 'Screen').hasOwnProperty('get') is 
 PASS Object.getOwnPropertyDescriptor(global, 'Screen').hasOwnProperty('set') is false
 PASS Object.getOwnPropertyDescriptor(global, 'Screen').enumerable is false
 PASS Object.getOwnPropertyDescriptor(global, 'Screen').configurable is true
+PASS Object.getOwnPropertyDescriptor(global, 'SecurityPolicy').value is SecurityPolicy
+PASS Object.getOwnPropertyDescriptor(global, 'SecurityPolicy').hasOwnProperty('get') is false
+PASS Object.getOwnPropertyDescriptor(global, 'SecurityPolicy').hasOwnProperty('set') is false
+PASS Object.getOwnPropertyDescriptor(global, 'SecurityPolicy').enumerable is false
+PASS Object.getOwnPropertyDescriptor(global, 'SecurityPolicy').configurable is true
+PASS Object.getOwnPropertyDescriptor(global, 'SecurityPolicyViolationEvent').value is SecurityPolicyViolationEvent
+PASS Object.getOwnPropertyDescriptor(global, 'SecurityPolicyViolationEvent').hasOwnProperty('get') is false
+PASS Object.getOwnPropertyDescriptor(global, 'SecurityPolicyViolationEvent').hasOwnProperty('set') is false
+PASS Object.getOwnPropertyDescriptor(global, 'SecurityPolicyViolationEvent').enumerable is false
+PASS Object.getOwnPropertyDescriptor(global, 'SecurityPolicyViolationEvent').configurable is true
 PASS Object.getOwnPropertyDescriptor(global, 'Selection').value is Selection
 PASS Object.getOwnPropertyDescriptor(global, 'Selection').hasOwnProperty('get') is false
 PASS Object.getOwnPropertyDescriptor(global, 'Selection').hasOwnProperty('set') is false

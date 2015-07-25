@@ -24,11 +24,11 @@
 #define CallFrame_h
 
 #include "AbstractPC.h"
-#include "VM.h"
 #include "JSStack.h"
 #include "MacroAssemblerCodeRef.h"
 #include "Register.h"
 #include "StackVisitor.h"
+#include "VM.h"
 #include "VMEntryRecord.h"
 
 namespace JSC  {
@@ -43,7 +43,7 @@ namespace JSC  {
     class ExecState : private Register {
     public:
         JSValue calleeAsValue() const { return this[JSStack::Callee].jsValue(); }
-        JSObject* callee() const { return this[JSStack::Callee].function(); }
+        JSObject* callee() const { return this[JSStack::Callee].object(); }
         CodeBlock* codeBlock() const { return this[JSStack::CodeBlock].Register::codeBlock(); }
         JSScope* scope(int scopeRegisterOffset) const
         {
@@ -75,13 +75,12 @@ namespace JSC  {
         // But they're used in many places in legacy code, so they're not going away any time soon.
 
         void clearException() { vm().clearException(); }
-        void clearSupplementaryExceptionInfo()
-        {
-            vm().clearExceptionStack();
-        }
 
-        JSValue exception() const { return vm().exception(); }
-        bool hadException() const { return !vm().exception().isEmpty(); }
+        Exception* exception() const { return vm().exception(); }
+        bool hadException() const { return !!vm().exception(); }
+
+        Exception* lastException() const { return vm().lastException(); }
+        void clearLastException() { vm().clearLastException(); }
 
         AtomicStringTable* atomicStringTable() const { return vm().atomicStringTable(); }
         const CommonIdentifiers& propertyNames() const { return *vm().propertyNames; }
@@ -252,6 +251,10 @@ namespace JSC  {
         JSValue thisValue() { return this[thisArgumentOffset()].jsValue(); }
         void setThisValue(JSValue value) { this[thisArgumentOffset()] = value; }
 
+        // Under the constructor implemented in C++, thisValue holds the newTarget instead of the automatically constructed value.
+        // The result of this function is only effective under the "construct" context.
+        JSValue newTarget() { return thisValue(); }
+
         JSValue argumentAfterCapture(size_t argument);
 
         static int offsetFor(size_t argumentCountIncludingThis) { return argumentCountIncludingThis + JSStack::ThisArgument - 1; }
@@ -259,7 +262,7 @@ namespace JSC  {
         static CallFrame* noCaller() { return 0; }
 
         void setArgumentCountIncludingThis(int count) { static_cast<Register*>(this)[JSStack::ArgumentCount].payload() = count; }
-        void setCallee(JSObject* callee) { static_cast<Register*>(this)[JSStack::Callee] = Register::withCallee(callee); }
+        void setCallee(JSObject* callee) { static_cast<Register*>(this)[JSStack::Callee] = callee; }
         void setCodeBlock(CodeBlock* codeBlock) { static_cast<Register*>(this)[JSStack::CodeBlock] = codeBlock; }
         void setReturnPC(void* value) { callerFrameAndPC().pc = reinterpret_cast<Instruction*>(value); }
 

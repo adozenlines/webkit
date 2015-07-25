@@ -71,7 +71,7 @@ typedef unsigned DebugOverlayRegions;
 class Settings : public RefCounted<Settings> {
     WTF_MAKE_NONCOPYABLE(Settings); WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassRefPtr<Settings> create(Page*);
+    static Ref<Settings> create(Page*);
     ~Settings();
 
     void pageDestroyed() { m_page = nullptr; }
@@ -270,6 +270,9 @@ public:
     const String& mediaKeysStorageDirectory() const { return m_mediaKeysStorageDirectory; }
 #endif
 
+    WEBCORE_EXPORT void setForcePendingWebGLPolicy(bool);
+    bool isForcePendingWebGLPolicy() const { return m_forcePendingWebGLPolicy; }
+
 private:
     explicit Settings(Page*);
 
@@ -322,6 +325,8 @@ private:
 #endif
     bool m_hiddenPageCSSAnimationSuspensionEnabled : 1;
     bool m_fontFallbackPrefersPictographs : 1;
+
+    bool m_forcePendingWebGLPolicy : 1;
 
 #if USE(AVFOUNDATION)
     WEBCORE_EXPORT static bool gAVFoundationEnabled;

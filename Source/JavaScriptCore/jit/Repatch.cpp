@@ -49,6 +49,7 @@
 #include "StructureRareDataInlines.h"
 #include "StructureStubClearingWatchpoint.h"
 #include "ThunkGenerators.h"
+#include <wtf/CommaPrinter.h>
 #include <wtf/ListDump.h>
 #include <wtf/StringPrintStream.h>
 
@@ -447,9 +448,7 @@ static bool generateByIdStub(
             // shrink it after.
             
             callLinkInfo = std::make_unique<CallLinkInfo>();
-            callLinkInfo->callType = CallLinkInfo::Call;
-            callLinkInfo->codeOrigin = stubInfo.codeOrigin;
-            callLinkInfo->calleeGPR = loadedValueGPR;
+            callLinkInfo->setUpCall(CallLinkInfo::Call, stubInfo.codeOrigin, loadedValueGPR);
             
             MacroAssembler::JumpList done;
             
@@ -583,9 +582,9 @@ static bool generateByIdStub(
         patchBuffer.link(operationCall, custom);
         patchBuffer.link(handlerCall, lookupExceptionHandler);
     } else if (kind == CallGetter || kind == CallSetter) {
-        callLinkInfo->hotPathOther = patchBuffer.locationOfNearCall(fastPathCall);
-        callLinkInfo->hotPathBegin = patchBuffer.locationOf(addressOfLinkFunctionCheck);
-        callLinkInfo->callReturnLocation = patchBuffer.locationOfNearCall(slowPathCall);
+        callLinkInfo->setCallLocations(patchBuffer.locationOfNearCall(slowPathCall),
+            patchBuffer.locationOf(addressOfLinkFunctionCheck),
+            patchBuffer.locationOfNearCall(fastPathCall));
 
         ThunkGenerator generator = linkThunkGeneratorFor(
             CodeForCall, RegisterPreservationNotRequired);
@@ -1168,16 +1167,15 @@ static Structure* emitPutTransitionStubAndGetOldStructure(ExecState* exec, VM* v
     MacroAssembler::Call callFlushWriteBarrierBuffer;
     MacroAssembler::Jump ownerIsRememberedOrInEden = stubJit.jumpIfIsRememberedOrInEden(baseGPR);
     {
-        WriteBarrierBuffer* writeBarrierBuffer = &stubJit.vm()->heap.writeBarrierBuffer();
-        stubJit.move(MacroAssembler::TrustedImmPtr(writeBarrierBuffer), scratchGPR1);
-        stubJit.load32(MacroAssembler::Address(scratchGPR1, WriteBarrierBuffer::currentIndexOffset()), scratchGPR2);
+        WriteBarrierBuffer& writeBarrierBuffer = stubJit.vm()->heap.writeBarrierBuffer();
+        stubJit.load32(writeBarrierBuffer.currentIndexAddress(), scratchGPR2);
         MacroAssembler::Jump needToFlush =
-            stubJit.branch32(MacroAssembler::AboveOrEqual, scratchGPR2, MacroAssembler::Address(scratchGPR1, WriteBarrierBuffer::capacityOffset()));
+            stubJit.branch32(MacroAssembler::AboveOrEqual, scratchGPR2, MacroAssembler::TrustedImm32(writeBarrierBuffer.capacity()));
 
         stubJit.add32(MacroAssembler::TrustedImm32(1), scratchGPR2);
-        stubJit.store32(scratchGPR2, MacroAssembler::Address(scratchGPR1, WriteBarrierBuffer::currentIndexOffset()));
+        stubJit.store32(scratchGPR2, writeBarrierBuffer.currentIndexAddress());
 
-        stubJit.loadPtr(MacroAssembler::Address(scratchGPR1, WriteBarrierBuffer::bufferOffset()), scratchGPR1);
+        stubJit.move(MacroAssembler::TrustedImmPtr(writeBarrierBuffer.buffer()), scratchGPR1);
         // We use an offset of -sizeof(void*) because we already added 1 to scratchGPR2.
         stubJit.storePtr(baseGPR, MacroAssembler::BaseIndex(scratchGPR1, scratchGPR2, MacroAssembler::ScalePtr, static_cast<int32_t>(-sizeof(void*))));
 
@@ -1606,7 +1604,7 @@ static void linkSlowFor(
     RepatchBuffer& repatchBuffer, VM* vm, CallLinkInfo& callLinkInfo, ThunkGenerator generator)
 {
     repatchBuffer.relink(
-        callLinkInfo.callReturnLocation, vm->getCTIStub(generator).code());
+        callLinkInfo.callReturnLocation(), vm->getCTIStub(generator).code());
 }
 
 static void linkSlowFor(
@@ -1621,7 +1619,7 @@ void linkFor(
     JSFunction* callee, MacroAssemblerCodePtr codePtr, CodeSpecializationKind kind,
     RegisterPreservationMode registers)
 {
-    ASSERT(!callLinkInfo.stub);
+    ASSERT(!callLinkInfo.stub());
     
     CodeBlock* callerCodeBlock = exec->callerFrame()->codeBlock();
 
@@ -1630,11 +1628,11 @@ void linkFor(
     RepatchBuffer repatchBuffer(callerCodeBlock);
     
     ASSERT(!callLinkInfo.isLinked());
-    callLinkInfo.callee.set(exec->callerFrame()->vm(), callLinkInfo.hotPathBegin, callerCodeBlock->ownerExecutable(), callee);
-    callLinkInfo.lastSeenCallee.set(exec->callerFrame()->vm(), callerCodeBlock->ownerExecutable(), callee);
+    callLinkInfo.setCallee(exec->callerFrame()->vm(), callLinkInfo.hotPathBegin(), callerCodeBlock->ownerExecutable(), callee);
+    callLinkInfo.setLastSeenCallee(exec->callerFrame()->vm(), callerCodeBlock->ownerExecutable(), callee);
     if (shouldShowDisassemblyFor(callerCodeBlock))
-        dataLog("Linking call in ", *callerCodeBlock, " at ", callLinkInfo.codeOrigin, " to ", pointerDump(calleeCodeBlock), ", entrypoint at ", codePtr, "\n");
-    repatchBuffer.relink(callLinkInfo.hotPathOther, codePtr);
+        dataLog("Linking call in ", *callerCodeBlock, " at ", callLinkInfo.codeOrigin(), " to ", pointerDump(calleeCodeBlock), ", entrypoint at ", codePtr, "\n");
+    repatchBuffer.relink(callLinkInfo.hotPathOther(), codePtr);
     
     if (calleeCodeBlock)
         calleeCodeBlock->linkIncomingCall(exec->callerFrame(), &callLinkInfo);
@@ -1665,12 +1663,12 @@ static void revertCall(
     RepatchBuffer& repatchBuffer, VM* vm, CallLinkInfo& callLinkInfo, ThunkGenerator generator)
 {
     repatchBuffer.revertJumpReplacementToBranchPtrWithPatch(
-        RepatchBuffer::startOfBranchPtrWithPatchOnRegister(callLinkInfo.hotPathBegin),
-        static_cast<MacroAssembler::RegisterID>(callLinkInfo.calleeGPR), 0);
+        RepatchBuffer::startOfBranchPtrWithPatchOnRegister(callLinkInfo.hotPathBegin()),
+        static_cast<MacroAssembler::RegisterID>(callLinkInfo.calleeGPR()), 0);
     linkSlowFor(repatchBuffer, vm, callLinkInfo, generator);
-    callLinkInfo.hasSeenShouldRepatch = false;
-    callLinkInfo.callee.clear();
-    callLinkInfo.stub.clear();
+    callLinkInfo.clearSeen();
+    callLinkInfo.clearCallee();
+    callLinkInfo.clearStub();
     if (callLinkInfo.isOnList())
         callLinkInfo.remove();
 }
@@ -1680,7 +1678,7 @@ void unlinkFor(
     CodeSpecializationKind kind, RegisterPreservationMode registers)
 {
     if (Options::showDisassembly())
-        dataLog("Unlinking call from ", callLinkInfo.callReturnLocation, " in request from ", pointerDump(repatchBuffer.codeBlock()), "\n");
+        dataLog("Unlinking call from ", callLinkInfo.callReturnLocation(), " in request from ", pointerDump(repatchBuffer.codeBlock()), "\n");
     
     revertCall(
         repatchBuffer, repatchBuffer.codeBlock()->vm(), callLinkInfo,
@@ -1726,9 +1724,9 @@ void linkPolymorphicCall(
     VM* vm = callerCodeBlock->vm();
     
     CallVariantList list;
-    if (PolymorphicCallStubRoutine* stub = callLinkInfo.stub.get())
+    if (PolymorphicCallStubRoutine* stub = callLinkInfo.stub())
         list = stub->variants();
-    else if (JSFunction* oldCallee = callLinkInfo.callee.get())
+    else if (JSFunction* oldCallee = callLinkInfo.callee())
         list = CallVariantList{ CallVariant(oldCallee) };
     
     list = variantListWithVariant(list, newVariant);
@@ -1745,6 +1743,9 @@ void linkPolymorphicCall(
         }
     }
     
+    if (isClosureCall)
+        callLinkInfo.setHasSeenClosure();
+    
     Vector<PolymorphicCallCase> callCases;
     
     // Figure out what our cases are.
@@ -1757,7 +1758,7 @@ void linkPolymorphicCall(
             
             // If we cannot handle a callee, assume that it's better for this whole thing to be a
             // virtual call.
-            if (exec->argumentCountIncludingThis() < static_cast<size_t>(codeBlock->numParameters()) || callLinkInfo.callType == CallLinkInfo::CallVarargs || callLinkInfo.callType == CallLinkInfo::ConstructVarargs) {
+            if (exec->argumentCountIncludingThis() < static_cast<size_t>(codeBlock->numParameters()) || callLinkInfo.callType() == CallLinkInfo::CallVarargs || callLinkInfo.callType() == CallLinkInfo::ConstructVarargs) {
                 linkVirtualFor(exec, callLinkInfo, CodeForCall, registers);
                 return;
             }
@@ -1777,7 +1778,7 @@ void linkPolymorphicCall(
         return;
     }
     
-    GPRReg calleeGPR = static_cast<GPRReg>(callLinkInfo.calleeGPR);
+    GPRReg calleeGPR = static_cast<GPRReg>(callLinkInfo.calleeGPR());
     
     CCallHelpers stubJit(vm, callerCodeBlock);
     
@@ -1828,15 +1829,35 @@ void linkPolymorphicCall(
     if (callerCodeBlock->jitType() != JITCode::topTierJIT())
         fastCounts = std::make_unique<uint32_t[]>(callCases.size());
     
-    for (size_t i = callCases.size(); i--;) {
+    for (size_t i = 0; i < callCases.size(); ++i) {
         if (fastCounts)
             fastCounts[i] = 0;
         
         CallVariant variant = callCases[i].variant();
+        int64_t newCaseValue;
         if (isClosureCall)
-            caseValues[i] = bitwise_cast<intptr_t>(variant.executable());
+            newCaseValue = bitwise_cast<intptr_t>(variant.executable());
         else
-            caseValues[i] = bitwise_cast<intptr_t>(variant.function());
+            newCaseValue = bitwise_cast<intptr_t>(variant.function());
+        
+        if (!ASSERT_DISABLED) {
+            for (size_t j = 0; j < i; ++j) {
+                if (caseValues[j] != newCaseValue)
+                    continue;
+
+                dataLog("ERROR: Attempt to add duplicate case value.\n");
+                dataLog("Existing case values: ");
+                CommaPrinter comma;
+                for (size_t k = 0; k < i; ++k)
+                    dataLog(comma, caseValues[k]);
+                dataLog("\n");
+                dataLog("Attempting to add: ", newCaseValue, "\n");
+                dataLog("Variant list: ", listDump(callCases), "\n");
+                RELEASE_ASSERT_NOT_REACHED();
+            }
+        }
+        
+        caseValues[i] = newCaseValue;
     }
     
     GPRReg fastCountsBaseGPR =
@@ -1872,7 +1893,7 @@ void linkPolymorphicCall(
     stubJit.move(CCallHelpers::TrustedImm32(JSValue::CellTag), GPRInfo::regT1);
 #endif
     stubJit.move(CCallHelpers::TrustedImmPtr(&callLinkInfo), GPRInfo::regT2);
-    stubJit.move(CCallHelpers::TrustedImmPtr(callLinkInfo.callReturnLocation.executableAddress()), GPRInfo::regT4);
+    stubJit.move(CCallHelpers::TrustedImmPtr(callLinkInfo.callReturnLocation().executableAddress()), GPRInfo::regT4);
     
     stubJit.restoreReturnAddressBeforeReturn(GPRInfo::regT4);
     AssemblyHelpers::Jump slow = stubJit.jump();
@@ -1889,16 +1910,16 @@ void linkPolymorphicCall(
             callToCodePtr.call, FunctionPtr(callToCodePtr.codePtr.executableAddress()));
     }
     if (JITCode::isOptimizingJIT(callerCodeBlock->jitType()))
-        patchBuffer.link(done, callLinkInfo.callReturnLocation.labelAtOffset(0));
+        patchBuffer.link(done, callLinkInfo.callReturnLocation().labelAtOffset(0));
     else
-        patchBuffer.link(done, callLinkInfo.hotPathOther.labelAtOffset(0));
+        patchBuffer.link(done, callLinkInfo.hotPathOther().labelAtOffset(0));
     patchBuffer.link(slow, CodeLocationLabel(vm->getCTIStub(linkPolymorphicCallThunkGeneratorFor(registers)).code()));
     
     RefPtr<PolymorphicCallStubRoutine> stubRoutine = adoptRef(new PolymorphicCallStubRoutine(
         FINALIZE_CODE_FOR(
             callerCodeBlock, patchBuffer,
             ("Polymorphic call stub for %s, return point %p, targets %s",
-                toCString(*callerCodeBlock).data(), callLinkInfo.callReturnLocation.labelAtOffset(0).executableAddress(),
+                toCString(*callerCodeBlock).data(), callLinkInfo.callReturnLocation().labelAtOffset(0).executableAddress(),
                 toCString(listDump(callCases)).data())),
         *vm, callerCodeBlock->ownerExecutable(), exec->callerFrame(), callLinkInfo, callCases,
         WTF::move(fastCounts)));
@@ -1906,14 +1927,14 @@ void linkPolymorphicCall(
     RepatchBuffer repatchBuffer(callerCodeBlock);
     
     repatchBuffer.replaceWithJump(
-        RepatchBuffer::startOfBranchPtrWithPatchOnRegister(callLinkInfo.hotPathBegin),
+        RepatchBuffer::startOfBranchPtrWithPatchOnRegister(callLinkInfo.hotPathBegin()),
         CodeLocationLabel(stubRoutine->code().code()));
     // This is weird. The original slow path should no longer be reachable.
     linkSlowFor(repatchBuffer, vm, callLinkInfo, CodeForCall, registers);
     
     // If there had been a previous stub routine, that one will die as soon as the GC runs and sees
     // that it's no longer on stack.
-    callLinkInfo.stub = stubRoutine.release();
+    callLinkInfo.setStub(stubRoutine.release());
     
     // The call link info no longer has a call cache apart from the jump to the polymorphic call
     // stub.

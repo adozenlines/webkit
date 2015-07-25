@@ -142,7 +142,7 @@ void HTMLImageElement::parseAttribute(const QualifiedName& name, const AtomicStr
         if (is<RenderImage>(renderer()))
             downcast<RenderImage>(*renderer()).updateAltText();
     } else if (name == srcAttr || name == srcsetAttr) {
-        unsigned sourceSize = parseSizesAttribute(fastGetAttribute(sizesAttr).string(), document().renderView(), document().frame());
+        float sourceSize = parseSizesAttribute(fastGetAttribute(sizesAttr).string(), document().renderView(), document().frame());
         ImageCandidate candidate = bestFitSourceForImageAttributes(document().deviceScaleFactor(), fastGetAttribute(srcAttr), fastGetAttribute(srcsetAttr), sourceSize);
         setBestFitURLAndDPRFromImageCandidate(candidate);
         m_imageLoader.updateFromElementIgnoringPreviousError();
@@ -174,7 +174,7 @@ void HTMLImageElement::parseAttribute(const QualifiedName& name, const AtomicStr
     } else {
         if (name == nameAttr) {
             bool willHaveName = !value.isNull();
-            if (hasName() != willHaveName && inDocument() && is<HTMLDocument>(document())) {
+            if (m_hadNameBeforeAttributeChanged != willHaveName && inDocument() && is<HTMLDocument>(document())) {
                 HTMLDocument& document = downcast<HTMLDocument>(this->document());
                 const AtomicString& id = getIdAttribute();
                 if (!id.isEmpty() && id != getNameAttribute()) {
@@ -184,6 +184,7 @@ void HTMLImageElement::parseAttribute(const QualifiedName& name, const AtomicStr
                         document.removeDocumentNamedItem(*id.impl(), *this);
                 }
             }
+            m_hadNameBeforeAttributeChanged = willHaveName;
         }
         HTMLElement::parseAttribute(name, value);
     }

@@ -698,12 +698,34 @@ InjectedScript.prototype = {
             }
         }
 
-        // Iterate prototype chain.
+        function arrayIndexPropertyNames(o, length)
+        {
+            var array = new Array(length);
+            for (var i = 0; i < length; ++i) {
+                if (i in o)
+                    array.push("" + i);
+            }
+            return array;
+        }
+
+        // FIXME: <https://webkit.org/b/143589> Web Inspector: Better handling for large collections in Object Trees
+        // For array types with a large length we attempt to skip getOwnPropertyNames and instead just sublist of indexes.
+        var isArrayTypeWithLargeLength = false;
+        try {
+            isArrayTypeWithLargeLength = injectedScript._subtype(object) === "array" && isFinite(object.length) && object.length > 100;
+        } catch(e) {}
+
         for (var o = object; this._isDefined(o); o = o.__proto__) {
             var isOwnProperty = o === object;
-            processProperties(o, Object.getOwnPropertyNames(o), isOwnProperty);
-            if (Object.getOwnPropertySymbols)
-                processProperties(o, Object.getOwnPropertySymbols(o), isOwnProperty);
+
+            if (isArrayTypeWithLargeLength && isOwnProperty)
+                processProperties(o, arrayIndexPropertyNames(o, 100), isOwnProperty);
+            else {
+                processProperties(o, Object.getOwnPropertyNames(o), isOwnProperty);
+                if (Object.getOwnPropertySymbols)
+                    processProperties(o, Object.getOwnPropertySymbols(o), isOwnProperty);
+            }
+
             if (collectionMode === InjectedScript.CollectionMode.OwnProperties)
                 break;
         }
@@ -747,12 +769,65 @@ InjectedScript.prototype = {
         try {
             if (typeof obj.splice === "function" && isFinite(obj.length))
                 return "array";
-            if (Object.prototype.toString.call(obj) === "[object Arguments]" && isFinite(obj.length)) // arguments.
-                return "array";
         } catch (e) {
         }
 
         return null;
+    },
+
+    _nodeDescription: function(node)
+    {
+        var isXMLDocument = node.ownerDocument && !!node.ownerDocument.xmlVersion;
+        var description = isXMLDocument ? node.nodeName : node.nodeName.toLowerCase();
+
+        switch (node.nodeType) {
+        case 1: // Node.ELEMENT_NODE
+            if (node.id)
+                description += "#" + node.id;
+            if (node.hasAttribute("class")) {
+                // Using .getAttribute() is a workaround for SVG*Element.className returning SVGAnimatedString,
+                // which doesn't have any useful String methods. See <https://webkit.org/b/145363/>.
+                description += "." + node.getAttribute("class").trim().replace(/\s+/g, ".");
+            }
+            return description;
+
+        default:
+            return description;
+        }
+    },
+
+    _classPreview: function(classConstructorValue)
+    {
+        return "class " + classConstructorValue.name;
+    },
+
+    _nodePreview: function(node)
+    {
+        var isXMLDocument = node.ownerDocument && !!node.ownerDocument.xmlVersion;
+        var nodeName = isXMLDocument ? node.nodeName : node.nodeName.toLowerCase();
+
+        switch (node.nodeType) {
+        case 1: // Node.ELEMENT_NODE
+            if (node.id)
+                return "<" + nodeName + " id=\"" + node.id + "\">";
+            if (node.className)
+                return "<" + nodeName + " class=\"" + node.className + "\">";
+            if (nodeName === "input" && node.type)
+                return "<" + nodeName + " type=\"" + node.type + "\">";
+            return "<" + nodeName + ">";
+
+        case 3: // Node.TEXT_NODE
+            return nodeName + " \"" + node.nodeValue + "\"";
+
+        case 8: // Node.COMMENT_NODE
+            return "<!--" + node.nodeValue + "-->";
+
+        case 10: // Node.DOCUMENT_TYPE_NODE
+            return "<!DOCTYPE " + nodeName + ">";
+
+        default:
+            return nodeName;
+        }
     },
 
     _describe: function(obj)
@@ -774,27 +849,12 @@ InjectedScript.prototype = {
         if (subtype === "error")
             return toString(obj);
 
-        if (subtype === "node") {
-            var description = obj.nodeName.toLowerCase();
-            switch (obj.nodeType) {
-            case 1 /* Node.ELEMENT_NODE */:
-                description += obj.id ? "#" + obj.id : "";
-                var className = obj.className;
-                description += (className && typeof className === "string") ? "." + className.trim().replace(/\s+/g, ".") : "";
-                break;
-            case 10 /*Node.DOCUMENT_TYPE_NODE */:
-                description = "<!DOCTYPE " + description + ">";
-                break;
-            }
-            return description;
-        }
+        if (subtype === "node")
+            return this._nodeDescription(obj);
 
         var className = InjectedScriptHost.internalConstructorName(obj);
         if (subtype === "array")
             return className;
-
-        if (subtype === "class")
-            return obj.name;
 
         // NodeList in JSC is a function, check for array prior to this.
         if (typeof obj === "function")
@@ -948,8 +1008,10 @@ InjectedScript.RemoteObject = function(object, objectGroupName, forceValueType, 
         this.size = InjectedScriptHost.weakMapSize(object);
     else if (subtype === "weakset")
         this.size = InjectedScriptHost.weakSetSize(object);
-    else if (subtype === "class")
+    else if (subtype === "class") {
         this.classPrototype = injectedScript._wrapObject(object.prototype, objectGroupName);
+        this.className = object.name;
+    }
 
     if (generatePreview && this.type === "object")
         this.preview = this._generatePreview(object, undefined, columnNames);
@@ -1002,7 +1064,7 @@ InjectedScript.RemoteObject.prototype = {
 
         var propertiesThreshold = {
             properties: isTableRowsRequest ? 1000 : Math.max(5, firstLevelKeysCount),
-            indexes: isTableRowsRequest ? 1000 : Math.max(100, firstLevelKeysCount)
+            indexes: isTableRowsRequest ? 1000 : Math.max(10, firstLevelKeysCount)
         };
 
         try {
@@ -1053,16 +1115,17 @@ InjectedScript.RemoteObject.prototype = {
             if (name === "__proto__")
                 continue;
 
-            // Do not show "length" on array like objects in preview.
-            if (this.subtype === "array" && name === "length")
+            // For arrays, only allow indexes.
+            if (this.subtype === "array" && !isUInt32(name))
                 continue;
 
             // Do not show non-enumerable non-own properties. Special case to allow array indexes that may be on the prototype.
-            if (!descriptor.enumerable && !descriptor.isOwn && !(this.subtype === "array" && isUInt32(name)))
+            if (!descriptor.enumerable && !descriptor.isOwn && this.subtype !== "array")
                 continue;
 
             // If we have a filter, only show properties in the filter.
-            if (firstLevelKeys && firstLevelKeys.indexOf(name) === -1)
+            // FIXME: Currently these filters do nothing on the backend.
+            if (firstLevelKeys && !firstLevelKeys.includes(name))
                 continue;
 
             // Getter/setter.
@@ -1117,14 +1180,8 @@ InjectedScript.RemoteObject.prototype = {
                 property.subtype = subtype;
 
             // Second level.
-            if (secondLevelKeys === null || secondLevelKeys) {
-                var subPreview = this._generatePreview(value, secondLevelKeys || undefined, undefined);
-                property.valuePreview = subPreview;
-                if (!subPreview.lossless)
-                    preview.lossless = false;
-                if (subPreview.overflow)
-                    preview.overflow = true;
-            } else if (this._isPreviewableObject(value)) {
+            if ((secondLevelKeys === null || secondLevelKeys) || this._isPreviewableObject(value)) {
+                // FIXME: If we want secondLevelKeys filter to continue we would need some refactoring.
                 var subPreview = this._createObjectPreviewForValue(value);
                 property.valuePreview = subPreview;
                 if (!subPreview.lossless)
@@ -1133,8 +1190,16 @@ InjectedScript.RemoteObject.prototype = {
                     preview.overflow = true;
             } else {
                 var description = "";
-                if (type !== "function" || subtype === "class")
-                    description = this._abbreviateString(injectedScript._describe(value), maxLength, subtype === "regexp");
+                if (type !== "function" || subtype === "class") {
+                    var fullDescription;
+                    if (subtype === "class")
+                        fullDescription = "class " + value.name;
+                    else if (subtype === "node")
+                        fullDescription = injectedScript._nodePreview(value);
+                    else
+                        fullDescription = injectedScript._describe(value);
+                    description = this._abbreviateString(fullDescription, maxLength, subtype === "regexp");
+                }
                 property.value = description;
                 preview.lossless = false;
             }

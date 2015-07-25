@@ -35,7 +35,7 @@
 #define DUMP_PROPERTYMAP_STATS 0
 #define DUMP_PROPERTYMAP_COLLISIONS 0
 
-#define PROPERTY_MAP_DELETED_ENTRY_KEY ((AtomicStringImpl*)1)
+#define PROPERTY_MAP_DELETED_ENTRY_KEY ((UniquedStringImpl*)1)
 
 namespace JSC {
 
@@ -133,7 +133,7 @@ public:
         return Structure::create(vm, globalObject, prototype, TypeInfo(CellType, StructureFlags), info());
     }
 
-    typedef AtomicStringImpl* KeyType;
+    typedef UniquedStringImpl* KeyType;
     typedef PropertyMapEntry ValueType;
 
     // The in order iterator provides overloaded * and -> to access the Value at the current position.
@@ -271,7 +271,7 @@ inline PropertyTable::find_iterator PropertyTable::find(const KeyType& key)
 {
     ASSERT(key);
     ASSERT(key->isAtomic() || key->isSymbol());
-    unsigned hash = key->existingHash();
+    unsigned hash = IdentifierRepHash::hash(key);
     unsigned step = 0;
 
 #if DUMP_PROPERTYMAP_STATS
@@ -286,7 +286,7 @@ inline PropertyTable::find_iterator PropertyTable::find(const KeyType& key)
             return std::make_pair(&table()[entryIndex - 1], hash & m_indexMask);
 
         if (!step)
-            step = WTF::doubleHash(key->existingHash()) | 1;
+            step = WTF::doubleHash(IdentifierRepHash::hash(key)) | 1;
 
 #if DUMP_PROPERTYMAP_STATS
         ++propertyMapHashTableStats->numCollisions;
@@ -294,7 +294,7 @@ inline PropertyTable::find_iterator PropertyTable::find(const KeyType& key)
 
 #if DUMP_PROPERTYMAP_COLLISIONS
         dataLog("PropertyTable collision for ", key, " (", hash, ") with step ", step, "\n");
-        dataLog("Collided with ", table()[entryIndex - 1].key, "(", table()[entryIndex - 1].key->existingHash(), ")\n");
+        dataLog("Collided with ", table()[entryIndex - 1].key, "(", IdentifierRepHash::hash(table()[entryIndex - 1].key), ")\n");
 #endif
 
         hash += step;
@@ -309,7 +309,7 @@ inline PropertyTable::ValueType* PropertyTable::get(const KeyType& key)
     if (!m_keyCount)
         return nullptr;
 
-    unsigned hash = key->existingHash();
+    unsigned hash = IdentifierRepHash::hash(key);
     unsigned step = 0;
 
 #if DUMP_PROPERTYMAP_STATS
@@ -328,7 +328,7 @@ inline PropertyTable::ValueType* PropertyTable::get(const KeyType& key)
 #endif
 
         if (!step)
-            step = WTF::doubleHash(key->existingHash()) | 1;
+            step = WTF::doubleHash(IdentifierRepHash::hash(key)) | 1;
         hash += step;
     }
 }

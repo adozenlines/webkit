@@ -44,6 +44,7 @@ namespace WebCore {
 class AudioContext;
 class ClientRect;
 class ClientRectList;
+class DOMPath;
 class DOMStringList;
 class DOMWindow;
 class Document;
@@ -55,6 +56,7 @@ class InspectorFrontendChannelDummy;
 class InspectorFrontendClientDummy;
 class InternalSettings;
 class MallocStatistics;
+class MediaSession;
 class MemoryInfo;
 class Node;
 class Page;
@@ -91,6 +93,8 @@ public:
     bool isPreloaded(const String& url);
     bool isLoadingFromMemoryCache(const String& url);
     String xhrResponseSource(XMLHttpRequest*);
+    bool isSharingStyleSheetContents(Element* linkA, Element* linkB);
+    bool isStyleSheetLoadingSubresources(Element* link);
     void setOverrideCachePolicy(const String&);
     void setOverrideResourceLoadPriority(const String&);
 
@@ -104,6 +108,7 @@ public:
     PassRefPtr<CSSComputedStyleDeclaration> computedStyleIncludingVisitedInfo(Node*, ExceptionCode&) const;
 
     Node* ensureShadowRoot(Element* host, ExceptionCode&);
+    Node* ensureUserAgentShadowRoot(Element* host, ExceptionCode&);
     Node* createShadowRoot(Element* host, ExceptionCode&);
     Node* shadowRoot(Element* host, ExceptionCode&);
     String shadowRootType(const Node*, ExceptionCode&) const;
@@ -113,6 +118,8 @@ public:
 
     // DOMTimers throttling testing.
     bool isTimerThrottled(int timeoutId, ExceptionCode&);
+    bool isRequestAnimationFrameThrottled() const;
+    bool areTimersThrottled() const;
 
     // Spatial Navigation testing.
     unsigned lastSpatialNavigationCandidateCount(ExceptionCode&) const;
@@ -157,6 +164,8 @@ public:
     void invalidateFontCache();
 
     void setScrollViewPosition(long x, long y, ExceptionCode&);
+    void setViewBaseBackgroundColor(const String& colorValue, ExceptionCode&);
+
     void setPagination(const String& mode, int gap, ExceptionCode& ec) { setPagination(mode, gap, 0, ec); }
     void setPagination(const String& mode, int gap, int pageLength, ExceptionCode&);
     String configurationForViewport(float devicePixelRatio, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight, ExceptionCode&);
@@ -184,6 +193,9 @@ public:
 
     Vector<String> userPreferredLanguages() const;
     void setUserPreferredLanguages(const Vector<String>&);
+
+    Vector<String> userPreferredAudioCharacteristics() const;
+    void setUserPreferredAudioCharacteristic(const String&);
 
     unsigned wheelEventHandlerCount(ExceptionCode&);
     unsigned touchEventHandlerCount(ExceptionCode&);
@@ -267,6 +279,7 @@ public:
 
     void setPageScaleFactor(float scaleFactor, int x, int y, ExceptionCode&);
     void setPageZoomFactor(float zoomFactor, ExceptionCode&);
+    void setTextZoomFactor(float zoomFactor, ExceptionCode&);
 
     void setUseFixedLayout(bool useFixedLayout, ExceptionCode&);
     void setFixedLayoutSize(int width, int height, ExceptionCode&);
@@ -303,11 +316,17 @@ public:
     void startTrackingStyleRecalcs(ExceptionCode&);
     unsigned long styleRecalcCount(ExceptionCode&);
 
+    void startTrackingCompositingUpdates(ExceptionCode&);
+    unsigned long compositingUpdateCount(ExceptionCode&);
+
     void updateLayoutIgnorePendingStylesheetsAndRunPostLayoutTasks(ExceptionCode&);
     void updateLayoutIgnorePendingStylesheetsAndRunPostLayoutTasks(Node*, ExceptionCode&);
+    unsigned layoutCount() const;
 
     PassRefPtr<ArrayBuffer> serializeObject(PassRefPtr<SerializedScriptValue>) const;
     PassRefPtr<SerializedScriptValue> deserializeBuffer(PassRefPtr<ArrayBuffer>) const;
+
+    bool isFromCurrentWorld(Deprecated::ScriptValue) const;
 
     void setUsesOverlayScrollbars(bool enabled);
 
@@ -362,6 +381,7 @@ public:
 #if ENABLE(MEDIA_SOURCE)
     WEBCORE_TESTSUPPORT_EXPORT void initializeMockMediaSource();
     Vector<String> bufferedSamplesForTrackID(SourceBuffer*, const AtomicString&);
+    void setShouldGenerateTimestamps(SourceBuffer*, bool);
 #endif
 
 #if ENABLE(VIDEO)
@@ -373,6 +393,13 @@ public:
     void setMediaElementRestrictions(HTMLMediaElement*, const String& restrictions, ExceptionCode&);
     void postRemoteControlCommand(const String&, ExceptionCode&);
     bool elementIsBlockingDisplaySleep(Element*) const;
+#endif
+
+#if ENABLE(MEDIA_SESSION)
+    void sendMediaSessionStartOfInterruptionNotification(const String&);
+    void sendMediaSessionEndOfInterruptionNotification(const String&);
+    String mediaSessionCurrentState(MediaSession*) const;
+    double mediaElementPlayerVolume(HTMLMediaElement*) const;
 #endif
 
 #if ENABLE(WEB_AUDIO)
@@ -390,10 +417,17 @@ public:
 
     RefPtr<File> createFile(const String&);
     void queueMicroTask(int);
+    bool testPreloaderSettingViewport();
 
 #if ENABLE(CONTENT_FILTERING)
     MockContentFilterSettings& mockContentFilterSettings();
 #endif
+
+#if ENABLE(CSS_SCROLL_SNAP)
+    String scrollSnapOffsets(Element*, ExceptionCode&);
+#endif
+
+    String pathStringWithShrinkWrappedRects(Vector<double> rectComponents, double radius, ExceptionCode&);
 
 private:
     explicit Internals(Document*);

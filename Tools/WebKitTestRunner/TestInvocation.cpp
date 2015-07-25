@@ -177,6 +177,8 @@ void TestInvocation::invoke()
 
     WKPagePostMessageToInjectedBundle(TestController::singleton().mainWebView()->page(), messageName.get(), beginTestMessageBody.get());
 
+    bool shouldOpenExternalURLs = false;
+
     TestController::singleton().runUntil(m_gotInitialResponse, TestController::shortTimeout);
     if (!m_gotInitialResponse) {
         m_errorMessage = "Timed out waiting for initial response from web process\n";
@@ -186,7 +188,7 @@ void TestInvocation::invoke()
     if (m_error)
         goto end;
 
-    WKPageLoadURL(TestController::singleton().mainWebView()->page(), m_url.get());
+    WKPageLoadURLWithShouldOpenExternalURLsPolicy(TestController::singleton().mainWebView()->page(), m_url.get(), shouldOpenExternalURLs);
 
     TestController::singleton().runUntil(m_gotFinalMessage, TestController::noTimeout);
     if (m_error)
@@ -245,9 +247,15 @@ void TestInvocation::dump(const char* textToStdout, const char* textToStderr, bo
     fflush(stderr);
 }
 
-void TestInvocation::forceRepaintDoneCallback(WKErrorRef, void* context)
+void TestInvocation::forceRepaintDoneCallback(WKErrorRef error, void* context)
 {
+    // The context may not be valid any more, e.g. if WebKit is invalidating callbacks at process exit.
+    if (error)
+        return;
+
     TestInvocation* testInvocation = static_cast<TestInvocation*>(context);
+    RELEASE_ASSERT(TestController::singleton().isCurrentInvocation(testInvocation));
+
     testInvocation->m_gotRepaint = true;
     TestController::singleton().notifyDone();
 }
@@ -551,7 +559,10 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
         WKRetainPtr<WKStringRef> targetKey(AdoptWK, WKStringCreateWithUTF8CString("target"));
         WKStringRef targetWK = static_cast<WKStringRef>(WKDictionaryGetItemForKey(loadDataDictionary, targetKey.get()));
 
-        TestController::singleton().workQueueManager().queueLoad(toWTFString(urlWK), toWTFString(targetWK));
+        WKRetainPtr<WKStringRef> shouldOpenExternalURLsKey(AdoptWK, WKStringCreateWithUTF8CString("shouldOpenExternalURLs"));
+        WKBooleanRef shouldOpenExternalURLsValueWK = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(loadDataDictionary, shouldOpenExternalURLsKey.get()));
+
+        TestController::singleton().workQueueManager().queueLoad(toWTFString(urlWK), toWTFString(targetWK), WKBooleanGetValue(shouldOpenExternalURLsValueWK));
         return;
     }
 

@@ -56,6 +56,7 @@
 #import "RenderThemeIOS.h"
 #import "RenderView.h"
 #import "SoftLinking.h"
+#import "UIColorSPI.h"
 #import "UserAgentScripts.h"
 #import "UserAgentStyleSheets.h"
 #import "WebCoreThreadRun.h"
@@ -65,15 +66,18 @@
 #import <wtf/RefPtr.h>
 #import <wtf/StdLibExtras.h>
 
-@interface UIApplication
-+ (UIApplication *)sharedApplication;
-@property(nonatomic,copy) NSString *preferredContentSizeCategory;
-@end
-
 SOFT_LINK_FRAMEWORK(UIKit)
 SOFT_LINK_CLASS(UIKit, UIApplication)
+SOFT_LINK_CLASS(UIKit, UIColor)
 SOFT_LINK_CONSTANT(UIKit, UIContentSizeCategoryDidChangeNotification, CFStringRef)
 #define UIContentSizeCategoryDidChangeNotification getUIContentSizeCategoryDidChangeNotification()
+
+#if !USE(APPLE_INTERNAL_SDK)
+@interface UIApplication
++ (UIApplication *)sharedApplication;
+@property (nonatomic, copy) NSString *preferredContentSizeCategory;
+@end
+#endif
 
 @interface WebCoreRenderThemeBundle : NSObject
 @end
@@ -132,7 +136,7 @@ static CGFunctionRef getSharedFunctionRef(IOSGradientRef gradient, Interpolation
     CGFunctionRef function = nullptr;
 
     static HashMap<IOSGradientRef, CGFunctionRef>* linearFunctionRefs;
-    static HashMap<IOSGradientRef, CGFunctionRef>* exponentialFunctionRefs;;
+    static HashMap<IOSGradientRef, CGFunctionRef>* exponentialFunctionRefs;
 
     if (interpolation == LinearInterpolation) {
         if (!linearFunctionRefs)
@@ -287,13 +291,13 @@ RenderThemeIOS::RenderThemeIOS()
 
 PassRefPtr<RenderTheme> RenderTheme::themeForPage(Page*)
 {
-    static RenderTheme* renderTheme = RenderThemeIOS::create().leakRef();
-    return renderTheme;
+    static RenderTheme& renderTheme = RenderThemeIOS::create().leakRef();
+    return &renderTheme;
 }
 
-PassRefPtr<RenderTheme> RenderThemeIOS::create()
+Ref<RenderTheme> RenderThemeIOS::create()
 {
-    return adoptRef(new RenderThemeIOS);
+    return adoptRef(*new RenderThemeIOS);
 }
 
 static String& _contentSizeCategory()
@@ -373,9 +377,9 @@ bool RenderThemeIOS::paintCheckboxDecorations(const RenderObject& box, const Pai
     if (isChecked(box)) {
         drawAxialGradient(cgContext, gradientWithName(ConcaveGradient), clip.location(), FloatPoint(clip.x(), clip.maxY()), LinearInterpolation);
 
-        static float thicknessRatio = 2 / 14.0;
-        static CGSize size = { 14.0f, 14.0f };
-        static CGPoint pathRatios[3] = {
+        static const float thicknessRatio = 2 / 14.0;
+        static const CGSize size = { 14.0f, 14.0f };
+        static const CGPoint pathRatios[3] = {
             { 2.5f / size.width, 7.5f / size.height },
             { 5.5f / size.width, 10.5f / size.height },
             { 11.5f / size.width, 2.5f / size.height }
@@ -461,7 +465,7 @@ bool RenderThemeIOS::paintRadioDecorations(const RenderObject& box, const PaintI
         // The inner circle is 6 / 14 the size of the surrounding circle, 
         // leaving 8 / 14 around it. (8 / 14) / 2 = 2 / 7.
 
-        static float InnerInverseRatio = 2 / 7.0;
+        static const float InnerInverseRatio = 2 / 7.0;
 
         clip.inflateX(-clip.width() * InnerInverseRatio);
         clip.inflateY(-clip.height() * InnerInverseRatio);
@@ -1069,11 +1073,6 @@ Color RenderThemeIOS::platformInactiveSelectionBackgroundColor() const
     return Color::transparent;
 }
 
-bool RenderThemeIOS::shouldShowPlaceholderWhenFocused() const
-{
-    return true;
-}
-
 bool RenderThemeIOS::shouldHaveSpinButton(HTMLInputElement&) const
 {
     return false;
@@ -1281,7 +1280,6 @@ String RenderThemeIOS::mediaControlsStyleSheet()
     if (m_mediaControlsStyleSheet.isEmpty()) {
         StringBuilder builder;
         builder.append([NSString stringWithContentsOfFile:[[NSBundle bundleForClass:[WebCoreRenderThemeBundle class]] pathForResource:@"mediaControlsiOS" ofType:@"css"] encoding:NSUTF8StringEncoding error:nil]);
-        builder.append(wkGetMediaUIImageData(wkMediaUIPartOptimizedFullscreenButton));
         m_mediaControlsStyleSheet = builder.toString();
     }
     return m_mediaControlsStyleSheet;
@@ -1306,6 +1304,50 @@ String RenderThemeIOS::mediaControlsScript()
 #endif
 }
 #endif // ENABLE(VIDEO)
+
+Color RenderThemeIOS::systemColor(CSSValueID cssValueID) const
+{
+    auto addResult = m_systemColorCache.add(cssValueID, Color());
+    if (!addResult.isNewEntry)
+        return addResult.iterator->value;
+
+    Color color;
+    switch (cssValueID) {
+    case CSSValueAppleWirelessPlaybackTargetActive:
+        color = [getUIColorClass() systemBlueColor].CGColor;
+        break;
+    case CSSValueAppleSystemBlue:
+        color = [getUIColorClass() systemBlueColor].CGColor;
+        break;
+    case CSSValueAppleSystemGray:
+        color = [getUIColorClass() systemGrayColor].CGColor;
+        break;
+    case CSSValueAppleSystemGreen:
+        color = [getUIColorClass() systemGreenColor].CGColor;
+        break;
+    case CSSValueAppleSystemOrange:
+        color = [getUIColorClass() systemOrangeColor].CGColor;
+        break;
+    case CSSValueAppleSystemPink:
+        color = [getUIColorClass() systemPinkColor].CGColor;
+        break;
+    case CSSValueAppleSystemRed:
+        color = [getUIColorClass() systemRedColor].CGColor;
+        break;
+    case CSSValueAppleSystemYellow:
+        color = [getUIColorClass() systemYellowColor].CGColor;
+        break;
+    default:
+        break;
+    }
+
+    if (!color.isValid())
+        color = RenderTheme::systemColor(cssValueID);
+
+    addResult.iterator->value = color;
+
+    return addResult.iterator->value;
+}
 
 }
 

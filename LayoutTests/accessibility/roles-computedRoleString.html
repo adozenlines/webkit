@@ -69,7 +69,7 @@
 <!-- skipped <output> -->
 <p data-role="" class="ex">X</p>
 <!-- skipped <param> -->
-<pre data-role="group" class="ex">X</pre>
+<pre data-role="" class="ex">X</pre>
 <progress data-role="progressbar" class="ex" value="0.75">X</progress>
 <q data-role="" class="ex">X</q>
 <!-- skipped <ruby/rp/rt> -->
@@ -97,24 +97,44 @@
 <sup data-role="" class="ex">X</sup>
 <svg data-role="" class="ex">X</svg>
 
-<table data-role="grid" class="ex">
+<table data-role="table" class="ex">
     <caption data-role="" class="ex">X</caption>
     <thead data-role="rowgroup" class="ex">
         <tr data-role="row" class="ex">
-            <th data-role="gridcell" class="ex">X</th><!-- FIXME: should be columnheader -->
+            <th data-role="columnheader" class="ex">X</th>
         </tr>
     </thead>
     <tbody data-role="rowgroup" class="ex">
         <tr data-role="row" class="ex">
-            <td data-role="gridcell" class="ex">X</td>
+            <td data-role="cell" class="ex">X</td>
         </tr>
     </tbody>
     <tfoot data-role="rowgroup" class="ex">
         <tr data-role="row" class="ex">
-            <td data-role="gridcell" class="ex">X</td>
+            <td data-role="cell" class="ex">X</td>
         </tr>
     </tfoot>
 </table>
+
+<table role="grid" data-role="grid" class="ex">
+    <caption data-role="" class="ex">X</caption>
+    <thead data-role="rowgroup" class="ex">
+        <tr data-role="row" class="ex">
+            <th data-role="columnheader" class="ex">X</th>
+        </tr>
+    </thead>
+    <tbody data-role="rowgroup" class="ex">
+        <tr data-role="row" class="ex">
+            <td role="gridcell" data-role="gridcell" class="ex">X</td>
+        </tr>
+    </tbody>
+    <tfoot data-role="rowgroup" class="ex">
+        <tr data-role="row" class="ex">
+            <td role="gridcell" data-role="gridcell" class="ex">X</td>
+        </tr>
+    </tfoot>
+</table>
+
 <textarea data-role="textbox" class="ex">X</textarea>
 <time data-role="" class="ex">X</time>
 <ul data-role="list" class="ex">
@@ -161,8 +181,8 @@
 <div role="grid"                     data-role="grid" class="ex">
     <div role="rowgroup"             data-role="rowgroup" class="ex">
         <div role="row"              data-role="row" class="ex">
-            <div role="rowheader"    data-role="gridcell" class="ex">X</div><!-- FIXME: should be rowheader -->
-            <div role="columnheader" data-role="gridcell" class="ex">X</div><!-- FIXME: should be columnheader -->
+            <div role="rowheader"    data-role="rowheader" class="ex">X</div>
+            <div role="columnheader" data-role="columnheader" class="ex">X</div>
             <div role="gridcell"     data-role="gridcell" class="ex">X</div>
         </div>
     </div>
@@ -222,8 +242,8 @@
 <div role="treegrid"                 data-role="grid" class="ex"><!-- FIXME: should be treegrid -->
     <div role="rowgroup"             data-role="rowgroup" class="ex">
         <div role="row"              data-role="row" class="ex">
-            <div role="rowheader"    data-role="gridcell" class="ex">X</div><!-- FIXME: should be rowheader -->
-            <div role="columnheader" data-role="gridcell" class="ex">X</div><!-- FIXME: should be columnheader -->
+            <div role="rowheader"    data-role="rowheader" class="ex">X</div>
+            <div role="columnheader" data-role="columnheader" class="ex">X</div>
             <div role="gridcell"     data-role="gridcell" class="ex">X</div>
         </div>
     </div>

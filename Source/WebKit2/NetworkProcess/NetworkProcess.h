@@ -32,8 +32,8 @@
 #include "ChildProcess.h"
 #include "DownloadManager.h"
 #include "MessageReceiverMap.h"
-#include "NetworkResourceLoadScheduler.h"
 #include <WebCore/DiagnosticLoggingClient.h>
+#include <WebCore/MemoryPressureHandler.h>
 #include <WebCore/SessionID.h>
 #include <memory>
 #include <wtf/Forward.h>
@@ -45,6 +45,8 @@
 
 namespace WebCore {
 class CertificateInfo;
+class NetworkStorageSession;
+class SecurityOrigin;
 }
 
 namespace WebKit {
@@ -75,20 +77,28 @@ public:
 
     void removeNetworkConnectionToWebProcess(NetworkConnectionToWebProcess*);
 
-    NetworkResourceLoadScheduler& networkResourceLoadScheduler() { return m_networkResourceLoadScheduler; }
-
     AuthenticationManager& authenticationManager();
     DownloadManager& downloadManager();
     bool canHandleHTTPSServerTrustEvaluation() const { return m_canHandleHTTPSServerTrustEvaluation; }
 
-    void processWillSuspend();
-    void cancelProcessWillSuspend();
+    void processWillSuspendImminently(bool& handled);
+    void prepareToSuspend();
+    void cancelPrepareToSuspend();
     void processDidResume();
 
     // Diagnostic messages logging.
     void logDiagnosticMessage(uint64_t webPageID, const String& message, const String& description, WebCore::ShouldSample);
     void logDiagnosticMessageWithResult(uint64_t webPageID, const String& message, const String& description, WebCore::DiagnosticLoggingResultType, WebCore::ShouldSample);
     void logDiagnosticMessageWithValue(uint64_t webPageID, const String& message, const String& description, const String& value, WebCore::ShouldSample);
+
+#if USE(CFURLCACHE)
+    static Vector<Ref<WebCore::SecurityOrigin>> cfURLCacheOrigins();
+    static void clearCFURLCacheForOrigins(const Vector<SecurityOriginData>&);
+#endif
+
+#if PLATFORM(COCOA)
+    void clearHSTSCache(WebCore::NetworkStorageSession&, std::chrono::system_clock::time_point modifiedSince);
+#endif
 
 private:
     NetworkProcess();
@@ -99,8 +109,8 @@ private:
     virtual void terminate() override;
     void platformTerminate();
 
-    void lowMemoryHandler(bool critical);
-    void platformLowMemoryHandler(bool critical);
+    void lowMemoryHandler(WebCore::Critical);
+    void platformLowMemoryHandler(WebCore::Critical);
 
     // ChildProcess
     virtual void initializeProcess(const ChildProcessInitializationParameters&) override;
@@ -125,6 +135,7 @@ private:
 
     // Message Handlers
     void didReceiveNetworkProcessMessage(IPC::Connection&, IPC::MessageDecoder&);
+    void didReceiveSyncNetworkProcessMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&);
     void initializeNetworkProcess(const NetworkProcessCreationParameters&);
     void createNetworkConnectionToWebProcess();
     void ensurePrivateBrowsingSession(WebCore::SessionID);
@@ -156,8 +167,6 @@ private:
 
     // Connections to WebProcesses.
     Vector<RefPtr<NetworkConnectionToWebProcess>> m_webProcessConnections;
-
-    NetworkResourceLoadScheduler m_networkResourceLoadScheduler;
 
     String m_diskCacheDirectory;
     bool m_hasSetCacheModel;

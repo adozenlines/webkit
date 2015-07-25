@@ -32,6 +32,7 @@
 #include "JSArray.h"
 #include "JSArrayIterator.h"
 #include "JSStack.h"
+#include "MathCommon.h"
 #include "MaxFrameExtentForSlowPathCall.h"
 #include "JSCInlines.h"
 #include "SpecializedThunkJIT.h"
@@ -176,7 +177,7 @@ static MacroAssemblerCodeRef virtualForThunkGenerator(
     // slow path execution for the profiler.
     jit.add32(
         CCallHelpers::TrustedImm32(1),
-        CCallHelpers::Address(GPRInfo::regT2, OBJECT_OFFSETOF(CallLinkInfo, slowPathCount)));
+        CCallHelpers::Address(GPRInfo::regT2, CallLinkInfo::offsetOfSlowPathCount()));
 
     // FIXME: we should have a story for eliminating these checks. In many cases,
     // the DFG knows that the value is definitely a cell, or definitely a function.
@@ -348,8 +349,8 @@ static MacroAssemblerCodeRef nativeForGenerator(VM* vm, CodeSpecializationKind k
 #else
     JSInterfaceJIT::Jump exceptionHandler = jit.branch32(
         JSInterfaceJIT::NotEqual,
-        JSInterfaceJIT::AbsoluteAddress(reinterpret_cast<char*>(vm->addressOfException()) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.tag)),
-        JSInterfaceJIT::TrustedImm32(JSValue::EmptyValueTag));
+        JSInterfaceJIT::AbsoluteAddress(vm->addressOfException()),
+        JSInterfaceJIT::TrustedImm32(0));
 #endif
 
     jit.emitFunctionEpilogue();
@@ -683,16 +684,6 @@ MacroAssemblerCodeRef sqrtThunkGenerator(VM* vm)
 #define UnaryDoubleOpWrapper(function) function##Wrapper
 enum MathThunkCallingConvention { };
 typedef MathThunkCallingConvention(*MathThunk)(MathThunkCallingConvention);
-extern "C" {
-
-double jsRound(double) REFERENCED_FROM_ASM;
-double jsRound(double d)
-{
-    double integer = ceil(d);
-    return integer - (integer - d > 0.5);
-}
-
-}
 
 #if CPU(X86_64) && COMPILER(GCC) && (OS(DARWIN) || OS(LINUX))
 

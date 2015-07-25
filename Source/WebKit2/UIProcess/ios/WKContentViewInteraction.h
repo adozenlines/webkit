@@ -89,6 +89,7 @@ struct WKAutoCorrectionData {
     UIWKAutocorrectionCompletionHandler autocorrectionHandler;
     UIWKAutocorrectionContextHandler autocorrectionContextHandler;
 };
+
 }
 
 @interface WKContentView () {
@@ -116,6 +117,9 @@ struct WKAutoCorrectionData {
     RetainPtr<WKFormInputSession> _formInputSession;
     RetainPtr<WKFileUploadPanel> _fileUploadPanel;
     RetainPtr<UIGestureRecognizer> _previewGestureRecognizer;
+#if HAVE(LINK_PREVIEW)
+    RetainPtr<UIPreviewItemController> _previewItemController;
+#endif
 
     std::unique_ptr<WebKit::SmartMagnificationController> _smartMagnificationController;
 
@@ -200,8 +204,11 @@ struct WKAutoCorrectionData {
 - (void)_becomeFirstResponderWithSelectionMovingForward:(BOOL)selectingForward completionHandler:(void (^)(BOOL didBecomeFirstResponder))completionHandler;
 @end
 
-#if __IPHONE_OS_VERSION_MIN_REQUIRED >= 90000
-@interface WKContentView (WKInteractionPreview) <UIViewControllerPreviewingDelegate>
+#if HAVE(LINK_PREVIEW)
+@interface WKContentView (WKInteractionPreview) <UIPreviewItemDelegate>
+
+- (void)_registerPreview;
+- (void)_unregisterPreview;
 @end
 #endif
 

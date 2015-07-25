@@ -59,6 +59,7 @@
 #include "Settings.h"
 #include "ShadowRoot.h"
 #include "WebCoreSystemInterface.h"
+#include "WheelEventTestTrigger.h"
 #include <wtf/MainThread.h>
 #include <wtf/NeverDestroyed.h>
 #include <wtf/ObjcRuntimeExtras.h>
@@ -80,10 +81,21 @@ NSEvent *EventHandler::currentNSEvent()
     return currentNSEventSlot().get();
 }
 
+static RetainPtr<NSEvent>& correspondingPressureEventSlot()
+{
+    static NeverDestroyed<RetainPtr<NSEvent>> event;
+    return event;
+}
+
+NSEvent *EventHandler::correspondingPressureEvent()
+{
+    return correspondingPressureEventSlot().get();
+}
+
 class CurrentEventScope {
      WTF_MAKE_NONCOPYABLE(CurrentEventScope);
 public:
-    CurrentEventScope(NSEvent *);
+    CurrentEventScope(NSEvent *, NSEvent *correspondingPressureEvent);
     ~CurrentEventScope();
 
 private:
@@ -91,21 +103,27 @@ private:
 #ifndef NDEBUG
     RetainPtr<NSEvent> m_event;
 #endif
+    RetainPtr<NSEvent> m_savedPressureEvent;
+    RetainPtr<NSEvent> m_correspondingPressureEvent;
 };
 
-inline CurrentEventScope::CurrentEventScope(NSEvent *event)
+inline CurrentEventScope::CurrentEventScope(NSEvent *event, NSEvent *correspondingPressureEvent)
     : m_savedCurrentEvent(currentNSEventSlot())
 #ifndef NDEBUG
     , m_event(event)
 #endif
+    , m_savedPressureEvent(correspondingPressureEventSlot())
+    , m_correspondingPressureEvent(correspondingPressureEvent)
 {
     currentNSEventSlot() = event;
+    correspondingPressureEventSlot() = correspondingPressureEvent;
 }
 
 inline CurrentEventScope::~CurrentEventScope()
 {
     ASSERT(currentNSEventSlot() == m_event);
     currentNSEventSlot() = m_savedCurrentEvent;
+    correspondingPressureEventSlot() = m_savedPressureEvent;
 }
 
 bool EventHandler::wheelEvent(NSEvent *event)
@@ -114,7 +132,7 @@ bool EventHandler::wheelEvent(NSEvent *event)
     if (!page)
         return false;
 
-    CurrentEventScope scope(event);
+    CurrentEventScope scope(event, nil);
     return handleWheelEvent(PlatformEventFactory::createPlatformWheelEvent(event, page->chrome().platformPageClient()));
 }
 
@@ -124,7 +142,7 @@ bool EventHandler::keyEvent(NSEvent *event)
 
     ASSERT([event type] == NSKeyDown || [event type] == NSKeyUp);
 
-    CurrentEventScope scope(event);
+    CurrentEventScope scope(event, nil);
     return keyEvent(PlatformEventFactory::createPlatformKeyboardEvent(event));
 
     END_BLOCK_OBJC_EXCEPTIONS;
@@ -468,7 +486,7 @@ bool EventHandler::passWheelEventToWidget(const PlatformWheelEvent& wheelEvent, 
     return false;
 }
 
-void EventHandler::mouseDown(NSEvent *event)
+void EventHandler::mouseDown(NSEvent *event, NSEvent *correspondingPressureEvent)
 {
     FrameView* v = m_frame.view();
     if (!v || m_sendingEventToSubview)
@@ -478,14 +496,14 @@ void EventHandler::mouseDown(NSEvent *event)
     
     m_mouseDownView = nil;
     
-    CurrentEventScope scope(event);
+    CurrentEventScope scope(event, correspondingPressureEvent);
 
     handleMousePressEvent(currentPlatformMouseEvent());
 
     END_BLOCK_OBJC_EXCEPTIONS;
 }
 
-void EventHandler::mouseDragged(NSEvent *event)
+void EventHandler::mouseDragged(NSEvent *event, NSEvent *correspondingPressureEvent)
 {
     FrameView* v = m_frame.view();
     if (!v || m_sendingEventToSubview)
@@ -493,13 +511,13 @@ void EventHandler::mouseDragged(NSEvent *event)
 
     BEGIN_BLOCK_OBJC_EXCEPTIONS;
 
-    CurrentEventScope scope(event);
+    CurrentEventScope scope(event, correspondingPressureEvent);
     handleMouseMoveEvent(currentPlatformMouseEvent());
 
     END_BLOCK_OBJC_EXCEPTIONS;
 }
 
-void EventHandler::mouseUp(NSEvent *event)
+void EventHandler::mouseUp(NSEvent *event, NSEvent *correspondingPressureEvent)
 {
     FrameView* v = m_frame.view();
     if (!v || m_sendingEventToSubview)
@@ -507,7 +525,7 @@ void EventHandler::mouseUp(NSEvent *event)
 
     BEGIN_BLOCK_OBJC_EXCEPTIONS;
 
-    CurrentEventScope scope(event);
+    CurrentEventScope scope(event, correspondingPressureEvent);
 
     // Our behavior here is a little different that Qt. Qt always sends
     // a mouse release event, even for a double click. To correct problems
@@ -594,7 +612,7 @@ void EventHandler::sendFakeEventsAfterWidgetTracking(NSEvent *initiatingEvent)
     END_BLOCK_OBJC_EXCEPTIONS;
 }
 
-void EventHandler::mouseMoved(NSEvent *event)
+void EventHandler::mouseMoved(NSEvent *event, NSEvent* correspondingPressureEvent)
 {
     // Reject a mouse moved if the button is down - screws up tracking during autoscroll
     // These happen because WebKit sometimes has to fake up moved events.
@@ -602,12 +620,23 @@ void EventHandler::mouseMoved(NSEvent *event)
         return;
 
     BEGIN_BLOCK_OBJC_EXCEPTIONS;
-    CurrentEventScope scope(event);
+    CurrentEventScope scope(event, correspondingPressureEvent);
     mouseMoved(currentPlatformMouseEvent());
     END_BLOCK_OBJC_EXCEPTIONS;
 }
 
-void EventHandler::passMouseMovedEventToScrollbars(NSEvent *event)
+void EventHandler::pressureChange(NSEvent *event, NSEvent* correspondingPressureEvent)
+{
+    if (!m_frame.view() || m_sendingEventToSubview)
+        return;
+
+    BEGIN_BLOCK_OBJC_EXCEPTIONS;
+    CurrentEventScope scope(event, correspondingPressureEvent);
+    handleMouseForceEvent(currentPlatformMouseEvent());
+    END_BLOCK_OBJC_EXCEPTIONS;
+}
+
+void EventHandler::passMouseMovedEventToScrollbars(NSEvent *event, NSEvent* correspondingPressureEvent)
 {
     // Reject a mouse moved if the button is down - screws up tracking during autoscroll
     // These happen because WebKit sometimes has to fake up moved events.
@@ -615,7 +644,7 @@ void EventHandler::passMouseMovedEventToScrollbars(NSEvent *event)
         return;
 
     BEGIN_BLOCK_OBJC_EXCEPTIONS;
-    CurrentEventScope scope(event);
+    CurrentEventScope scope(event, correspondingPressureEvent);
     passMouseMovedEventToScrollbars(currentPlatformMouseEvent());
     END_BLOCK_OBJC_EXCEPTIONS;
 }
@@ -673,7 +702,7 @@ PlatformMouseEvent EventHandler::currentPlatformMouseEvent() const
     NSView *windowView = nil;
     if (Page* page = m_frame.page())
         windowView = page->chrome().platformPageClient();
-    return PlatformEventFactory::createPlatformMouseEvent(currentNSEvent(), windowView);
+    return PlatformEventFactory::createPlatformMouseEvent(currentNSEvent(), correspondingPressureEvent(), windowView);
 }
 
 bool EventHandler::eventActivatedView(const PlatformMouseEvent& event) const
@@ -742,7 +771,15 @@ unsigned EventHandler::accessKeyModifiers()
     return PlatformEvent::CtrlKey | PlatformEvent::AltKey;
 }
 
-static ContainerNode* findEnclosingOverflowScroll(ContainerNode* node)
+static ScrollableArea* scrollableAreaForBox(RenderBox& box)
+{
+    if (is<RenderListBox>(box))
+        return downcast<RenderListBox>(&box);
+
+    return box.layer();
+}
+    
+static ContainerNode* findEnclosingScrollableContainer(ContainerNode* node, float deltaX, float deltaY)
 {
     // Find the first node with a valid scrollable area starting with the current
     // node and traversing its parents (or shadow hosts).
@@ -754,8 +791,14 @@ static ContainerNode* findEnclosingOverflowScroll(ContainerNode* node)
             return nullptr;
 
         RenderBox* box = candidate->renderBox();
-        if (box && box->canBeScrolledAndHasScrollableArea())
-            return candidate;
+        if (box && box->canBeScrolledAndHasScrollableArea()) {
+            if (ScrollableArea* scrollableArea = scrollableAreaForBox(*box)) {
+                if (((deltaY > 0) && !scrollableArea->scrolledToTop()) || ((deltaY < 0) && !scrollableArea->scrolledToBottom())
+                    || ((deltaX > 0) && !scrollableArea->scrolledToRight()) || ((deltaX < 0) && !scrollableArea->scrolledToLeft())) {
+                    return candidate;
+                }
+            }
+        }
     }
     
     return nullptr;
@@ -854,6 +897,22 @@ static bool latchingIsLockedToAncestorOfThisFrame(const Frame& frame)
     return false;
 }
 
+static ScrollableArea* scrollableAreaForContainerNode(ContainerNode& container)
+{
+    ScrollableArea* scrollableArea = nullptr;
+
+    if (RenderBox* box = container.renderBox())
+        scrollableArea = scrollableAreaForBox(*box);
+
+    return scrollableArea;
+}
+
+static bool latchedToFrameOrBody(ContainerNode& container)
+{
+    // FIXME(106133): We might need to add or switch to is<HTMLDocumentElement> when this bug is fixed.
+    return is<HTMLFrameSetElement>(container) || is<HTMLBodyElement>(container);
+}
+
 void EventHandler::platformPrepareForWheelEvents(const PlatformWheelEvent& wheelEvent, const HitTestResult& result, RefPtr<Element>& wheelEventTarget, RefPtr<ContainerNode>& scrollableContainer, ScrollableArea*& scrollableArea, bool& isOverWidget)
 {
     FrameView* view = m_frame.view();
@@ -867,21 +926,20 @@ void EventHandler::platformPrepareForWheelEvents(const PlatformWheelEvent& wheel
             scrollableContainer = wheelEventTarget;
             scrollableArea = scrollViewForEventTarget(wheelEventTarget.get());
         } else {
-            scrollableContainer = findEnclosingOverflowScroll(wheelEventTarget.get());
-            if (scrollableContainer) {
-                if (RenderBox* box = scrollableContainer->renderBox()) {
-                    if (is<RenderListBox>(*box))
-                        scrollableArea = downcast<RenderListBox>(box);
-                    else
-                        scrollableArea = box->layer();
-                }
-            } else {
+            scrollableContainer = findEnclosingScrollableContainer(wheelEventTarget.get(), wheelEvent.deltaX(), wheelEvent.deltaY());
+            if (scrollableContainer)
+                scrollableArea = scrollableAreaForContainerNode(*scrollableContainer);
+            else {
                 scrollableContainer = view->frame().document()->bodyOrFrameset();
                 scrollableArea = view;
             }
         }
     }
     
+    Page* page = m_frame.page();
+    if (scrollableArea && page && page->expectsWheelEventTriggers())
+        scrollableArea->scrollAnimator().setWheelEventTestTrigger(page->testTrigger());
+
     ScrollLatchingState* latchingState = m_frame.mainFrame().latchingState();
     if (wheelEvent.shouldConsiderLatching()) {
         if (scrollableContainer && scrollableArea) {
@@ -911,6 +969,12 @@ void EventHandler::platformPrepareForWheelEvents(const PlatformWheelEvent& wheel
 
         wheelEventTarget = latchingState->wheelEventElement();
         isOverWidget = latchingState->widgetIsLatched();
+        scrollableContainer = latchingState->scrollableContainer();
+
+        if (scrollableContainer) {
+            if (!latchedToFrameOrBody(*scrollableContainer) && !latchingState->widgetIsLatched())
+                scrollableArea = scrollableAreaForContainerNode(*scrollableContainer);
+        }
     }
 }
 

@@ -320,7 +320,7 @@ PassRefPtr<OpenTypeVerticalData> FontCache::getVerticalData(const FontFileKey& k
 
     RefPtr<OpenTypeVerticalData> verticalData = OpenTypeVerticalData::create(platformData);
     if (!verticalData->isOpenType())
-        verticalData.clear();
+        verticalData = nullptr;
     fontVerticalDataCache.set(key, verticalData);
     return verticalData;
 }
@@ -342,7 +342,6 @@ struct FontDataCacheKeyHash {
 
 struct FontDataCacheKeyTraits : WTF::GenericHashTraits<FontPlatformData> {
     static const bool emptyValueIsZero = true;
-    static const bool needsDestruction = true;
     static const FontPlatformData& emptyValue()
     {
         static NeverDestroyed<FontPlatformData> key(0.f, false, false);

@@ -28,7 +28,7 @@
 
 #if ENABLE(NETWORK_CACHE)
 
-#include <wtf/MD5.h>
+#include <wtf/SHA1.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebKit {
@@ -39,12 +39,12 @@ class Decoder;
 
 class Key {
 public:
-    typedef MD5::Digest HashType;
+    typedef SHA1::Digest HashType;
 
     Key() { }
     Key(const Key&);
     Key(Key&&) = default;
-    Key(const String& method, const String& partition, const String& identifier);
+    Key(const String& method, const String& partition, const String& range, const String& identifier);
 
     Key& operator=(const Key&);
     Key& operator=(Key&&) = default;
@@ -74,6 +74,7 @@ private:
     String m_method;
     String m_partition;
     String m_identifier;
+    String m_range;
     HashType m_hash;
 };
 

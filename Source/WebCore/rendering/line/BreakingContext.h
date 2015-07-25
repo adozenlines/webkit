@@ -38,6 +38,7 @@
 #include "RenderSVGInlineText.h"
 #include "TrailingObjects.h"
 #include "break_lines.h"
+#include <wtf/Optional.h>
 #include <wtf/text/StringView.h>
 #include <wtf/unicode/CharacterNames.h>
 
@@ -60,6 +61,34 @@ struct WordMeasurement {
     int startOffset;
     int endOffset;
     HashSet<const Font*> fallbackFonts;
+};
+
+struct WordTrailingSpace {
+    WordTrailingSpace(RenderText& renderer, const RenderStyle& style, TextLayout* textLayout = nullptr)
+        : m_renderer(renderer)
+        , m_style(style)
+        , m_textLayout(textLayout)
+    {
+    }
+
+    WTF::Optional<float> width(HashSet<const Font*>& fallbackFonts)
+    {
+        if (m_state == WordTrailingSpaceState::Computed)
+            return m_width;
+
+        const FontCascade& font = m_style.fontCascade();
+        if ((font.typesettingFeatures() & Kerning) && !m_textLayout)
+            m_width = font.width(RenderBlock::constructTextRun(&m_renderer, font, &space, 1, m_style), &fallbackFonts) + font.wordSpacing();
+        m_state = WordTrailingSpaceState::Computed;
+        return m_width;
+    }
+private:
+    enum class WordTrailingSpaceState { Uninitialized, Computed };
+    WordTrailingSpaceState m_state { WordTrailingSpaceState::Uninitialized };
+    WTF::Optional<float> m_width;
+    RenderText& m_renderer;
+    const RenderStyle& m_style;
+    TextLayout* m_textLayout { nullptr };
 };
 
 class BreakingContext {
@@ -686,7 +715,7 @@ inline bool BreakingContext::handleText(WordMeasurements& wordMeasurements, bool
     if (m_autoWrap && !RenderStyle::autoWrap(m_lastWS) && m_ignoringSpaces)
         commitLineBreakAtCurrentWidth(renderText);
 
-    if (renderText.style().hasTextCombine() && is<RenderCombineText>(*m_current.renderer()) && !downcast<RenderCombineText>(*m_current.renderer()).isCombined()) {
+    if (renderText.style().hasTextCombine() && is<RenderCombineText>(*m_current.renderer())) {
         auto& combineRenderer = downcast<RenderCombineText>(*m_current.renderer());
         combineRenderer.combineText();
         // The length of the renderer's text may have changed. Increment stale iterator positions
@@ -715,6 +744,7 @@ inline bool BreakingContext::handleText(WordMeasurements& wordMeasurements, bool
     bool breakWords = m_currentStyle->breakWords() && ((m_autoWrap && !m_width.committedWidth()) || m_currWS == PRE);
     bool midWordBreak = false;
     bool breakAll = m_currentStyle->wordBreak() == BreakAllWordBreak && m_autoWrap;
+    bool keepAllWords = m_currentStyle->wordBreak() == KeepAllWordBreak;
     float hyphenWidth = 0;
     bool isLooseCJKMode = false;
 
@@ -740,10 +770,9 @@ inline bool BreakingContext::handleText(WordMeasurements& wordMeasurements, bool
     // Non-zero only when kerning is enabled and TextLayout isn't used, in which case we measure
     // words with their trailing space, then subtract its width.
     HashSet<const Font*> fallbackFonts;
-    float wordTrailingSpaceWidth = (font.typesettingFeatures() & Kerning) && !textLayout ? font.width(RenderBlock::constructTextRun(&renderText, font, &space, 1, style), &fallbackFonts) + wordSpacing : 0;
-
     UChar lastCharacter = m_renderTextInfo.lineBreakIterator.lastCharacter();
     UChar secondToLastCharacter = m_renderTextInfo.lineBreakIterator.secondToLastCharacter();
+    WordTrailingSpace wordTrailingSpace(renderText, style, textLayout);
     for (; m_current.offset() < renderText.textLength(); m_current.fastIncrementInTextNode()) {
         bool previousCharacterIsSpace = m_currentCharacterIsSpace;
         bool previousCharacterIsWS = m_currentCharacterIsWS;
@@ -770,7 +799,7 @@ inline bool BreakingContext::handleText(WordMeasurements& wordMeasurements, bool
         }
 
         int nextBreakablePosition = m_current.nextBreakablePosition();
-        bool betweenWords = c == '\n' || (m_currWS != PRE && !m_atStart && isBreakable(m_renderTextInfo.lineBreakIterator, m_current.offset(), nextBreakablePosition, breakNBSP, isLooseCJKMode)
+        bool betweenWords = c == '\n' || (m_currWS != PRE && !m_atStart && isBreakable(m_renderTextInfo.lineBreakIterator, m_current.offset(), nextBreakablePosition, breakNBSP, isLooseCJKMode, keepAllWords)
             && (style.hyphens() != HyphensNone || (m_current.previousInSameNode() != softHyphen)));
         m_current.setNextBreakablePosition(nextBreakablePosition);
 
@@ -801,8 +830,13 @@ inline bool BreakingContext::handleText(WordMeasurements& wordMeasurements, bool
             wordMeasurement.startOffset = lastSpace;
 
             float additionalTempWidth;
-            if (wordTrailingSpaceWidth && c == ' ')
-                additionalTempWidth = textWidth(renderText, lastSpace, m_current.offset() + 1 - lastSpace, font, m_width.currentWidth(), isFixedPitch, m_collapseWhiteSpace, wordMeasurement.fallbackFonts, textLayout) - wordTrailingSpaceWidth;
+            WTF::Optional<float> wordTrailingSpaceWidth;
+            if (c == ' ')
+                wordTrailingSpaceWidth = wordTrailingSpace.width(fallbackFonts);
+            if (wordTrailingSpaceWidth) {
+                additionalTempWidth = textWidth(renderText, lastSpace, m_current.offset() + 1 - lastSpace, font, m_width.currentWidth(), isFixedPitch, m_collapseWhiteSpace,
+                    wordMeasurement.fallbackFonts, textLayout) - wordTrailingSpaceWidth.value();
+            }
             else
                 additionalTempWidth = textWidth(renderText, lastSpace, m_current.offset() - lastSpace, font, m_width.currentWidth(), isFixedPitch, m_collapseWhiteSpace, wordMeasurement.fallbackFonts, textLayout);
 
@@ -937,7 +971,7 @@ inline bool BreakingContext::handleText(WordMeasurements& wordMeasurements, bool
             lastSpaceWordSpacing = applyWordSpacing ? wordSpacing : 0;
             wordSpacingForWordMeasurement = (applyWordSpacing && wordMeasurements.last().width) ? wordSpacing : 0;
             lastSpace = m_current.offset(); // e.g., "Foo    goo", don't add in any of the ignored spaces.
-            m_lineMidpointState.stopIgnoringSpaces(InlineIterator(0, m_current.renderer(), m_current.offset()));
+            m_lineMidpointState.stopIgnoringSpaces(InlineIterator(nullptr, m_current.renderer(), m_current.offset()));
         }
 
         if (isSVGText && m_current.offset()) {
@@ -1113,7 +1147,7 @@ inline TrailingObjects::CollapseFirstSpaceOrNot checkMidpoints(LineMidpointState
             currpoint.increment();
         if (currpoint == lBreak) {
             // We hit the line break before the start point. Shave off the start point.
-            lineMidpointState.decreaseNumMidpoints();
+            lineMidpointState.decrementNumMidpoints();
             if (endpoint.renderer()->style().collapseWhiteSpace() && endpoint.renderer()->isText()) {
                 endpoint.fastDecrement();
                 return TrailingObjects::DoNotCollapseFirstSpace;
@@ -1186,7 +1220,7 @@ inline InlineIterator BreakingContext::optimalLineBreakLocationForTrailingWord()
     bool isLooseCJKMode = m_renderTextInfo.text != &renderText && m_renderTextInfo.lineBreakIterator.isLooseCJKMode();
     bool breakNBSP = m_autoWrap && m_currentStyle->nbspMode() == SPACE;
     int nextBreakablePosition = lineBreak.nextBreakablePosition();
-    isBreakable(m_renderTextInfo.lineBreakIterator, lineBreak.offset() + 1, nextBreakablePosition, breakNBSP, isLooseCJKMode);
+    isBreakable(m_renderTextInfo.lineBreakIterator, lineBreak.offset() + 1, nextBreakablePosition, breakNBSP, isLooseCJKMode, m_currentStyle->wordBreak() == KeepAllWordBreak);
     if (nextBreakablePosition < 0 || static_cast<unsigned>(nextBreakablePosition) != renderText.textLength())
         return lineBreak;
     const RenderStyle& style = lineStyle(renderText, m_lineInfo);

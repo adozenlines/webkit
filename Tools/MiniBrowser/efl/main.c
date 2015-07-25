@@ -26,6 +26,8 @@
 #include <Elementary.h>
 #include <Evas.h>
 
+extern int efreet_cache_update;
+
 static const char DEFAULT_URL[] = "http://www.google.com/";
 static const char APP_NAME[] = "EFL MiniBrowser";
 static const int TOOL_BAR_ICON_SIZE = 24;
@@ -99,6 +101,8 @@ typedef struct _Color_Selector {
 typedef struct _Browser_Window {
     Evas_Object *elm_window;
     Evas_Object *ewk_view;
+    Evas_Object *horizontal_layout;
+    Evas_Object *vertical_layout;
     Evas_Object *url_bar;
     Evas_Object *back_button;
     Evas_Object *forward_button;
@@ -407,10 +411,23 @@ static void window_close(Browser_Window *window)
 }
 
 static void
+search_icon_show(Browser_Window *window)
+{
+    Evas_Object *icon = elm_icon_add(window->elm_window);
+    elm_icon_standard_set(icon, "edit-find");
+    elm_object_part_content_set(window->search.search_field, "icon", icon);
+    evas_object_size_hint_min_set(icon, 20, 20);
+    evas_object_size_hint_max_set(icon, 20, 20);
+    elm_entry_icon_visible_set(window->search.search_field, EINA_TRUE);
+    evas_object_show(icon);
+}
+
+static void
 search_box_show(Browser_Window *window)
 {
     evas_object_size_hint_min_set(window->search.search_bar, SEARCH_FIELD_SIZE + 2 * SEARCH_BUTTON_SIZE, SEARCH_BUTTON_SIZE);
 
+    search_icon_show(window);
     evas_object_show(window->search.search_bar);
     evas_object_show(window->search.search_field);
     evas_object_show(window->search.search_field_count);
@@ -514,6 +531,20 @@ script_execute_callback(Evas_Object *ewk_view, const char *return_value, void *u
 }
 
 static void
+toggle_window_fullscreen(Browser_Window *window, Eina_Bool isFullScreen)
+{
+    if (isFullScreen) {
+        evas_object_hide(window->horizontal_layout);
+        elm_box_unpack(window->vertical_layout, window->horizontal_layout);
+        elm_win_fullscreen_set(window->elm_window, EINA_TRUE);
+    } else {
+        elm_win_fullscreen_set(window->elm_window, EINA_FALSE);
+        elm_box_pack_start(window->vertical_layout, window->horizontal_layout);
+        evas_object_show(window->horizontal_layout);
+    }
+}
+
+static void
 on_key_down(void *user_data, Evas *e, Evas_Object *ewk_view, void *event_info)
 {
     Browser_Window *window = (Browser_Window *)user_data;
@@ -556,14 +587,14 @@ on_key_down(void *user_data, Evas *e, Evas_Object *ewk_view, void *event_info)
         ewk_view_stop(ewk_view);
     } else if (!strcmp(ev->key, "F7")) {
         Ewk_Pagination_Mode mode =  ewk_view_pagination_mode_get(ewk_view);
-        mode = (++mode) % (EWK_PAGINATION_MODE_BOTTOM_TO_TOP + 1);
+        mode = (mode + 1) % (EWK_PAGINATION_MODE_BOTTOM_TO_TOP + 1);
         if (ewk_view_pagination_mode_set(ewk_view, mode))
             INFO("Change Pagination Mode (F7) was pressed, changed to: %d", mode);
         else
             INFO("Change Pagination Mode (F7) was pressed, but NOT changed!");
     } else if (!strcmp(ev->key, "F11")) {
         INFO("Fullscreen (F11) was pressed, toggling window/fullscreen.");
-        elm_win_fullscreen_set(window->elm_window, !elm_win_fullscreen_get(window->elm_window));
+        toggle_window_fullscreen(window, !elm_win_fullscreen_get(window->elm_window));
     } else if (!strcmp(ev->key, "n") && ctrlPressed) {
         INFO("Create new window (Ctrl+n) was pressed.");
         Browser_Window *window = window_create(NULL, 0, 0);
@@ -1007,7 +1038,7 @@ static char *
 url_from_user_input(const char *arg)
 {
     /* If it is already a URL, return the argument as is. */
-    if (has_scheme(arg) || !strcasecmp(arg, "about:blank"))
+    if (has_scheme(arg) || eina_str_has_prefix(arg, "javascript:") || !strcasecmp(arg, "about:blank"))
         return strdup(arg);
 
     Eina_Strbuf *buf = eina_strbuf_manage_new(eina_file_path_sanitize(arg));
@@ -1029,6 +1060,18 @@ url_from_user_input(const char *arg)
     return url;
 }
 
+static Eina_Bool
+url_load_from_user_input(Evas_Object *ewk_view, const char *url)
+{
+    if (!ewk_view || !url)
+        return EINA_FALSE;
+
+    if (eina_str_has_prefix(url, "javascript:"))
+        return ewk_view_script_execute(ewk_view, strstr(url, "javascript:"), 0, 0);
+
+    return ewk_view_url_set(ewk_view, url);
+}
+
 static void
 on_url_bar_activated(void *user_data, Evas_Object *url_bar, void *event_info)
 {
@@ -1037,7 +1080,7 @@ on_url_bar_activated(void *user_data, Evas_Object *url_bar, void *event_info)
     const char *markup_url = elm_entry_entry_get(url_bar);
     char *user_url = elm_entry_markup_to_utf8(markup_url);
     char *url = url_from_user_input(user_url);
-    ewk_view_url_set(window->ewk_view, url);
+    url_load_from_user_input(window->ewk_view, url);
 
     free(user_url);
     free(url);
@@ -1595,7 +1638,9 @@ static void
 on_fullscreen_accept(void *user_data, Evas_Object *obj, void *event_info)
 {
     PermissionData *permission_data = (PermissionData *)user_data;
+    Browser_Window *window = window_find_with_ewk_view(permission_data->ewk_view);
 
+    elm_win_resize_object_del(window->elm_window, permission_data->permission_popup);
     evas_object_del(permission_data->permission_popup);
     evas_object_focus_set(permission_data->ewk_view, EINA_TRUE);
     free(permission_data);
@@ -1605,8 +1650,10 @@ static void
 on_fullscreen_deny(void *user_data, Evas_Object *obj, void *event_info)
 {
     PermissionData *permission_data = (PermissionData *)user_data;
+    Browser_Window *window = window_find_with_ewk_view(permission_data->ewk_view);
 
     ewk_view_fullscreen_exit(permission_data->ewk_view);
+    elm_win_resize_object_del(window->elm_window, permission_data->permission_popup);
     evas_object_del(permission_data->permission_popup);
     evas_object_focus_set(permission_data->ewk_view, EINA_TRUE);
     free(permission_data);
@@ -1617,7 +1664,7 @@ static Eina_Bool on_fullscreen_enter(Ewk_View_Smart_Data *sd, Ewk_Security_Origi
     Browser_Window *window = window_find_with_ewk_view(sd->self);
 
     /* Go fullscreen */
-    elm_win_fullscreen_set(window->elm_window, EINA_TRUE);
+    toggle_window_fullscreen(window, EINA_TRUE);
 
     /* Show user popup */
     Evas_Object *permission_popup = elm_popup_add(window->elm_window);
@@ -1642,7 +1689,7 @@ static Eina_Bool on_fullscreen_enter(Ewk_View_Smart_Data *sd, Ewk_Security_Origi
     elm_object_text_set(deny_button, "Deny");
     elm_object_part_content_set(permission_popup, "button2", deny_button);
     evas_object_smart_callback_add(deny_button, "clicked", on_fullscreen_deny, permission_data);
-
+    elm_win_resize_object_add(window->elm_window, permission_popup);
     evas_object_show(permission_popup);
 
     return EINA_TRUE;
@@ -1652,7 +1699,7 @@ static Eina_Bool on_fullscreen_exit(Ewk_View_Smart_Data *sd)
 {
     Browser_Window *window = window_find_with_ewk_view(sd->self);
 
-    elm_win_fullscreen_set(window->elm_window, EINA_FALSE);
+    toggle_window_fullscreen(window, EINA_FALSE);
 
     return EINA_TRUE;
 }
@@ -2030,19 +2077,19 @@ static Browser_Window *window_create(Evas_Object *opener, int width, int height)
     evas_object_show(bg);
 
     /* Create vertical layout */
-    Evas_Object *vertical_layout = elm_box_add(window->elm_window);
-    elm_box_padding_set(vertical_layout, 0, 2);
-    evas_object_size_hint_weight_set(vertical_layout, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
-    elm_win_resize_object_add(window->elm_window, vertical_layout);
-    evas_object_show(vertical_layout);
+    window->vertical_layout = elm_box_add(window->elm_window);
+    elm_box_padding_set(window->vertical_layout, 0, 2);
+    evas_object_size_hint_weight_set(window->vertical_layout, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
+    elm_win_resize_object_add(window->elm_window, window->vertical_layout);
+    evas_object_show(window->vertical_layout);
 
     /* Create horizontal layout for top bar */
-    Evas_Object *horizontal_layout = elm_box_add(window->elm_window);
-    elm_box_horizontal_set(horizontal_layout, EINA_TRUE);
-    evas_object_size_hint_weight_set(horizontal_layout, EVAS_HINT_EXPAND, 0.0);
-    evas_object_size_hint_align_set(horizontal_layout, EVAS_HINT_FILL, 0.0);
-    elm_box_pack_end(vertical_layout, horizontal_layout);
-    evas_object_show(horizontal_layout);
+    window->horizontal_layout = elm_box_add(window->elm_window);
+    elm_box_horizontal_set(window->horizontal_layout, EINA_TRUE);
+    evas_object_size_hint_weight_set(window->horizontal_layout, EVAS_HINT_EXPAND, 0.0);
+    evas_object_size_hint_align_set(window->horizontal_layout, EVAS_HINT_FILL, 0.0);
+    elm_box_pack_end(window->vertical_layout, window->horizontal_layout);
+    evas_object_show(window->horizontal_layout);
 
     /* Create Back button */
     window->back_button = create_toolbar_button(window->elm_window, "arrow_left");
@@ -2053,7 +2100,7 @@ static Browser_Window *window_create(Evas_Object *opener, int width, int height)
     elm_object_disabled_set(window->back_button, EINA_TRUE);
     evas_object_size_hint_weight_set(window->back_button, 0.0, EVAS_HINT_EXPAND);
     evas_object_size_hint_align_set(window->back_button, 0.0, 0.5);
-    elm_box_pack_end(horizontal_layout, window->back_button);
+    elm_box_pack_end(window->horizontal_layout, window->back_button);
     evas_object_show(window->back_button);
 
     /* Create Forward button */
@@ -2065,7 +2112,7 @@ static Browser_Window *window_create(Evas_Object *opener, int width, int height)
     elm_object_disabled_set(window->forward_button, EINA_TRUE);
     evas_object_size_hint_weight_set(window->forward_button, 0.0, EVAS_HINT_EXPAND);
     evas_object_size_hint_align_set(window->forward_button, 0.0, 0.5);
-    elm_box_pack_end(horizontal_layout, window->forward_button);
+    elm_box_pack_end(window->horizontal_layout, window->forward_button);
     evas_object_show(window->forward_button);
 
     /* Create URL bar */
@@ -2079,7 +2126,7 @@ static Browser_Window *window_create(Evas_Object *opener, int width, int height)
     evas_object_smart_callback_add(window->url_bar, "clicked", on_url_bar_clicked, window);
     evas_object_size_hint_weight_set(window->url_bar, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
     evas_object_size_hint_align_set(window->url_bar, EVAS_HINT_FILL, EVAS_HINT_FILL);
-    elm_box_pack_end(horizontal_layout, window->url_bar);
+    elm_box_pack_end(window->horizontal_layout, window->url_bar);
     evas_object_show(window->url_bar);
 
     /* Create Refresh button */
@@ -2089,7 +2136,7 @@ static Browser_Window *window_create(Evas_Object *opener, int width, int height)
     elm_object_tooltip_window_mode_set(refresh_button, EINA_TRUE);
     evas_object_size_hint_weight_set(refresh_button, 0.0, EVAS_HINT_EXPAND);
     evas_object_size_hint_align_set(refresh_button, 1.0, 0.5);
-    elm_box_pack_end(horizontal_layout, refresh_button);
+    elm_box_pack_end(window->horizontal_layout, refresh_button);
     evas_object_show(refresh_button);
 
     /* Create Stop button */
@@ -2099,7 +2146,7 @@ static Browser_Window *window_create(Evas_Object *opener, int width, int height)
     elm_object_tooltip_window_mode_set(stop_button, EINA_TRUE);
     evas_object_size_hint_weight_set(stop_button, 0.0, EVAS_HINT_EXPAND);
     evas_object_size_hint_align_set(stop_button, 1.0, 0.5);
-    elm_box_pack_end(horizontal_layout, stop_button);
+    elm_box_pack_end(window->horizontal_layout, stop_button);
     evas_object_show(stop_button);
 
     /* Create Home button */
@@ -2109,7 +2156,7 @@ static Browser_Window *window_create(Evas_Object *opener, int width, int height)
     elm_object_tooltip_window_mode_set(home_button, EINA_TRUE);
     evas_object_size_hint_weight_set(home_button, 0.0, EVAS_HINT_EXPAND);
     evas_object_size_hint_align_set(home_button, 1.0, 0.5);
-    elm_box_pack_end(horizontal_layout, home_button);
+    elm_box_pack_end(window->horizontal_layout, home_button);
     evas_object_show(home_button);
 
     /* Create Search bar */
@@ -2117,7 +2164,7 @@ static Browser_Window *window_create(Evas_Object *opener, int width, int height)
     elm_box_horizontal_set(window->search.search_bar, EINA_TRUE);
     evas_object_size_hint_min_set(window->search.search_bar, SEARCH_FIELD_SIZE + 2 * SEARCH_BUTTON_SIZE, 0);
     evas_object_size_hint_align_set(window->search.search_bar, EVAS_HINT_FILL, EVAS_HINT_FILL);
-    elm_box_pack_end(vertical_layout, window->search.search_bar);
+    elm_box_pack_end(window->vertical_layout, window->search.search_bar);
 
     /* Create Search field */
     window->search.search_field = elm_entry_add(window->elm_window);
@@ -2275,7 +2322,7 @@ static Browser_Window *window_create(Evas_Object *opener, int width, int height)
 
     evas_object_size_hint_weight_set(window->ewk_view, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
     evas_object_size_hint_align_set(window->ewk_view, EVAS_HINT_FILL, EVAS_HINT_FILL);
-    elm_box_pack_before(vertical_layout, window->ewk_view, window->search.search_bar);
+    elm_box_pack_before(window->vertical_layout, window->ewk_view, window->search.search_bar);
     evas_object_show(window->ewk_view);
 
     evas_object_resize(window->elm_window, width ? width : window_width, height ? height : window_height);
@@ -2370,6 +2417,8 @@ elm_main(int argc, char *argv[])
         ECORE_GETOPT_VALUE_NONE
     };
 
+    efreet_cache_update = 0;
+
     if (!ewk_init())
         return EXIT_FAILURE;
 
@@ -2388,12 +2437,10 @@ elm_main(int argc, char *argv[])
 
     if (evas_engine_name)
         elm_config_accel_preference_set(evas_engine_name);
-#if defined(HAVE_ECORE_X)
     else {
         evas_engine_name = "opengl";
         elm_config_accel_preference_set(evas_engine_name);
     }
-#endif
 
     Ewk_Context *context = ewk_context_default_get();
 
@@ -2402,6 +2449,9 @@ elm_main(int argc, char *argv[])
 
     // Enable favicon database.
     ewk_context_favicon_database_directory_set(context, NULL);
+
+    // Use a proper cache model.
+    ewk_context_cache_model_set(context, EWK_CACHE_MODEL_PRIMARY_WEBBROWSER);
 
     if (cookies_policy_string) {
         Ewk_Cookie_Accept_Policy cookie_policy = parse_cookies_policy(cookies_policy_string);
@@ -2428,7 +2478,7 @@ elm_main(int argc, char *argv[])
 
     if (args < argc) {
         char *url = url_from_user_input(argv[args]);
-        ewk_view_url_set(window->ewk_view, url);
+        url_load_from_user_input(window->ewk_view, url);
         free(url);
     } else
         ewk_view_url_set(window->ewk_view, DEFAULT_URL);

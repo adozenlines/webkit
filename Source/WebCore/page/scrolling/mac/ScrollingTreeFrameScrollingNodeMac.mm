@@ -29,6 +29,8 @@
 #if ENABLE(ASYNC_SCROLLING) && PLATFORM(MAC)
 
 #import "FrameView.h"
+#import "LayoutSize.h"
+#import "Logging.h"
 #import "NSScrollerImpDetails.h"
 #import "PlatformWheelEvent.h"
 #import "ScrollingCoordinator.h"
@@ -48,18 +50,16 @@ namespace WebCore {
 
 static void logThreadedScrollingMode(unsigned synchronousScrollingReasons);
 
-PassRefPtr<ScrollingTreeFrameScrollingNode> ScrollingTreeFrameScrollingNodeMac::create(ScrollingTree& scrollingTree, ScrollingNodeID nodeID)
+Ref<ScrollingTreeFrameScrollingNode> ScrollingTreeFrameScrollingNodeMac::create(ScrollingTree& scrollingTree, ScrollingNodeID nodeID)
 {
-    return adoptRef(new ScrollingTreeFrameScrollingNodeMac(scrollingTree, nodeID));
+    return adoptRef(*new ScrollingTreeFrameScrollingNodeMac(scrollingTree, nodeID));
 }
 
 ScrollingTreeFrameScrollingNodeMac::ScrollingTreeFrameScrollingNodeMac(ScrollingTree& scrollingTree, ScrollingNodeID nodeID)
     : ScrollingTreeFrameScrollingNode(scrollingTree, nodeID)
     , m_scrollController(*this)
-    , m_verticalScrollbarPainter(0)
-    , m_horizontalScrollbarPainter(0)
-    , m_lastScrollHadUnfilledPixels(false)
-    , m_hadFirstUpdate(false)
+    , m_verticalScrollbarPainter(nullptr)
+    , m_horizontalScrollbarPainter(nullptr)
 {
 }
 
@@ -137,7 +137,16 @@ void ScrollingTreeFrameScrollingNodeMac::updateBeforeChildren(const ScrollingSta
 
     if (scrollingStateNode.hasChangedProperty(ScrollingStateFrameScrollingNode::VerticalSnapOffsets))
         m_scrollController.updateScrollSnapPoints(ScrollEventAxis::Vertical, convertToLayoutUnits(scrollingStateNode.verticalSnapOffsets()));
+
+    if (scrollingStateNode.hasChangedProperty(ScrollingStateScrollingNode::CurrentHorizontalSnapOffsetIndex))
+        m_scrollController.setActiveScrollSnapIndexForAxis(ScrollEventAxis::Horizontal, scrollingStateNode.currentHorizontalSnapPointIndex());
+    
+    if (scrollingStateNode.hasChangedProperty(ScrollingStateScrollingNode::CurrentVerticalSnapOffsetIndex))
+        m_scrollController.setActiveScrollSnapIndexForAxis(ScrollEventAxis::Vertical, scrollingStateNode.currentVerticalSnapPointIndex());
 #endif
+
+    if (scrollingStateNode.hasChangedProperty(ScrollingStateScrollingNode::ExpectsWheelEventTestTrigger))
+        m_expectsWheelEventTestTrigger = scrollingStateNode.expectsWheelEventTestTrigger();
 
     m_hadFirstUpdate = true;
 }
@@ -172,7 +181,21 @@ void ScrollingTreeFrameScrollingNodeMac::handleWheelEvent(const PlatformWheelEve
         [m_horizontalScrollbarPainter setUsePresentationValue:NO];
     }
 
+#if ENABLE(CSS_SCROLL_SNAP) || ENABLE(RUBBER_BANDING)
+    if (m_expectsWheelEventTestTrigger) {
+        if (scrollingTree().shouldHandleWheelEventSynchronously(wheelEvent))
+            removeTestDeferralForReason(reinterpret_cast<WheelEventTestTrigger::ScrollableAreaIdentifier>(scrollingNodeID()), WheelEventTestTrigger::ScrollingThreadSyncNeeded);
+        else
+            deferTestsForReason(reinterpret_cast<WheelEventTestTrigger::ScrollableAreaIdentifier>(scrollingNodeID()), WheelEventTestTrigger::ScrollingThreadSyncNeeded);
+    }
+#endif
+
     m_scrollController.handleWheelEvent(wheelEvent);
+#if ENABLE(CSS_SCROLL_SNAP)
+    scrollingTree().setMainFrameIsScrollSnapping(m_scrollController.isScrollSnapInProgress());
+    if (m_scrollController.activeScrollSnapIndexDidChange())
+        scrollingTree().setActiveScrollSnapIndices(scrollingNodeID(), m_scrollController.activeScrollSnapIndexForAxis(ScrollEventAxis::Horizontal), m_scrollController.activeScrollSnapIndexForAxis(ScrollEventAxis::Vertical));
+#endif
     scrollingTree().setOrClearLatchedNode(wheelEvent, scrollingNodeID());
     scrollingTree().handleWheelEventPhase(wheelEvent.phase());
 }
@@ -381,7 +404,7 @@ void ScrollingTreeFrameScrollingNodeMac::setScrollLayerPosition(const FloatPoint
     FloatRect viewportRect(FloatPoint(), scrollableAreaSize());
     
     FloatSize scrollOffsetForFixedChildren = FrameView::scrollOffsetForFixedPosition(enclosingLayoutRect(viewportRect), LayoutSize(totalContentsSize()), scrollOffset, scrollOrigin(), frameScaleFactor(),
-        false, behaviorForFixed, headerHeight(), footerHeight());
+        fixedElementsLayoutRelativeToFrame(), behaviorForFixed, headerHeight(), footerHeight());
     
     if (m_counterScrollingLayer)
         m_counterScrollingLayer.get().position = FloatPoint(scrollOffsetForFixedChildren);
@@ -401,7 +424,7 @@ void ScrollingTreeFrameScrollingNodeMac::setScrollLayerPosition(const FloatPoint
         // then we should recompute scrollOffsetForFixedChildren for the banner with a scale factor of 1.
         float horizontalScrollOffsetForBanner = scrollOffsetForFixedChildren.width();
         if (frameScaleFactor() != 1)
-            horizontalScrollOffsetForBanner = FrameView::scrollOffsetForFixedPosition(enclosingLayoutRect(viewportRect), LayoutSize(totalContentsSize()), scrollOffset, scrollOrigin(), 1, false, behaviorForFixed, headerHeight(), footerHeight()).width();
+            horizontalScrollOffsetForBanner = FrameView::scrollOffsetForFixedPosition(enclosingLayoutRect(viewportRect), LayoutSize(totalContentsSize()), scrollOffset, scrollOrigin(), 1, fixedElementsLayoutRelativeToFrame(), behaviorForFixed, headerHeight(), footerHeight()).width();
 
         if (m_headerLayer)
             m_headerLayer.get().position = FloatPoint(horizontalScrollOffsetForBanner, FrameView::yPositionForHeaderLayer(position, topContentInset));
@@ -536,7 +559,7 @@ static void logThreadedScrollingMode(unsigned synchronousScrollingReasons)
         WTFLogAlways("SCROLLING: Switching to threaded scrolling mode. Time: %f\n", WTF::monotonicallyIncreasingTime());
 }
 
-#if ENABLE(CSS_SCROLL_SNAP) && PLATFORM(MAC)
+#if ENABLE(CSS_SCROLL_SNAP)
 LayoutUnit ScrollingTreeFrameScrollingNodeMac::scrollOffsetOnAxis(ScrollEventAxis axis) const
 {
     const FloatPoint& currentPosition = scrollPosition();
@@ -559,7 +582,40 @@ float ScrollingTreeFrameScrollingNodeMac::pageScaleFactor() const
 {
     return frameScaleFactor();
 }
+
+void ScrollingTreeFrameScrollingNodeMac::startScrollSnapTimer()
+{
+    scrollingTree().setMainFrameIsScrollSnapping(true);
+}
+
+void ScrollingTreeFrameScrollingNodeMac::stopScrollSnapTimer()
+{
+    scrollingTree().setMainFrameIsScrollSnapping(false);
+}
+    
+LayoutSize ScrollingTreeFrameScrollingNodeMac::scrollExtent() const
+{
+    return LayoutSize(totalContentsSize());
+}
 #endif
+
+void ScrollingTreeFrameScrollingNodeMac::deferTestsForReason(WheelEventTestTrigger::ScrollableAreaIdentifier identifier, WheelEventTestTrigger::DeferTestTriggerReason reason) const
+{
+    if (!m_expectsWheelEventTestTrigger)
+        return;
+
+    LOG(WheelEventTestTriggers, "  ScrollingTreeFrameScrollingNodeMac::deferTestsForReason: STARTING deferral for %p because of %d", identifier, reason);
+    scrollingTree().deferTestsForReason(identifier, reason);
+}
+    
+void ScrollingTreeFrameScrollingNodeMac::removeTestDeferralForReason(WheelEventTestTrigger::ScrollableAreaIdentifier identifier, WheelEventTestTrigger::DeferTestTriggerReason reason) const
+{
+    if (!m_expectsWheelEventTestTrigger)
+        return;
+    
+    LOG(WheelEventTestTriggers, "   ScrollingTreeFrameScrollingNodeMac::deferTestsForReason: ENDING deferral for %p because of %d", identifier, reason);
+    scrollingTree().removeTestDeferralForReason(identifier, reason);
+}
 
 } // namespace WebCore
 

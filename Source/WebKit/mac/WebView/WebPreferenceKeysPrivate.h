@@ -119,9 +119,11 @@
 #define WebKitHyperlinkAuditingEnabledPreferenceKey @"WebKitHyperlinkAuditingEnabled"
 #define WebKitAVFoundationEnabledKey @"WebKitAVFoundationEnabled"
 #define WebKitHixie76WebSocketProtocolEnabledKey @"WebKitHixie76WebSocketProtocolEnabled"
-#define WebKitMediaPlaybackRequiresUserGesturePreferenceKey @"WebKitMediaPlaybackRequiresUserGesture"
-#define WebKitMediaPlaybackAllowsInlinePreferenceKey @"WebKitMediaPlaybackAllowsInline"
-#define WebKitAllowsAlternateFullscreenPreferenceKey @"WebKitAllowsAlternateFullscreen"
+#define WebKitRequiresUserGestureForMediaPlaybackPreferenceKey @"WebKitMediaPlaybackRequiresUserGesture"
+#define WebKitAllowsInlineMediaPlaybackPreferenceKey @"WebKitMediaPlaybackAllowsInline"
+#define WebKitAllowsPictureInPictureMediaPlaybackPreferenceKey @"WebKitAllowsPictureInPictureMediaPlayback"
+#define WebKitAllowsAirPlayForMediaPlaybackPreferenceKey @"WebKitMediaPlaybackAllowsAirPlay"
+#define WebKitMediaControlsScaleWithPageZoomPreferenceKey @"WebKitMediaControlsScaleWithPageZoom"
 #define WebKitMockScrollbarsEnabledPreferenceKey @"WebKitMockScrollbarsEnabled"
 #define WebKitShouldDisplaySubtitlesPreferenceKey @"WebKitShouldDisplaySubtitles"
 #define WebKitShouldDisplayCaptionsPreferenceKey @"WebKitShouldDisplayCaptions"
@@ -130,7 +132,6 @@
 #define WebKitSuppressesIncrementalRenderingKey @"WebKitSuppressesIncrementalRendering"
 #define WebKitSubpixelCSSOMElementMetricsEnabledPreferenceKey @"WebKitSubpixelCSSOMElementMetricsEnabled"
 #if TARGET_OS_IPHONE
-#define WebKitMediaPlaybackAllowsAirPlayPreferenceKey @"WebKitMediaPlaybackAllowsAirPlay"
 #define WebKitAudioSessionCategoryOverride @"WebKitAudioSessionCategoryOverride"
 #define WebKitAVKitEnabled @"WebKitAVKitEnabled"
 #endif
@@ -172,6 +173,7 @@
 #define WebKitDebugFullPageZoomPreferenceKey @"WebKitDebugFullPageZoomPreferenceKey"
 #define WebKitMinimumZoomFontSizePreferenceKey @"WebKitMinimumZoomFontSizePreferenceKey"
 #define WebKitAntialiasedFontDilationEnabledKey @"AntialiasedFontDilationEnabled"
+#define WebKitHTTPEquivEnabledPreferenceKey @"WebKitHTTPEquivEnabled"
 
 #if TARGET_OS_IPHONE
 #define WebKitStandalonePreferenceKey @"WebKitStandalonePreferenceKey"

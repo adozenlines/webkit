@@ -58,8 +58,7 @@ typedef int ExceptionCode;
 
 class UserMediaRequest : public MediaStreamCreationClient, public ContextDestructionObserver {
 public:
-    static PassRefPtr<UserMediaRequest> create(ScriptExecutionContext*, UserMediaController*, const Dictionary& options, PassRefPtr<NavigatorUserMediaSuccessCallback>, PassRefPtr<NavigatorUserMediaErrorCallback>, ExceptionCode&);
-    static PassRefPtr<UserMediaRequest> create(ScriptExecutionContext*, UserMediaController*, const Dictionary& options, MediaDevices::ResolveCallback, MediaDevices::RejectCallback, ExceptionCode&);
+    static void start(Document*, const Dictionary&, MediaDevices::Promise&&, ExceptionCode&);
     ~UserMediaRequest();
 
     WEBCORE_EXPORT SecurityOrigin* securityOrigin() const;
@@ -70,12 +69,17 @@ public:
 
     bool requiresAudio() const { return m_audioConstraints; }
     bool requiresVideo() const { return m_videoConstraints; }
+    
+    const Vector<String>& videoDeviceUIDs() const { return m_videoDeviceUIDs; }
+    const Vector<String>& audioDeviceUIDs() const { return m_audioDeviceUIDs; }
 
+    const Vector<String>& deviceUIDsVideo() const { return m_deviceUIDsVideo; }
+    const Vector<String>& deviceUIDsAudio() const { return m_deviceUIDsAudio; }
 private:
-    UserMediaRequest(ScriptExecutionContext*, UserMediaController*, PassRefPtr<MediaConstraints> audioConstraints, PassRefPtr<MediaConstraints> videoConstraints, MediaDevices::ResolveCallback, MediaDevices::RejectCallback);
+    UserMediaRequest(ScriptExecutionContext*, UserMediaController*, PassRefPtr<MediaConstraints> audioConstraints, PassRefPtr<MediaConstraints> videoConstraints, MediaDevices::Promise&&);
 
     // MediaStreamCreationClient
-    virtual void constraintsValidated() override final;
+    virtual void constraintsValidated(const Vector<RefPtr<RealtimeMediaSource>>&, const Vector<RefPtr<RealtimeMediaSource>>&) override final;
     virtual void constraintsInvalid(const String& constraintName) override final;
     virtual void didCreateStream(PassRefPtr<MediaStreamPrivate>) override final;
     virtual void failedToCreateStreamWithConstraintsError(const String& constraintName) override final;
@@ -86,11 +90,16 @@ private:
     
     RefPtr<MediaConstraints> m_audioConstraints;
     RefPtr<MediaConstraints> m_videoConstraints;
+    
+    Vector<String> m_deviceUIDsVideo;
+    Vector<String> m_deviceUIDsAudio;
 
+    Vector<String> m_videoDeviceUIDs;
+    Vector<String> m_audioDeviceUIDs;
+    
     UserMediaController* m_controller;
 
-    MediaDevices::ResolveCallback m_resolveCallback;
-    MediaDevices::RejectCallback m_rejectCallback;
+    MediaDevices::Promise m_promise;
 };
 
 } // namespace WebCore

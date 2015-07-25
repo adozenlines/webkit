@@ -52,9 +52,9 @@ class DownloadProxyMap;
 class WebProcessPool;
 struct NetworkProcessCreationParameters;
 
-class NetworkProcessProxy : public ChildProcessProxy, public ProcessThrottlerClient {
+class NetworkProcessProxy : public ChildProcessProxy, private ProcessThrottlerClient {
 public:
-    static PassRefPtr<NetworkProcessProxy> create(WebProcessPool&);
+    static Ref<NetworkProcessProxy> create(WebProcessPool&);
     ~NetworkProcessProxy();
 
     void getNetworkProcessConnection(PassRefPtr<Messages::WebProcessProxy::GetNetworkProcessConnection::DelayedReply>);
@@ -69,14 +69,11 @@ public:
     void setProcessSuppressionEnabled(bool);
 #endif
 
-    void sendProcessWillSuspend() override;
-    void sendCancelProcessWillSuspend() override;
-    void didCancelProcessSuspension();
     void processReadyToSuspend();
-    void sendProcessDidResume() override;
+
     void setIsHoldingLockedFiles(bool);
 
-    ProcessThrottler& throttler() { return *m_throttler; }
+    ProcessThrottler& throttler() { return m_throttler; }
 
 private:
     NetworkProcessProxy(WebProcessPool&);
@@ -84,9 +81,17 @@ private:
     // ChildProcessProxy
     virtual void getLaunchOptions(ProcessLauncher::LaunchOptions&) override;
     virtual void connectionWillOpen(IPC::Connection&) override;
+    virtual void processWillShutDown(IPC::Connection&) override;
 
     void platformGetLaunchOptions(ProcessLauncher::LaunchOptions&);
     void networkProcessCrashedOrFailedToLaunch();
+
+    // ProcessThrottlerClient
+    void sendProcessWillSuspendImminently() override;
+    void sendPrepareToSuspend() override;
+    void sendCancelPrepareToSuspend() override;
+    void sendProcessDidResume() override;
+    void didSetAssertionState(AssertionState) override;
 
     // IPC::Connection::Client
     virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
@@ -103,9 +108,9 @@ private:
     void didFetchWebsiteData(uint64_t callbackID, const WebsiteData&);
     void didDeleteWebsiteData(uint64_t callbackID);
     void didDeleteWebsiteDataForOrigins(uint64_t callbackID);
-    void logDiagnosticMessage(uint64_t pageID, const String& message, const String& description, bool shouldSample);
-    void logDiagnosticMessageWithResult(uint64_t pageID, const String& message, const String& description, uint32_t result, bool shouldSample);
-    void logDiagnosticMessageWithValue(uint64_t pageID, const String& message, const String& description, const String& value, bool shouldSample);
+    void logSampledDiagnosticMessage(uint64_t pageID, const String& message, const String& description);
+    void logSampledDiagnosticMessageWithResult(uint64_t pageID, const String& message, const String& description, uint32_t result);
+    void logSampledDiagnosticMessageWithValue(uint64_t pageID, const String& message, const String& description, const String& value);
 
     // ProcessLauncher::Client
     virtual void didFinishLaunching(ProcessLauncher*, IPC::Connection::Identifier) override;
@@ -121,7 +126,7 @@ private:
 
     std::unique_ptr<DownloadProxyMap> m_downloadProxyMap;
     CustomProtocolManagerProxy m_customProtocolManagerProxy;
-    std::unique_ptr<ProcessThrottler> m_throttler;
+    ProcessThrottler m_throttler;
     ProcessThrottler::BackgroundActivityToken m_tokenForHoldingLockedFiles;
 };
 

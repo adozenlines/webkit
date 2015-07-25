@@ -215,7 +215,7 @@ SLOW_PATH_DECL(slow_path_create_scoped_arguments)
 {
     BEGIN();
     JSLexicalEnvironment* scope = jsCast<JSLexicalEnvironment*>(OP(2).jsValue());
-    ScopedArgumentsTable* table = exec->codeBlock()->symbolTable()->arguments();
+    ScopedArgumentsTable* table = scope->symbolTable()->arguments();
     RETURN(ScopedArguments::createByCopying(exec, table, scope));
 }
 
@@ -234,6 +234,12 @@ SLOW_PATH_DECL(slow_path_create_this)
     ConstructData constructData;
     ASSERT(constructor->methodTable()->getConstructData(constructor, constructData) == ConstructTypeJS);
 #endif
+
+    auto& cacheWriteBarrier = pc[4].u.jsCell;
+    if (!cacheWriteBarrier)
+        cacheWriteBarrier.set(exec->vm(), exec->codeBlock()->ownerExecutable(), constructor);
+    else if (cacheWriteBarrier.unvalidatedGet() != JSCell::seenMultipleCalleeObjects() && cacheWriteBarrier.get() != constructor)
+        cacheWriteBarrier.setWithoutWriteBarrier(JSCell::seenMultipleCalleeObjects());
 
     size_t inlineCapacity = pc[3].u.operand;
     Structure* structure = constructor->rareData(exec, inlineCapacity)->allocationProfile()->structure();
@@ -262,7 +268,7 @@ SLOW_PATH_DECL(slow_path_to_this)
 SLOW_PATH_DECL(slow_path_throw_tdz_error)
 {
     BEGIN();
-    THROW(createReferenceError(exec, "Cannot access uninitialized variable."));
+    THROW(createTDZError(exec));
 }
 
 SLOW_PATH_DECL(slow_path_not)
@@ -630,6 +636,18 @@ SLOW_PATH_DECL(slow_path_profile_type_clear_log)
     BEGIN();
     vm.typeProfilerLog()->processLogEntries(ASCIILiteral("LLInt log full."));
     END();
+}
+
+SLOW_PATH_DECL(slow_path_create_lexical_environment)
+{
+    BEGIN();
+    int scopeReg = pc[2].u.operand;
+    JSScope* currentScope = exec->uncheckedR(scopeReg).Register::scope();
+    SymbolTable* symbolTable = jsCast<SymbolTable*>(OP_C(3).jsValue());
+    JSValue initialValue = OP_C(4).jsValue();
+    ASSERT(initialValue == jsUndefined() || initialValue == jsTDZValue());
+    JSScope* newScope = JSLexicalEnvironment::create(vm, exec->lexicalGlobalObject(), currentScope, symbolTable, initialValue);
+    RETURN(newScope);
 }
 
 } // namespace JSC

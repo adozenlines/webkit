@@ -46,6 +46,41 @@ using namespace JSC;
 namespace WebCore {
 
 namespace ContentExtensions {
+    
+static bool containsOnlyASCIIWithNoUppercase(const String& domain)
+{
+    for (unsigned i = 0; i < domain.length(); ++i) {
+        UChar c = domain.at(i);
+        if (!isASCII(c) || isASCIIUpper(c))
+            return false;
+    }
+    return true;
+}
+    
+static std::error_code getDomainList(ExecState& exec, JSObject* arrayObject, Vector<String>& vector)
+{
+    ASSERT(vector.isEmpty());
+    if (!arrayObject || !isJSArray(arrayObject))
+        return ContentExtensionError::JSONInvalidDomainList;
+    JSArray* array = jsCast<JSArray*>(arrayObject);
+    
+    unsigned length = array->length();
+    for (unsigned i = 0; i < length; ++i) {
+        // FIXME: JSObject::getIndex should be marked as const.
+        JSValue value = array->getIndex(&exec, i);
+        if (exec.hadException() || !value.isString())
+            return ContentExtensionError::JSONInvalidDomainList;
+        
+        // Domains should be punycode encoded lower case.
+        const String& domain = jsCast<JSString*>(value)->value(&exec);
+        if (domain.isEmpty())
+            return ContentExtensionError::JSONInvalidDomainList;
+        if (!containsOnlyASCIIWithNoUppercase(domain))
+            return ContentExtensionError::JSONDomainNotLowerCaseASCII;
+        vector.append(domain);
+    }
+    return { };
+}
 
 static std::error_code getTypeFlags(ExecState& exec, const JSValue& typeValue, ResourceFlags& flags, uint16_t (*stringToType)(const String&))
 {
@@ -96,18 +131,45 @@ static std::error_code loadTrigger(ExecState& exec, JSObject& ruleObject, Trigge
         trigger.urlFilterIsCaseSensitive = urlFilterCaseValue.toBoolean(&exec);
 
     JSValue resourceTypeValue = triggerObject.get(&exec, Identifier::fromString(&exec, "resource-type"));
-    if (resourceTypeValue && !exec.hadException()) {
+    if (!exec.hadException() && resourceTypeValue.isObject()) {
         auto typeFlagsError = getTypeFlags(exec, resourceTypeValue, trigger.flags, readResourceType);
         if (typeFlagsError)
             return typeFlagsError;
-    }
+    } else if (!resourceTypeValue.isUndefined())
+        return ContentExtensionError::JSONInvalidTriggerFlagsArray;
 
     JSValue loadTypeValue = triggerObject.get(&exec, Identifier::fromString(&exec, "load-type"));
-    if (loadTypeValue && !exec.hadException()) {
+    if (!exec.hadException() && loadTypeValue.isObject()) {
         auto typeFlagsError = getTypeFlags(exec, loadTypeValue, trigger.flags, readLoadType);
         if (typeFlagsError)
             return typeFlagsError;
-    }
+    } else if (!loadTypeValue.isUndefined())
+        return ContentExtensionError::JSONInvalidTriggerFlagsArray;
+
+    JSValue ifDomain = triggerObject.get(&exec, Identifier::fromString(&exec, "if-domain"));
+    if (!exec.hadException() && ifDomain.isObject()) {
+        auto ifDomainError = getDomainList(exec, asObject(ifDomain), trigger.domains);
+        if (ifDomainError)
+            return ifDomainError;
+        if (trigger.domains.isEmpty())
+            return ContentExtensionError::JSONInvalidDomainList;
+        ASSERT(trigger.domainCondition == Trigger::DomainCondition::None);
+        trigger.domainCondition = Trigger::DomainCondition::IfDomain;
+    } else if (!ifDomain.isUndefined())
+        return ContentExtensionError::JSONInvalidDomainList;
+    
+    JSValue unlessDomain = triggerObject.get(&exec, Identifier::fromString(&exec, "unless-domain"));
+    if (!exec.hadException() && unlessDomain.isObject()) {
+        if (trigger.domainCondition != Trigger::DomainCondition::None)
+            return ContentExtensionError::JSONUnlessAndIfDomain;
+        auto unlessDomainError = getDomainList(exec, asObject(unlessDomain), trigger.domains);
+        if (unlessDomainError)
+            return unlessDomainError;
+        if (trigger.domains.isEmpty())
+            return ContentExtensionError::JSONInvalidDomainList;
+        trigger.domainCondition = Trigger::DomainCondition::UnlessDomain;
+    } else if (!unlessDomain.isUndefined())
+        return ContentExtensionError::JSONInvalidDomainList;
 
     return { };
 }
@@ -160,6 +222,7 @@ static std::error_code loadRule(ExecState& exec, JSObject& ruleObject, Vector<Co
 
 static std::error_code loadEncodedRules(ExecState& exec, const String& rules, Vector<ContentExtensionRule>& ruleList)
 {
+    // FIXME: JSONParse should require callbacks instead of an ExecState.
     JSValue decodedRules = JSONParse(&exec, rules);
 
     if (exec.hadException() || !decodedRules)
@@ -180,6 +243,9 @@ static std::error_code loadEncodedRules(ExecState& exec, const String& rules, Ve
     Vector<ContentExtensionRule> localRuleList;
 
     unsigned length = topLevelArray->length();
+    const unsigned maxRuleCount = 50000;
+    if (length > maxRuleCount)
+        return ContentExtensionError::JSONTooManyRules;
     for (unsigned i = 0; i < length; ++i) {
         JSValue value = topLevelArray->getIndex(&exec, i);
         if (exec.hadException() || !value)
@@ -211,7 +277,7 @@ std::error_code parseRuleList(const String& rules, Vector<ContentExtensionRule>&
     ExecState* exec = globalObject->globalExec();
     auto error = loadEncodedRules(*exec, rules, ruleList);
 
-    vm.clear();
+    vm = nullptr;
 
     if (error)
         return error;

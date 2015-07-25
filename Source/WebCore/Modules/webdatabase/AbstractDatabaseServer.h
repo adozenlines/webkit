@@ -55,7 +55,9 @@ public:
         RetryOpenDatabase
     };
 
-    virtual PassRefPtr<DatabaseBackendBase> openDatabase(RefPtr<DatabaseContext>&, const String& name, const String& expectedVersion, const String& displayName, unsigned long estimatedSize, bool setVersionInNewDatabase, DatabaseError&, String& errorMessage, OpenAttempt = FirstTryToOpenDatabase) = 0;
+    virtual RefPtr<DatabaseBackendBase> openDatabase(RefPtr<DatabaseContext>&, const String& name, const String& expectedVersion, const String& displayName, unsigned long estimatedSize, bool setVersionInNewDatabase, DatabaseError&, String& errorMessage, OpenAttempt = FirstTryToOpenDatabase) = 0;
+
+    virtual void closeAllDatabases() = 0;
 
     virtual bool hasEntryForOrigin(SecurityOrigin*) = 0;
     virtual void origins(Vector<RefPtr<SecurityOrigin>>& result) = 0;

@@ -38,7 +38,7 @@
 #include "VideoSinkGStreamer.h"
 #include "WebKitWebSourceGStreamer.h"
 #include <gst/gst.h>
-#include <wtf/gobject/GMutexLocker.h>
+#include <wtf/glib/GMutexLocker.h>
 #include <wtf/text/CString.h>
 
 #include <gst/audio/streamvolume.h>
@@ -69,6 +69,12 @@
 #elif USE(EGL)
 #include "GLContextEGL.h"
 #include <gst/gl/egl/gstgldisplay_egl.h>
+#endif
+
+#if PLATFORM(X11)
+#include "PlatformDisplayX11.h"
+#elif PLATFORM(WAYLAND)
+#include "PlatformDisplayWayland.h"
 #endif
 
 // gstglapi.h may include eglplatform.h and it includes X.h, which
@@ -228,12 +234,11 @@ bool MediaPlayerPrivateGStreamerBase::ensureGstGLContext()
         return true;
 
     if (!m_glDisplay) {
+        const auto& sharedDisplay = PlatformDisplay::sharedDisplay();
 #if PLATFORM(X11)
-        Display* display = GLContext::sharedX11Display();
-        m_glDisplay = GST_GL_DISPLAY(gst_gl_display_x11_new_with_display(display));
+        m_glDisplay = GST_GL_DISPLAY(gst_gl_display_x11_new_with_display(downcast<PlatformDisplayX11>(sharedDisplay).native()));
 #elif PLATFORM(WAYLAND)
-        EGLDisplay display = WaylandDisplay::instance()->eglDisplay();
-        m_glDisplay = GST_GL_DISPLAY(gst_gl_display_egl_new_with_egl_display(display));
+        m_glDisplay = GST_GL_DISPLAY(gst_gl_display_egl_new_with_egl_display(downcast<PlatformDisplayWayland>(sharedDisplay).native()));
 #endif
     }
 
@@ -525,9 +530,6 @@ void MediaPlayerPrivateGStreamerBase::paint(GraphicsContext* context, const Floa
 #if USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS)
 void MediaPlayerPrivateGStreamerBase::paintToTextureMapper(TextureMapper* textureMapper, const FloatRect& targetRect, const TransformationMatrix& matrix, float opacity)
 {
-    if (textureMapper->accelerationMode() != TextureMapper::OpenGLMode)
-        return;
-
     if (!m_player->visible())
         return;
 

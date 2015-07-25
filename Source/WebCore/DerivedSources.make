@@ -35,6 +35,7 @@ VPATH = \
     $(WebCore)/Modules/indexeddb \
     $(WebCore)/Modules/indieui \
     $(WebCore)/Modules/mediacontrols \
+    $(WebCore)/Modules/mediasession \
     $(WebCore)/Modules/mediasource \
     $(WebCore)/Modules/mediastream \
     $(WebCore)/Modules/notifications \
@@ -103,6 +104,9 @@ NON_SVG_BINDING_IDLS = \
     $(WebCore)/Modules/indexeddb/WorkerGlobalScopeIndexedDatabase.idl \
     $(WebCore)/Modules/indieui/UIRequestEvent.idl \
     $(WebCore)/Modules/mediacontrols/MediaControlsHost.idl \
+    $(WebCore)/Modules/mediasession/HTMLMediaElementMediaSession.idl \
+    $(WebCore)/Modules/mediasession/MediaRemoteControls.idl \
+    $(WebCore)/Modules/mediasession/MediaSession.idl \
 	$(WebCore)/Modules/mediasource/DOMURLMediaSource.idl \
 	$(WebCore)/Modules/mediasource/AudioTrackMediaSource.idl \
 	$(WebCore)/Modules/mediasource/MediaSource.idl \
@@ -116,8 +120,10 @@ NON_SVG_BINDING_IDLS = \
 	$(WebCore)/Modules/mediastream/AllVideoCapabilities.idl \
 	$(WebCore)/Modules/mediastream/AllAudioCapabilities.idl \
     $(WebCore)/Modules/mediastream/CapabilityRange.idl \
+	$(WebCore)/Modules/mediastream/DOMURLMediaStream.idl \
     $(WebCore)/Modules/mediastream/HTMLMediaElementMediaStream.idl \
     $(WebCore)/Modules/mediastream/MediaSourceStates.idl \
+    $(WebCore)/Modules/mediastream/MediaDeviceInfo.idl \
     $(WebCore)/Modules/mediastream/MediaDevices.idl \
 	$(WebCore)/Modules/mediastream/MediaStream.idl \
 	$(WebCore)/Modules/mediastream/MediaStreamCapabilities.idl \
@@ -284,6 +290,7 @@ NON_SVG_BINDING_IDLS = \
     $(WebCore)/dom/EventListener.idl \
     $(WebCore)/dom/EventTarget.idl \
     $(WebCore)/dom/FocusEvent.idl \
+    $(WebCore)/dom/GlobalEventHandlers.idl \
     $(WebCore)/dom/HashChangeEvent.idl \
     $(WebCore)/dom/KeyboardEvent.idl \
     $(WebCore)/dom/MessageChannel.idl \
@@ -299,8 +306,11 @@ NON_SVG_BINDING_IDLS = \
     $(WebCore)/dom/NodeFilter.idl \
     $(WebCore)/dom/NodeIterator.idl \
     $(WebCore)/dom/NodeList.idl \
+    $(WebCore)/dom/NonElementParentNode.idl \
+    $(WebCore)/dom/NonDocumentTypeChildNode.idl \
     $(WebCore)/dom/OverflowEvent.idl \
     $(WebCore)/dom/PageTransitionEvent.idl \
+    $(WebCore)/dom/ParentNode.idl \
     $(WebCore)/dom/PopStateEvent.idl \
     $(WebCore)/dom/ProcessingInstruction.idl \
     $(WebCore)/dom/ProgressEvent.idl \
@@ -308,6 +318,7 @@ NON_SVG_BINDING_IDLS = \
     $(WebCore)/dom/Range.idl \
     $(WebCore)/dom/RangeException.idl \
     $(WebCore)/dom/RequestAnimationFrameCallback.idl \
+    $(WebCore)/dom/SecurityPolicyViolationEvent.idl \
     $(WebCore)/dom/StringCallback.idl \
     $(WebCore)/dom/Text.idl \
     $(WebCore)/dom/TextEvent.idl \
@@ -499,6 +510,7 @@ NON_SVG_BINDING_IDLS = \
     $(WebCore)/page/UserMessageHandlersNamespace.idl \
     $(WebCore)/page/UserMessageHandler.idl \
     $(WebCore)/page/WindowBase64.idl \
+    $(WebCore)/page/WindowEventHandlers.idl \
     $(WebCore)/page/WindowTimers.idl \
     $(WebCore)/page/WorkerNavigator.idl \
     $(WebCore)/plugins/DOMMimeType.idl \
@@ -709,10 +721,10 @@ else
     WTF_PLATFORM_IOS = 0
 endif
 
-ifeq ($(shell $(CC) -std=gnu++11 -x c++ -E -P -dM $(SDK_FLAGS) $(FRAMEWORK_FLAGS) $(HEADER_FLAGS) -include "wtf/Platform.h" /dev/null | grep WTF_USE_APPLE_INTERNAL_SDK | cut -d' ' -f3), 1)
-    WTF_USE_APPLE_INTERNAL_SDK = 1
+ifeq ($(shell $(CC) -std=gnu++11 -x c++ -E -P -dM $(SDK_FLAGS) $(FRAMEWORK_FLAGS) $(HEADER_FLAGS) -include "wtf/Platform.h" /dev/null | grep USE_APPLE_INTERNAL_SDK | cut -d' ' -f3), 1)
+    USE_APPLE_INTERNAL_SDK = 1
 else
-    WTF_USE_APPLE_INTERNAL_SDK = 0
+    USE_APPLE_INTERNAL_SDK = 0
 endif
 
 ifeq ($(shell $(CC) -std=gnu++11 -x c++ -E -P -dM $(SDK_FLAGS) $(FRAMEWORK_FLAGS) $(HEADER_FLAGS) -include "wtf/Platform.h" /dev/null | grep ENABLE_ORIENTATION_EVENTS | cut -d' ' -f3), 1)
@@ -837,8 +849,8 @@ ifeq ($(ENABLE_ORIENTATION_EVENTS), 1)
     ADDITIONAL_IDL_DEFINES := $(ADDITIONAL_IDL_DEFINES) ENABLE_ORIENTATION_EVENTS
 endif
 
-ifeq ($(WTF_USE_APPLE_INTERNAL_SDK), 1)
-    ADDITIONAL_IDL_DEFINES := $(ADDITIONAL_IDL_DEFINES) WTF_USE_APPLE_INTERNAL_SDK
+ifeq ($(USE_APPLE_INTERNAL_SDK), 1)
+    ADDITIONAL_IDL_DEFINES := $(ADDITIONAL_IDL_DEFINES) USE_APPLE_INTERNAL_SDK
 endif
 
 # --------

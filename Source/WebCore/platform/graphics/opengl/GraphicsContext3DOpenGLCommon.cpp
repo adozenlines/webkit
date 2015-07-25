@@ -359,7 +359,7 @@ bool GraphicsContext3D::checkVaryingsPacking(Platform3DObject vertexShader, Plat
         const auto& fragmentSymbol = fragmentEntry.varyingMap.find(symbolName);
         if (fragmentSymbol != fragmentEntry.varyingMap.end()) {
             ShVariableInfo symbolInfo;
-            symbolInfo.type = static_cast<ShDataType>((fragmentSymbol->value).type);
+            symbolInfo.type = (fragmentSymbol->value).type;
             // The arrays are already split up.
             symbolInfo.size = (fragmentSymbol->value).size;
             combinedVaryings.add(symbolName, symbolInfo);
@@ -397,7 +397,7 @@ bool GraphicsContext3D::precisionsMatch(Platform3DObject vertexShader, Platform3
     const auto& vertexEntry = m_shaderSourceMap.find(vertexShader)->value;
     const auto& fragmentEntry = m_shaderSourceMap.find(fragmentShader)->value;
 
-    HashMap<String, ShPrecisionType> vertexSymbolPrecisionMap;
+    HashMap<String, sh::GLenum> vertexSymbolPrecisionMap;
 
     for (const auto& entry : vertexEntry.uniformMap)
         vertexSymbolPrecisionMap.add(entry.value.mappedName, entry.value.precision);
@@ -1361,7 +1361,7 @@ Platform3DObject GraphicsContext3D::createVertexArray()
 {
     makeContextCurrent();
     GLuint array = 0;
-#if (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(IOS))
+#if !USE(OPENGL_ES_2) && (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(IOS))
     glGenVertexArrays(1, &array);
 #elif defined(GL_APPLE_vertex_array_object) && GL_APPLE_vertex_array_object
     glGenVertexArraysAPPLE(1, &array);
@@ -1375,7 +1375,7 @@ void GraphicsContext3D::deleteVertexArray(Platform3DObject array)
         return;
     
     makeContextCurrent();
-#if (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(IOS))
+#if !USE(OPENGL_ES_2) && (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(IOS))
     glDeleteVertexArrays(1, &array);
 #elif defined(GL_APPLE_vertex_array_object) && GL_APPLE_vertex_array_object
     glDeleteVertexArraysAPPLE(1, &array);
@@ -1388,7 +1388,7 @@ GC3Dboolean GraphicsContext3D::isVertexArray(Platform3DObject array)
         return GL_FALSE;
     
     makeContextCurrent();
-#if (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(IOS))
+#if !USE(OPENGL_ES_2) && (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(IOS))
     return glIsVertexArray(array);
 #elif defined(GL_APPLE_vertex_array_object) && GL_APPLE_vertex_array_object
     return glIsVertexArrayAPPLE(array);
@@ -1399,7 +1399,7 @@ GC3Dboolean GraphicsContext3D::isVertexArray(Platform3DObject array)
 void GraphicsContext3D::bindVertexArray(Platform3DObject array)
 {
     makeContextCurrent();
-#if (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(IOS))
+#if !USE(OPENGL_ES_2) && (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(IOS))
     glBindVertexArray(array);
 #elif defined(GL_APPLE_vertex_array_object) && GL_APPLE_vertex_array_object
     glBindVertexArrayAPPLE(array);

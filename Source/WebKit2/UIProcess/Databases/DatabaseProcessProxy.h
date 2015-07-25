@@ -45,7 +45,7 @@ class WebProcessPool;
 
 class DatabaseProcessProxy : public ChildProcessProxy {
 public:
-    static PassRefPtr<DatabaseProcessProxy> create(WebProcessPool*);
+    static Ref<DatabaseProcessProxy> create(WebProcessPool*);
     ~DatabaseProcessProxy();
 
     void fetchWebsiteData(WebCore::SessionID, WebsiteDataTypes, std::function<void (WebsiteData)> completionHandler);
@@ -59,6 +59,7 @@ private:
 
     // ChildProcessProxy
     virtual void getLaunchOptions(ProcessLauncher::LaunchOptions&) override;
+    virtual void processWillShutDown(IPC::Connection&) override;
 
     // IPC::Connection::Client
     virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;

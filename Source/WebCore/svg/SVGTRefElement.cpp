@@ -62,8 +62,7 @@ public:
 
     static const SVGTRefTargetEventListener* cast(const EventListener* listener)
     {
-        return listener->type() == SVGTRefTargetEventListenerType
-                ? static_cast<const SVGTRefTargetEventListener*>(listener) : 0;
+        return listener->type() == SVGTRefTargetEventListenerType ? static_cast<const SVGTRefTargetEventListener*>(listener) : nullptr;
     }
 
     void attach(PassRefPtr<Element> target);
@@ -83,7 +82,7 @@ private:
 SVGTRefTargetEventListener::SVGTRefTargetEventListener(SVGTRefElement& trefElement)
     : EventListener(SVGTRefTargetEventListenerType)
     , m_trefElement(trefElement)
-    , m_target(0)
+    , m_target(nullptr)
 {
 }
 
@@ -105,7 +104,7 @@ void SVGTRefTargetEventListener::detach()
 
     m_target->removeEventListener(eventNames().DOMSubtreeModifiedEvent, this, false);
     m_target->removeEventListener(eventNames().DOMNodeRemovedFromDocumentEvent, this, false);
-    m_target.clear();
+    m_target = nullptr;
 }
 
 bool SVGTRefTargetEventListener::operator==(const EventListener& listener)
@@ -259,11 +258,11 @@ Node::InsertionNotificationRequest SVGTRefElement::insertedInto(ContainerNode& r
 {
     SVGElement::insertedInto(rootParent);
     if (rootParent.inDocument())
-        return InsertionShouldCallDidNotifySubtreeInsertions;
+        return InsertionShouldCallFinishedInsertingSubtree;
     return InsertionDone;
 }
 
-void SVGTRefElement::didNotifySubtreeInsertions(ContainerNode*)
+void SVGTRefElement::finishedInsertingSubtree()
 {
     buildPendingResource();
 }

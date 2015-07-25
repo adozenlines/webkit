@@ -30,6 +30,7 @@
 #include "JSExportMacros.h"
 #include <stdint.h>
 #include <stdio.h>
+#include <wtf/PrintStream.h>
 #include <wtf/StdLibExtras.h>
 
 namespace JSC {
@@ -80,6 +81,8 @@ public:
     bool init(const char*);
     bool isInRange(unsigned);
     const char* rangeString() const { return (m_state > InitError) ? m_rangeString : "<null>"; }
+    
+    void dump(PrintStream& out) const;
 
 private:
     RangeState m_state;
@@ -106,6 +109,7 @@ typedef const char* optionString;
     v(unsigned, errorModeReservedZoneSize, 64 * KB, nullptr) \
     \
     v(bool, crashIfCantAllocateJITMemory, false, nullptr) \
+    v(unsigned, jitMemoryReservationSize, 0, nullptr) \
     \
     v(bool, forceDFGCodeBlockLiveness, false, nullptr) \
     v(bool, forceICFailure, false, nullptr) \
@@ -144,6 +148,7 @@ typedef const char* optionString;
     v(bool, verboseCompilationQueue, false, nullptr) \
     v(bool, reportCompileTimes, false, "dumps JS function signature and the time it took to compile") \
     v(bool, reportFTLCompileTimes, false, "dumps JS function signature and the time it took to FTL compile") \
+    v(bool, reportTotalCompileTimes, false, nullptr) \
     v(bool, verboseCFA, false, nullptr) \
     v(bool, verboseFTLToJSThunk, false, nullptr) \
     v(bool, verboseFTLFailure, false, nullptr) \
@@ -229,6 +234,7 @@ typedef const char* optionString;
     v(unsigned, maximumBinaryStringSwitchTotalLength, 2000, nullptr) \
     \
     v(double, jitPolicyScale, 1.0, "scale JIT thresholds to this specified ratio between 0.0 (compile ASAP) and 1.0 (compile like normal).") \
+    v(bool, forceEagerCompilation, false, nullptr) \
     v(int32, thresholdForJITAfterWarmUp, 500, nullptr) \
     v(int32, thresholdForJITSoon, 100, nullptr) \
     \
@@ -291,6 +297,7 @@ typedef const char* optionString;
     v(gcLogLevel, logGC, GCLogging::None, "debugging option to log GC activity (0 = None, 1 = Basic, 2 = Verbose)") \
     v(bool, disableGC, false, nullptr) \
     v(unsigned, gcMaxHeapSize, 0, nullptr) \
+    v(unsigned, forceRAMSize, 0, nullptr) \
     v(bool, recordGCPauseTimes, false, nullptr) \
     v(bool, logHeapStatisticsAtExit, false, nullptr) \
     v(bool, enableTypeProfiler, false, nullptr) \
@@ -306,6 +313,11 @@ typedef const char* optionString;
     v(unsigned, fireExecutableAllocationFuzzAt, 0, nullptr) \
     v(unsigned, fireExecutableAllocationFuzzAtOrAfter, 0, nullptr) \
     v(bool, verboseExecutableAllocationFuzz, false, nullptr) \
+    \
+    v(bool, enableOSRExitFuzz, false, nullptr) \
+    v(unsigned, fireOSRExitFuzzAtStatic, 0, nullptr) \
+    v(unsigned, fireOSRExitFuzzAt, 0, nullptr) \
+    v(unsigned, fireOSRExitFuzzAtOrAfter, 0, nullptr) \
     \
     v(bool, enableDollarVM, false, "installs the $vm debugging tool in global objects") \
     v(optionString, functionOverrides, nullptr, "file with debugging overrides for function bodies") \
@@ -342,13 +354,14 @@ public:
         gcLogLevelType,
     };
 
-    static void initialize();
+    JS_EXPORT_PRIVATE static void initialize();
 
     // Parses a single command line option in the format "<optionName>=<value>"
     // (no spaces allowed) and set the specified option if appropriate.
     JS_EXPORT_PRIVATE static bool setOption(const char* arg);
     JS_EXPORT_PRIVATE static void dumpAllOptions(DumpLevel, const char* title = nullptr, FILE* stream = stdout);
     static void dumpOption(DumpLevel, OptionID, FILE* stream = stdout, const char* header = "", const char* footer = "");
+    JS_EXPORT_PRIVATE static void ensureOptionsAreCoherent();
 
     // Declare accessors for each option:
 #define FOR_EACH_OPTION(type_, name_, defaultValue_, description_) \

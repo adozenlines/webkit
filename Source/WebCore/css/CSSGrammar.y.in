@@ -146,9 +146,7 @@ static bool selectorListDoesNotMatchAnyPseudoElement(const Vector<std::unique_pt
 %token WEBKIT_DECLS_SYM
 %token WEBKIT_VALUE_SYM
 %token WEBKIT_MEDIAQUERY_SYM
-#if ENABLE_PICTURE_SIZES
 %token WEBKIT_SIZESATTR_SYM
-#endif
 %token WEBKIT_SELECTOR_SYM
 %token WEBKIT_REGION_RULE_SYM
 %token WEBKIT_VIEWPORT_RULE_SYM
@@ -257,8 +255,6 @@ static bool selectorListDoesNotMatchAnyPseudoElement(const Vector<std::unique_pt
 %type <mediaQueryExp> media_query_exp base_media_query_exp
 %destructor { delete $$; } media_query_exp base_media_query_exp
 
-#if ENABLE_PICTURE_SIZES
-
 %union { Vector<CSSParser::SourceSize>* sourceSizeList; }
 %type <sourceSizeList> source_size_list
 %destructor { delete $$; } source_size_list
@@ -268,8 +264,6 @@ static bool selectorListDoesNotMatchAnyPseudoElement(const Vector<std::unique_pt
 
 %type <value> source_size_length
 %destructor { destroy($$); } source_size_length
-
-#endif
 
 %union { Vector<std::unique_ptr<MediaQueryExp>>* mediaQueryExpList; }
 %type <mediaQueryExpList> media_query_exp_list maybe_and_media_query_exp_list
@@ -374,9 +368,7 @@ stylesheet:
   | webkit_decls maybe_space
   | webkit_value maybe_space
   | webkit_mediaquery maybe_space
-#if ENABLE_PICTURE_SIZES
   | webkit_source_size_list maybe_space
-#endif
   | webkit_selector maybe_space
   | webkit_keyframe_rule maybe_space
   | webkit_supports_condition maybe_space
@@ -426,6 +418,8 @@ maybe_charset: /* empty */ | charset ;
 closing_brace: '}' | %prec LOWEST_PREC TOKEN_EOF ;
 
 closing_parenthesis: ')' | %prec LOWEST_PREC TOKEN_EOF ;
+
+closing_bracket: ']' | %prec LOWEST_PREC TOKEN_EOF;
 
 charset:
   CHARSET_SYM maybe_space STRING maybe_space ';' {
@@ -563,8 +557,6 @@ string_or_uri: STRING | URI ;
 
 maybe_media_value: /*empty*/ { $$ = nullptr; } | ':' maybe_space expr maybe_space { $$ = $3; } ;
 
-#if ENABLE_PICTURE_SIZES
-
 webkit_source_size_list:
     WEBKIT_SIZESATTR_SYM WHITESPACE source_size_list maybe_space '}' {
         parser->m_sourceSizeList = std::unique_ptr<Vector<CSSParser::SourceSize>>($3);
@@ -589,8 +581,6 @@ maybe_source_media_query_exp:
     | base_media_query_exp maybe_space;
 
 source_size_length: unary_term | calc_function;
-
-#endif
 
 base_media_query_exp: '(' maybe_space IDENT maybe_space maybe_media_value ')' {
         std::unique_ptr<CSSParserValueList> mediaValue($5);
@@ -654,11 +644,11 @@ media_query:
     }
     ;
 
-maybe_media_list: /* empty */ { $$ = MediaQuerySet::create().leakRef(); } | media_list ;
+maybe_media_list: /* empty */ { $$ = &MediaQuerySet::create().leakRef(); } | media_list ;
 
 media_list:
     media_query {
-        $$ = MediaQuerySet::create().leakRef();
+        $$ = &MediaQuerySet::create().leakRef();
         $$->addMediaQuery(std::unique_ptr<MediaQuery>($1));
         parser->updateLastMediaLine($$);
     }
@@ -1021,7 +1011,9 @@ combinator:
     '+' maybe_space { $$ = CSSParserSelectorCombinator::DirectAdjacent; }
   | '~' maybe_space { $$ = CSSParserSelectorCombinator::IndirectAdjacent; }
   | '>' maybe_space { $$ = CSSParserSelectorCombinator::Child; }
+#if ENABLE_CSS_SELECTORS_LEVEL4
   | '>' '>' maybe_space { $$ = CSSParserSelectorCombinator::DescendantDoubleChild; }
+#endif
   ;
 
 maybe_unary_operator: unary_operator | { $$ = 1; } ;
@@ -1597,13 +1589,13 @@ ident_list:
     ;
 
 track_names_list:
-    '(' maybe_space closing_parenthesis {
+    '[' maybe_space closing_bracket {
         $$.setFromValueList(std::make_unique<CSSParserValueList>());
     }
-    | '(' maybe_space ident_list closing_parenthesis {
+    | '[' maybe_space ident_list closing_bracket {
         $$.setFromValueList(std::unique_ptr<CSSParserValueList>($3));
     }
-    | '(' maybe_space expr_recovery closing_parenthesis {
+    | '[' maybe_space expr_recovery closing_bracket {
         $$.id = CSSValueInvalid;
         $$.unit = 0;
         YYERROR;
@@ -1876,7 +1868,7 @@ invalid_rule: error invalid_block ;
 
 invalid_block: '{' error_recovery closing_brace { parser->invalidBlockHit(); } ;
 
-invalid_square_brackets_block: '[' error_recovery ']' | '[' error_recovery TOKEN_EOF ;
+invalid_square_brackets_block: '[' error_recovery closing_bracket ;
 
 invalid_parentheses_block: opening_parenthesis error_recovery closing_parenthesis;
 

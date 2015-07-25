@@ -123,6 +123,8 @@ WK_EXPORT void WKPageSetApplicationNameForUserAgent(WKPageRef page, WKStringRef 
 WK_EXPORT WKStringRef WKPageCopyCustomUserAgent(WKPageRef page);
 WK_EXPORT void WKPageSetCustomUserAgent(WKPageRef page, WKStringRef userAgent);
 
+WK_EXPORT void WKPageSetUserContentExtensionsEnabled(WKPageRef, bool);
+    
 WK_EXPORT bool WKPageSupportsTextEncoding(WKPageRef page);
 WK_EXPORT WKStringRef WKPageCopyCustomTextEncodingName(WKPageRef page);
 WK_EXPORT void WKPageSetCustomTextEncodingName(WKPageRef page, WKStringRef encodingName);
@@ -144,6 +146,7 @@ WK_EXPORT void WKPageRestoreFromSessionState(WKPageRef page, WKTypeRef sessionSt
 
 WK_EXPORT double WKPageGetBackingScaleFactor(WKPageRef page);
 WK_EXPORT void WKPageSetCustomBackingScaleFactor(WKPageRef page, double customScaleFactor);
+WK_EXPORT void WKPageClearWheelEventTestTrigger(WKPageRef page);
 
 WK_EXPORT bool WKPageSupportsTextZoom(WKPageRef page);
 WK_EXPORT double WKPageGetTextZoomFactor(WKPageRef page);

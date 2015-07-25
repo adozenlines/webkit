@@ -55,6 +55,7 @@
 #include <runtime/BooleanObject.h>
 #include <runtime/DateInstance.h>
 #include <runtime/Error.h>
+#include <runtime/Exception.h>
 #include <runtime/ExceptionHelpers.h>
 #include <runtime/JSArrayBuffer.h>
 #include <runtime/JSArrayBufferView.h>
@@ -681,23 +682,23 @@ private:
         }
     }
 
-    void dumpString(String str)
+    void dumpString(const String& string)
     {
-        if (str.isEmpty())
+        if (string.isEmpty())
             write(EmptyStringTag);
         else {
             write(StringTag);
-            write(str);
+            write(string);
         }
     }
 
-    void dumpStringObject(String str)
+    void dumpStringObject(const String& string)
     {
-        if (str.isEmpty())
+        if (string.isEmpty())
             write(EmptyStringObjectTag);
         else {
             write(StringObjectTag);
-            write(str);
+            write(string);
         }
     }
 
@@ -983,7 +984,7 @@ private:
     void write(const Identifier& ident)
     {
         const String& str = ident.string();
-        StringConstantPool::AddResult addResult = m_constantPool.add(str.impl(), m_constantPool.size());
+        StringConstantPool::AddResult addResult = m_constantPool.add(ident.impl(), m_constantPool.size());
         if (!addResult.isNewEntry) {
             write(StringPoolTag);
             writeStringIndex(addResult.iterator->value);
@@ -1211,7 +1212,7 @@ private:
     ObjectPool m_objectPool;
     ObjectPool m_transferredMessagePorts;
     ObjectPool m_transferredArrayBuffers;
-    typedef HashMap<RefPtr<StringImpl>, uint32_t, IdentifierRepHash> StringConstantPool;
+    typedef HashMap<RefPtr<UniquedStringImpl>, uint32_t, IdentifierRepHash> StringConstantPool;
     StringConstantPool m_constantPool;
     Identifier m_emptyIdentifier;
 };
@@ -1253,7 +1254,7 @@ SerializationReturnCode CloneSerializer::serialize(JSValue in)
                     indexStack.removeLast();
                     lengthStack.removeLast();
 
-                    propertyStack.append(PropertyNameArray(m_exec));
+                    propertyStack.append(PropertyNameArray(m_exec, PropertyNameMode::Strings));
                     array->methodTable()->getOwnNonIndexPropertyNames(array, m_exec, propertyStack.last(), EnumerationMode());
                     if (propertyStack.last().size()) {
                         write(NonIndexPropertiesTag);
@@ -1303,7 +1304,7 @@ SerializationReturnCode CloneSerializer::serialize(JSValue in)
                     return DataCloneError;
                 inputObjectStack.append(inObject);
                 indexStack.append(0);
-                propertyStack.append(PropertyNameArray(m_exec));
+                propertyStack.append(PropertyNameArray(m_exec, PropertyNameMode::Strings));
                 inObject->methodTable()->getOwnPropertyNames(inObject, m_exec, propertyStack.last(), EnumerationMode());
             }
             objectStartVisitMember:
@@ -1371,7 +1372,7 @@ SerializationReturnCode CloneSerializer::serialize(JSValue in)
                     mapIteratorStack.removeLast();
                     JSObject* object = inputObjectStack.last();
                     ASSERT(jsDynamicCast<JSMap*>(object));
-                    propertyStack.append(PropertyNameArray(m_exec));
+                    propertyStack.append(PropertyNameArray(m_exec, PropertyNameMode::Strings));
                     object->methodTable()->getOwnPropertyNames(object, m_exec, propertyStack.last(), EnumerationMode());
                     write(NonMapPropertiesTag);
                     indexStack.append(0);
@@ -1415,7 +1416,7 @@ SerializationReturnCode CloneSerializer::serialize(JSValue in)
                     setIteratorStack.removeLast();
                     JSObject* object = inputObjectStack.last();
                     ASSERT(jsDynamicCast<JSSet*>(object));
-                    propertyStack.append(PropertyNameArray(m_exec));
+                    propertyStack.append(PropertyNameArray(m_exec, PropertyNameMode::Strings));
                     object->methodTable()->getOwnPropertyNames(object, m_exec, propertyStack.last(), EnumerationMode());
                     write(NonSetPropertiesTag);
                     indexStack.append(0);
@@ -2650,9 +2651,7 @@ std::unique_ptr<SerializedScriptValue::ArrayBufferContentsArray> SerializedScrip
     return contents;
 }
 
-PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(ExecState* exec, JSValue value,
-                                                                MessagePortArray* messagePorts, ArrayBufferArray* arrayBuffers,
-                                                                SerializationErrorMode throwExceptions)
+RefPtr<SerializedScriptValue> SerializedScriptValue::create(ExecState* exec, JSValue value, MessagePortArray* messagePorts, ArrayBufferArray* arrayBuffers, SerializationErrorMode throwExceptions)
 {
     Vector<uint8_t> buffer;
     Vector<String> blobURLs;
@@ -2667,32 +2666,32 @@ PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(ExecState* exec,
         maybeThrowExceptionIfSerializationFailed(exec, code);
 
     if (!serializationDidCompleteSuccessfully(code))
-        return 0;
+        return nullptr;
 
-    return adoptRef(new SerializedScriptValue(buffer, blobURLs, WTF::move(arrayBufferContentsArray)));
+    return adoptRef(*new SerializedScriptValue(buffer, blobURLs, WTF::move(arrayBufferContentsArray)));
 }
 
-PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(const String& string)
+RefPtr<SerializedScriptValue> SerializedScriptValue::create(const String& string)
 {
     Vector<uint8_t> buffer;
     if (!CloneSerializer::serialize(string, buffer))
-        return 0;
-    return adoptRef(new SerializedScriptValue(buffer));
+        return nullptr;
+    return adoptRef(*new SerializedScriptValue(buffer));
 }
 
 #if ENABLE(INDEXED_DATABASE)
-PassRefPtr<SerializedScriptValue> SerializedScriptValue::numberValue(double value)
+Ref<SerializedScriptValue> SerializedScriptValue::numberValue(double value)
 {
     Vector<uint8_t> buffer;
     CloneSerializer::serializeNumber(value, buffer);
-    return adoptRef(new SerializedScriptValue(buffer));
+    return adoptRef(*new SerializedScriptValue(buffer));
 }
 
-PassRefPtr<SerializedScriptValue> SerializedScriptValue::undefinedValue()
+Ref<SerializedScriptValue> SerializedScriptValue::undefinedValue()
 {
     Vector<uint8_t> buffer;
     CloneSerializer::serializeUndefined(buffer);
-    return adoptRef(new SerializedScriptValue(buffer));
+    return adoptRef(*new SerializedScriptValue(buffer));
 }
 #endif
 
@@ -2704,7 +2703,7 @@ PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(JSContextRef ori
     RefPtr<SerializedScriptValue> serializedValue = SerializedScriptValue::create(exec, value, nullptr, nullptr);
     if (exec->hadException()) {
         if (exception)
-            *exception = toRef(exec, exec->exception());
+            *exception = toRef(exec, exec->exception()->value());
         exec->clearException();
         return 0;
     }
@@ -2734,7 +2733,7 @@ JSValueRef SerializedScriptValue::deserialize(JSContextRef destinationContext, J
     JSValue value = deserialize(exec, exec->lexicalGlobalObject(), nullptr);
     if (exec->hadException()) {
         if (exception)
-            *exception = toRef(exec, exec->exception());
+            *exception = toRef(exec, exec->exception()->value());
         exec->clearException();
         return nullptr;
     }
@@ -2742,10 +2741,10 @@ JSValueRef SerializedScriptValue::deserialize(JSContextRef destinationContext, J
     return toRef(exec, value);
 }
 
-PassRefPtr<SerializedScriptValue> SerializedScriptValue::nullValue()
+Ref<SerializedScriptValue> SerializedScriptValue::nullValue()
 {
     Vector<uint8_t> buffer;
-    return adoptRef(new SerializedScriptValue(buffer));
+    return adoptRef(*new SerializedScriptValue(buffer));
 }
 
 void SerializedScriptValue::maybeThrowExceptionIfSerializationFailed(ExecState* exec, SerializationReturnCode code)

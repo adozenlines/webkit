@@ -1,27 +1,23 @@
 
-FAIL Underlying source start: throwing getter assert_throws: constructing the stream should re-throw the error function "function () {
-        new ReadableStream({
-            ge..." threw object "TypeError: ReadableStream constructor object start proper..." ("TypeError") expected object "Error: a unique string" ("Error")
+PASS Underlying source start: throwing getter 
 PASS Underlying source start: throwing method 
-TIMEOUT Underlying source: throwing pull getter (initial pull) Test timed out
-TIMEOUT Underlying source: throwing pull method (initial pull) Test timed out
-FAIL Underlying source: throwing pull getter (second pull) read is not implemented
-FAIL Underlying source: throwing pull method (second pull) read is not implemented
-FAIL Underlying source: throwing cancel getter cancel is not implemented
-FAIL Underlying source: throwing cancel method cancel is not implemented
-FAIL Underlying source: throwing strategy getter assert_throws: enqueue should throw the error function "function () { c.enqueue('a'); }" did not throw
-FAIL Underlying source: throwing strategy.size getter assert_throws: enqueue should throw the error function "function () { c.enqueue('a'); }" did not throw
-FAIL Underlying source: throwing strategy.size method assert_throws: enqueue should throw the error function "function () { c.enqueue('a'); }" did not throw
-FAIL Underlying source: throwing strategy.shouldApplyBackpressure getter assert_throws: enqueue should throw the error function "function () { c.enqueue('a'); }" did not throw
-FAIL Underlying source: throwing strategy.shouldApplyBackpressure method assert_throws: enqueue should throw the error function "function () { c.enqueue('a'); }" did not throw
-FAIL Underlying source: strategy.size returning NaN assert_unreached: enqueue didn't throw Reached unreachable code
-FAIL Underlying source: strategy.size returning -Infinity assert_unreached: enqueue didn't throw Reached unreachable code
-FAIL Underlying source: strategy.size returning +Infinity assert_unreached: enqueue didn't throw Reached unreachable code
+PASS Underlying source: throwing pull getter (initial pull) 
+PASS Underlying source: throwing pull method (initial pull) 
+PASS Underlying source: throwing pull getter (second pull) 
+PASS Underlying source: throwing pull method (second pull) 
+PASS Underlying source: throwing cancel getter 
+PASS Underlying source: throwing cancel method 
+PASS Underlying source: calling enqueue on an empty canceled stream should not throw 
+PASS Underlying source: calling enqueue on a non-empty canceled stream should not throw 
+PASS Underlying source: calling enqueue on a closed stream should throw 
+PASS Underlying source: calling enqueue on an errored stream should throw 
 PASS Underlying source: calling close twice on an empty stream should throw the second time 
-FAIL Underlying source: calling close twice on a non-empty stream should throw the second time read is not implemented
-FAIL Underlying source: calling close on an empty canceled stream should not throw cancel is not implemented
-FAIL Underlying source: calling close on a non-empty canceled stream should not throw cancel is not implemented
-TIMEOUT Underlying source: calling close after error should throw Test timed out
-TIMEOUT Underlying source: calling error twice should throw the second time Test timed out
+PASS Underlying source: calling close twice on a non-empty stream should throw the second time 
+PASS Underlying source: calling close on an empty canceled stream should not throw 
+PASS Underlying source: calling close on a non-empty canceled stream should not throw 
+PASS Underlying source: calling close after error should throw 
+PASS Underlying source: calling error twice should throw the second time 
 PASS Underlying source: calling error after close should throw 
+PASS Underlying source: calling error and returning a rejected promise from start should cause the stream to error with the first error 
+PASS Underlying source: calling error and returning a rejected promise from pull should cause the stream to error with the first error 
 

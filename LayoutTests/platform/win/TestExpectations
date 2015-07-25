@@ -37,6 +37,7 @@ fast/text/international/bidi-AN-after-empty-run.html [ Skip ]
 fast/text/international/bidi-CS-after-AN.html [ Skip ]
 fast/text/international/bidi-neutral-run.html [ Skip ]
 fast/text/international/bidi-neutral-directionality-paragraph-start.html [ Skip ]
+fast/text/hidpi-text-selection-gap-between-words.html [ Skip ]
 svg/W3C-SVG-1.1/fonts-glyph-02-t.svg [ Skip ]
 svg/W3C-SVG-1.1/text-intro-05-t.svg [ Skip ]
 svg/text/text-intro-05-t.svg [ Skip ]
@@ -83,6 +84,9 @@ webkit.org/b/74716 css3/filters/backdrop [ Skip ]
 
 # TODO Should be moved to platform/mac <rdar://5621425>
 http/tests/misc/willCacheResponse-delegate-callback.html [ Skip ]
+
+# testRunner.setAlwaysAcceptCookies() is not implemented on Windows.
+http/tests/xmlhttprequest/cross-origin-cookie-storage.html [ Skip ]
 
 # TODO No Dashboard compatibility mode on Windows
 http/tests/xmlhttprequest/default-content-type-dashboard.html [ Skip ]
@@ -133,9 +137,6 @@ fast/history/page-cache-notification-suspendable.html [ Skip ]
 
 # TODO DumpRenderTree code to enable Java is currently a no-op. Windows doesn't come with Java by default.
 java/ [ Skip ]
-
-# TODO Implement testRunner.dispatchPendingLoadRequests
-webkit.org/b/26481 http/tests/loading/deleted-host-in-resource-load-delegate-callback.html [ Skip ]
 
 # TODO No support for print-to-pdf in Windows DRT
 printing/compositing-layer-printing.html [ Skip ]
@@ -239,9 +240,12 @@ http/tests/security/cross-origin-worker-indexeddb-allowed.html [ Skip ]
 http/tests/security/cross-origin-worker-indexeddb.html [ Skip ]
 http/tests/security/no-indexeddb-from-sandbox.html [ Skip ]
 crypto/subtle/rsa-indexeddb.html [ Skip ]
-inspector-protocol/indexeddb/basics.html [ Skip ]
 fast/history/page-cache-indexed-closed-db.html [ Skip ]
 fast/history/page-cache-indexed-opened-db.html [ Skip ]
+
+# But since it is disabled at runtime, we should make sure it is correctly disabled
+storage/indexeddb/properties-disabled-at-runtime.html [ Pass ]
+
 fast/history/page-cache-webdatabase-no-transaction-db.html [ Skip ]
 fast/history/page-cache-webdatabase-pending-transaction.html [ Skip ]
 
@@ -344,6 +348,7 @@ webkit.org/b/42435 http/tests/misc/webtiming-cross-origin-and-back1.html [ Skip 
 webkit.org/b/42435 http/tests/misc/webtiming-cross-origin-redirect.php [ Skip ]
 webkit.org/b/42435 http/tests/misc/webtiming-no-origin.html [ Skip ]
 webkit.org/b/42435 http/tests/misc/webtiming-one-redirect.php [ Skip ]
+webkit.org/b/42435 http/tests/misc/webtiming-resolution.html [ Skip ]
 webkit.org/b/42435 http/tests/misc/webtiming-slow-load.php [ Skip ]
 webkit.org/b/42435 http/tests/misc/webtiming-ssl.php [ Skip ]
 webkit.org/b/42435 http/tests/misc/webtiming-two-redirects.php [ Skip ]
@@ -446,15 +451,13 @@ webkit.org/b/86914 webaudio/ [ Skip ]
 webkit.org/b/86914 fast/history/page-cache-closed-audiocontext.html [ Skip ]
 webkit.org/b/86914 fast/history/page-cache-running-audiocontext.html [ Skip ]
 webkit.org/b/86914 fast/history/page-cache-suspended-audiocontext.html [ Skip ]
+webkit.org/b/86914 media/W3C/audio [ Skip ]
 
 # ENABLE(DRAGGABLE_REGION) is disabled
 fast/css/draggable-region-parser.html [ Skip ]
 
 # Font feature settings is not implemented.
 css3/font-feature-settings-rendering.html [ Skip ]
-
-# TODO Implement dumpProgressFinishedCallback
-webkit.org/b/66773 http/tests/loading/progress-finished-callback.html
 
 # TODO HiDPI tests require test infrastructure enhancements (e.g. testRunner.setBackingScaleFactor)
 # https://bugs.webkit.org/show_bug.cgi?id=87919
@@ -501,9 +504,6 @@ http/tests/pointer-lock/ [ Skip ]
 
 # TODO Vibration API is not implemented.
 vibration/ [ Skip ]
-
-# Touch adjustment not enabled on Windows (or mac)
-webkit.org/b/78801 touchadjustment/ [ Skip ]
 
 # Needs BatteryClient implementation.
 webkit.org/b/62698 batterystatus/ [ Skip ]
@@ -746,9 +746,6 @@ fast/media [ Skip ]
 http/tests/media [ Skip ] 
 
 fast/layers/video-layer.html [ Skip ] # Skip until video control changes are done.
-
-# Web Audio is not supported on Windows
-media/W3C/audio [ Skip ]
 
 # Assertion failures
 webkit.org/b/48910 [ Debug ] http/tests/media/pdf-served-as-pdf.html [ Skip ]  # Crashing
@@ -1267,6 +1264,7 @@ accessibility/svg-element-press.html [ Skip ]
 
 # Missing cellForColumnAndRow implementation in DRT
 webkit.org/b/143081 accessibility/table-cell-display-block.html [ Skip ]
+accessibility/aria-table-with-presentational-elements.html [ Skip ]
 
 # Accessibility tests for notifications that don't exist or aren't needed on Mac OS X (or Windows)
 accessibility/aria-checkbox-sends-notification.html [ Skip ]
@@ -1332,8 +1330,10 @@ webkit.org/b/140798 [ Release ] accessibility/legend-children-are-visible.html [
 webkit.org/b/140798 [ Debug ] accessibility/legend-children-are-visible.html [ Skip ] # Debug assertion
 webkit.org/b/140798 [ Release ] accessibility/link-inside-button-accessible-text.html [ Failure ]
 webkit.org/b/140798 [ Debug ] accessibility/link-inside-button-accessible-text.html [ Skip ] # Debug assertion
-webkit.org/b/140798 [ Release ] accessibility/list-detection.html [ Failure ]
-webkit.org/b/140798 [ Debug ] accessibility/list-detection.html [ Skip ] # Debug assertion
+webkit.org/b/145271 [ Release ] accessibility/list-detection.html [ Failure ]
+webkit.org/b/145271 [ Debug ] accessibility/list-detection.html [ Skip ] # Debug assertion
+webkit.org/b/145271 [ Release ] accessibility/list-detection2.html [ Failure ]
+webkit.org/b/145271 [ Debug ] accessibility/list-detection2.html [ Failure ]
 webkit.org/b/140798 [ Release ] accessibility/listitem-title.html [ Failure ]
 webkit.org/b/140798 [ Debug ] accessibility/listitem-title.html [ Skip ] # Debug assertion
 webkit.org/b/140798 [ Release ] accessibility/math-multiscript-attributes.html [ Failure ]
@@ -1526,6 +1526,9 @@ webkit.org/b/140867 [ Debug ] accessibility/focusable-div.html [ Skip ]
 [ Debug ] accessibility/heading-title-includes-links.html [ Skip ]
 webkit.org/b/140867 [ Debug ] accessibility/spinbutton-value.html [ Skip ]
 
+# Apparently missing support for roleDescription on Windows.
+accessibility/aria-roledescription.html [ Failure ]
+
 # Attempt to add a text element that claims NOT to be an accessibility element:
 webkit.org/b/140870 [ Debug ] accessibility/canvas-fallback-content.html [ Skip ]
 webkit.org/b/140870 [ Debug ] accessibility/canvas-accessibilitynodeobject.html [ Skip ]
@@ -1596,7 +1599,6 @@ webkit.org/b/140869 [ Debug ] accessibility/aria-combobox.html [ Skip ]
 [ Debug ] accessibility/aria-help.html [ Skip ] # Crashing
 [ Debug ] accessibility/aria-hidden.html [ Skip ] # Crashing
 [ Debug ] accessibility/aria-hidden-crash.html [ Skip ] # Crashing
-[ Debug ] accessibility/aria-hidden-hides-all-elements.html [ Skip ] # Crashing
 [ Debug ] accessibility/aria-hidden-update.html [ Skip ] # Crashing
 [ Debug ] accessibility/aria-hidden-updates-alldescendants.html [ Skip ] # Crashing
 [ Debug ] accessibility/aria-inherits-presentational.html [ Skip ] # Crashing
@@ -1611,7 +1613,6 @@ webkit.org/b/140869 [ Debug ] accessibility/aria-combobox.html [ Skip ]
 [ Debug ] accessibility/paragraph-with-linebreaks.html [ Skip ] # Debug assertion
 [ Debug ] accessibility/aria-presentational-role.html [ Skip ] # Crashing
 [ Debug ] accessibility/aria-roles.html [ Skip ] # Crashing
-[ Debug ] accessibility/aria-table-hierarchy.html [ Skip ] # Crashing
 [ Debug ] accessibility/iframe-bastardization.html [ Skip ] # Debug assertion
 [ Debug ] accessibility/ignore-spacer-elements.html [ Skip ] # Debug assertion
 [ Debug ] accessibility/image-link-inline-cont.html [ Skip ] # Debug assertion
@@ -1655,6 +1656,10 @@ webkit.org/b/140869 [ Debug ] accessibility/aria-combobox.html [ Skip ]
 [ Debug ] accessibility/updating-attribute-in-table-causes-crash.html [ Skip ] # Debug assertion
 
 [ Debug ] platform/win/accessibility/option-element-selection-and-focus-events.html [ Skip ] # Debug Assertion
+
+webkit.org/b/146903 accessibility/aria-table-hierarchy.html [ Skip ]
+webkit.org/b/146903 accessibility/roles-table-and-cell.html [ Skip ]
+
 ################################################################################
 #######################   End Accessibility Issues   ###########################
 ################################################################################
@@ -1738,6 +1743,7 @@ webkit.org/b/140759 canvas/philip/tests/2d.path.arcTo.collinear.3.html
 webkit.org/b/140759 canvas/philip/tests/2d.shadow.enable.blur.html
 webkit.org/b/140759 canvas/philip/tests/2d.shadow.enable.x.html
 webkit.org/b/140759 canvas/philip/tests/2d.shadow.enable.y.html
+webkit.org/b/146795 canvas/philip/tests/2d.text.draw.fontface.notinpage.html [ Pass Failure ]
 
 fast/canvas/canvas-gradient-addStop-error.html [ Failure ]
 fast/canvas/canvas-quadratic-same-endpoint.html [ Failure ]
@@ -1843,6 +1849,7 @@ webkit.org/b/140705 imported/mozilla/svg/stroke-width-percentage-02a.svg [ Image
 webkit.org/b/116564 transitions/svg-text-shadow-transition.html [ Failure ]
 webkit.org/b/117322 svg/animations/mozilla/animateMotion-mpath-targetChange-1.svg [ ImageOnlyFailure ]
 webkit.org/b/117322 svg/filters/feDisplacementMap-filterUnits.svg [ ImageOnlyFailure ]
+webkit.org/b/144417 svg/filters/sourceAlpha-input-filter-effect.html [ ImageOnlyFailure ]
 
 # Subpixel rendering: borders are reporting float values.
 webkit.org/b/128061 svg/zoom/page/zoom-img-preserveAspectRatio-support-1.html [ Failure ]
@@ -2114,18 +2121,21 @@ webkit.org/b/140703 [ Debug ] http/tests/misc/link-rel-icon-beforeload.html [ Sk
 webkit.org/b/140703 http/tests/misc/will-send-request-returns-null-on-redirect.html [ Failure ]
 webkit.org/b/140703 http/tests/misc/window-dot-stop.html [ Failure ]
 webkit.org/b/140703 http/tests/security/401-logout/401-logout.php [ Failure ]
+webkit.org/b/146701 http/tests/security/private-browsing-http-auth.html [ Failure ]
 webkit.org/b/140703 http/tests/security/XFrameOptions/x-frame-options-allowall.html [ Failure ]
+webkit.org/b/140703 [ Debug ] http/tests/security/XFrameOptions/x-frame-options-cached.html [ Crash ]
 webkit.org/b/140703 http/tests/security/XFrameOptions/x-frame-options-deny.html [ Failure ]
+webkit.org/b/140703 [ Debug ] http/tests/security/XFrameOptions/x-frame-options-deny-delete-frame-in-load-event.html [ Crash ]
 webkit.org/b/140703 http/tests/security/XFrameOptions/x-frame-options-deny-meta-tag-in-body.html [ Failure ]
-webkit.org/b/140703 http/tests/security/XFrameOptions/x-frame-options-deny-meta-tag-parent-same-origin-allow.html [ Failure ]
-webkit.org/b/140703 http/tests/security/XFrameOptions/x-frame-options-deny-meta-tag-parent-same-origin-deny.html [ Failure ]
-webkit.org/b/140703 http/tests/security/XFrameOptions/x-frame-options-deny-meta-tag.html [ Failure ]
+webkit.org/b/140703 http/tests/security/XFrameOptions/x-frame-options-deny-meta-tag-parent-same-origin-allow.html [ Crash Failure ]
+webkit.org/b/140703 http/tests/security/XFrameOptions/x-frame-options-deny-meta-tag-parent-same-origin-deny.html [ Crash Failure ]
+webkit.org/b/140703 http/tests/security/XFrameOptions/x-frame-options-deny-meta-tag.html [ Crash Failure ]
 webkit.org/b/140703 http/tests/security/XFrameOptions/x-frame-options-invalid.html [ Failure ]
 webkit.org/b/140703 http/tests/security/XFrameOptions/x-frame-options-multiple-headers-conflict.html [ Failure ]
 webkit.org/b/140703 http/tests/security/XFrameOptions/x-frame-options-multiple-headers-sameorigin-allow.html [ Failure ]
 webkit.org/b/140703 http/tests/security/XFrameOptions/x-frame-options-multiple-headers-sameorigin-deny.html [ Failure ]
-webkit.org/b/140703 http/tests/security/XFrameOptions/x-frame-options-parent-same-origin-allow.html [ Failure ]
-webkit.org/b/140703 http/tests/security/XFrameOptions/x-frame-options-parent-same-origin-deny.html [ Failure ]
+webkit.org/b/140703 http/tests/security/XFrameOptions/x-frame-options-parent-same-origin-allow.html [ Crash Failure ]
+webkit.org/b/140703 http/tests/security/XFrameOptions/x-frame-options-parent-same-origin-deny.html [ Crash Failure ]
 webkit.org/b/140703 http/tests/xmlhttprequest/remember-bad-password.html [ Failure ]
 webkit.org/b/140703 http/tests/xmlhttprequest/failed-auth.html [ Failure ]
 
@@ -2243,6 +2253,7 @@ http/tests/cache/disk-cache
 
 # The following are unreviewed:
 http/tests/cache/content-type-ignored-during-revalidation.html [ Failure ]
+http/tests/cache/main-resource-304-reload.html [ Failure ]
 http/tests/cache/partitioned-cache.html [ Failure ]
 http/tests/cache/partitioned-cache-iframe.html [ Failure ]
 http/tests/cache/post-redirect-get.php [ Failure ] # Easy
@@ -2346,6 +2357,8 @@ inspector/dom/content-node-region-info.html [ Crash Pass Failure Timeout ]
 inspector/css/selector-specificity.html [ Skip ]
 inspector/css/pseudo-element-matches.html [ Skip ]
 
+webkit.org/b/147017 inspector/css/get-system-fonts.html [ Skip ]
+
 # Inspector Protocol
 webkit.org/b/140510 inspector-protocol/debugger/terminate-dedicated-worker-while-paused.html [ Skip ]  # Crashing
 inspector-protocol/debugger/pause-on-assert.html [ Skip ]
@@ -2363,7 +2376,10 @@ webkit.org/b/128979 [ Release ] inspector-protocol/dom/getAccessibilityPropertie
 inspector-protocol/debugger/removeBreakpoint.html [ Skip ] # Crashing
 inspector-protocol/debugger/searchInContent-linebreaks.html [ Pass Crash ] # Flaky
 
+webkit.org/b/143548 inspector/console/command-line-api.html [ Skip ] # Timeout
 webkit.org/b/143548 inspector/console/console-api.html [ Skip ] # Timeout
+webkit.org/b/143548 inspector/console/console-table.html [ Skip ] # Timeout
+
 ################################################################################
 #################        End Inspector Issues               ####################
 ################################################################################
@@ -2432,6 +2448,7 @@ webkit.org/b/59062 [ Release ] fast/images/animated-gif-restored-from-bfcache.ht
 webkit.org/b/59062 [ Debug ] fast/images/animated-gif-restored-from-bfcache.html [ Skip ] # Timeout
 [ Debug ] fast/images/animated-gif-iframe-webkit-transform.html [ Skip ] # Timeout
 [ Debug ] fast/images/animated-gif-webkit-transform.html [ Skip ] # Timeout
+fast/images/animated-gif-body-outside-viewport.html [ Skip ] # Timeout
 fast/images/animated-gif-window-resizing.html [ Skip ] # Timeout
 fast/images/animated-gif-zooming.html [ Skip ] # Timeout
 webkit.org/b/140211 fast/xsl/sort-locale.xml [ Failure ]
@@ -2496,6 +2513,10 @@ webkit.org/b/140250 fast/loader/stateobjects/replacestate-in-iframe.html [ Failu
 
 webkit.org/b/138676 imported/w3c/canvas/2d.line.join.parallel.html [ Failure ]
 webkit.org/b/138676 imported/w3c/canvas/2d.strokeRect.zero.5.html [ Failure ]
+
+# requestAnimationFrame throttling does not work on Windows because USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR) is disabled.
+webkit.org/b/144718 fast/animation/request-animation-frame-throttle-subframe-display-none.html [ Skip ]
+webkit.org/b/144718 fast/animation/request-animation-frame-throttle-subframe.html [ Skip ]
 
 ################################################################################
 ######################### Start list of UNREVIEWED failures ########################
@@ -2577,7 +2598,6 @@ webkit.org/b/138676 imported/w3c/canvas/2d.strokeRect.zero.5.html [ Failure ]
 [ Debug ] fast/regions/hover-content-inside-iframe-in-region.html [ Skip ] # Debug Assertion
 [ Debug ] fast/repaint/4774354.html [ Skip ] # Causes later tests to fail
 [ Debug ] fast/repaint/fixed-in-page-scale.html [ Skip ] # Debug assertion
-[ Debug ] fast/repaint/fixed-move-after-keyboard-scroll.html [ Skip ] # Debug assertion
 [ Debug ] fast/repaint/fixed-move-after-scroll.html [ Skip ] # Debug assertion
 [ Debug ] fast/repaint/fixed-position-transparency-with-overflow.html [ Skip ] # Debug assertion
 [ Debug ] fast/repaint/text-selection-rect-in-overflow-2.html [ Skip ] # Causes later tests to fail
@@ -2681,7 +2701,6 @@ fast/filter-image/filter-image.html [ ImageOnlyFailure ]
 
 fast/flexbox/001.html [ Pass Failure ]
 
-webkit.org/b/140517 [ Debug ] fast/forms/button-first-line-first-letter.html [ Skip ]  # Crashing
 webkit.org/b/140506 fast/forms/textfield-lastchange-was-useredit.html [ Skip ]  # Crashing
 webkit.org/b/140519 [ Debug ] fast/flexbox/flexing-overflow-scroll-item.html [ Skip ]  # Crashing
 
@@ -3053,6 +3072,8 @@ webkit.org/b/139968 fast/regions/overflow/overflow-first-and-last-regions.html [
 # rdar://problem/20656948
 accessibility/treeitem-child-exposed.html [ Failure ]
 
+webkit.org/b/144673 fast/forms/button-line-height.html [ ImageOnlyFailure ]
+
 ################################################################################
 ######################### End list of UNREVIEWED failures ##########################
 ################################################################################
@@ -3082,14 +3103,33 @@ http/tests/contentfiltering [ Skip ]
 [ Release ] inspector-protocol/layers/layers-for-node.html [ Skip ] # Timeouts
 [ Release ] inspector-protocol/layers/layers-generated-content.html  [ Skip ] # Timeouts
 
-# Started failing recently.
-webkit.org/b/143275 accessibility/aria-hidden-hides-all-elements.html [ Pass Failure ]
+# Windows doesn't have API for disabling meta refresh
+loader/meta-refresh-disabled.html [ Skip ]
 
-# Broken Ruby tests
-webkit.org/b/143354 fast/ruby/ruby-expansion-cjk.html [ ImageOnlyFailure ]
-webkit.org/b/143354 fast/ruby/ruby-expansion-cjk-2.html [ ImageOnlyFailure ]
-webkit.org/b/143354 fast/ruby/ruby-expansion-cjk-3.html [ ImageOnlyFailure ]
-webkit.org/b/143354 fast/ruby/ruby-expansion-cjk-4.html [ ImageOnlyFailure ]
-webkit.org/b/143354 fast/ruby/ruby-expansion-cjk-5.html [ ImageOnlyFailure ]
+# Started failing recently.
+[ Debug ] accessibility/aria-hidden-hides-all-elements.html [ Skip ] # Crashing
+webkit.org/b/143275 [ Release ] accessibility/aria-hidden-hides-all-elements.html [ Pass Failure ]
 
 webkit.org/b/143420 fast/fixed-layout/fixed-layout.html [ Skip ]
+
+# Seems to be font metrics dependent.
+fast/text/simple-line-layout-text-stroke-width.html [ Failure ]
+
+# ShouldOpenExternalURLs not yet supported in WK1
+loader/navigation-policy [ Skip ]
+
+#Subpixel difference
+fast/text/decorations-vertical-underline.html [ Skip ]
+
+# Test requires hardcoded font names, which I do not have for this port.
+fast/text/han-generic-font-families.html [ WontFix ]
+fast/text/hangul-generic-font-families.html [ WontFix ]
+
+# New test for Bug 144830 (r186388) always fails.
+http/tests/security/contentSecurityPolicy/userAgentShadowDOM/allow-audio.html [ Failure ]
+
+# <rdar://problem/21816197> large-js-program.php crashes (crashes slower on Debug)
+http/tests/misc/large-js-program.php [ Slow Crash ]
+
+# Slider thumb widget painting
+fast/repaint/block-inputrange-repaint.html [ Pass Failure ]

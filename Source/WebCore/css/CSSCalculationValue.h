@@ -86,13 +86,12 @@ private:
 
 class CSSCalcValue : public CSSValue {
 public:
-    static PassRefPtr<CSSCalcValue> create(CSSParserString name, CSSParserValueList& arguments, CalculationPermittedValueRange);
-    static PassRefPtr<CSSCalcValue> create(const CalculationValue&, const RenderStyle&);
+    static RefPtr<CSSCalcValue> create(CSSParserString name, CSSParserValueList& arguments, CalculationPermittedValueRange);
+    static RefPtr<CSSCalcValue> create(const CalculationValue&, const RenderStyle&);
 
     CalculationCategory category() const { return m_expression->category(); }
     bool isInt() const { return m_expression->isInteger(); }
     double doubleValue() const;
-    bool isNegative() const { return m_expression->doubleValue() < 0; }
     bool isPositive() const { return m_expression->doubleValue() > 0; }
     double computeLengthPx(const CSSToLengthConversionData&) const;
     unsigned short primitiveType() const { return m_expression->primitiveType(); }

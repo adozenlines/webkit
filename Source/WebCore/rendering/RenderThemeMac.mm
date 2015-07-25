@@ -48,9 +48,11 @@
 #import "LocalCurrentGraphicsContext.h"
 #import "LocalizedStrings.h"
 #import "MediaControlElements.h"
+#import "NSColorSPI.h"
 #import "NSSharingServicePickerSPI.h"
 #import "Page.h"
 #import "PaintInfo.h"
+#import "PathUtilities.h"
 #import "RenderAttachment.h"
 #import "RenderLayer.h"
 #import "RenderMedia.h"
@@ -200,13 +202,13 @@ enum {
 
 PassRefPtr<RenderTheme> RenderTheme::themeForPage(Page*)
 {
-    static RenderTheme* rt = RenderThemeMac::create().leakRef();
-    return rt;
+    static RenderTheme& rt = RenderThemeMac::create().leakRef();
+    return &rt;
 }
 
-PassRefPtr<RenderTheme> RenderThemeMac::create()
+Ref<RenderTheme> RenderThemeMac::create()
 {
-    return adoptRef(new RenderThemeMac);
+    return adoptRef(*new RenderThemeMac);
 }
 
 RenderThemeMac::RenderThemeMac()
@@ -324,7 +326,7 @@ static FontWeight toFontWeight(NSInteger appKitFontWeight)
     else if (appKitFontWeight < 1)
         appKitFontWeight = 1;
 
-    static FontWeight fontWeights[] = {
+    static const FontWeight fontWeights[] = {
         FontWeight100,
         FontWeight100,
         FontWeight200,
@@ -346,15 +348,21 @@ static FontWeight toFontWeight(NSInteger appKitFontWeight)
 void RenderThemeMac::updateCachedSystemFontDescription(CSSValueID cssValueId, FontDescription& fontDescription) const
 {
     NSFont* font;
+    // System-font-ness can't be encapsulated by simply a font name. Instead, we must use a token
+    // which FontCache will look for.
+    // Make sure we keep this list of possible tokens in sync with FontCascade::primaryFontIsSystemFont()
+    AtomicString fontName;
     switch (cssValueId) {
         case CSSValueSmallCaption:
             font = [NSFont systemFontOfSize:[NSFont smallSystemFontSize]];
             break;
         case CSSValueMenu:
             font = [NSFont menuFontOfSize:[NSFont systemFontSize]];
+            fontName = AtomicString("-apple-menu", AtomicString::ConstructFromLiteral);
             break;
         case CSSValueStatusBar:
             font = [NSFont labelFontOfSize:[NSFont labelFontSize]];
+            fontName = AtomicString("-apple-status-bar", AtomicString::ConstructFromLiteral);
             break;
         case CSSValueWebkitMiniControl:
             font = [NSFont systemFontOfSize:[NSFont systemFontSizeForControlSize:NSMiniControlSize]];
@@ -372,9 +380,12 @@ void RenderThemeMac::updateCachedSystemFontDescription(CSSValueID cssValueId, Fo
     if (!font)
         return;
 
+    if (fontName.isNull())
+        fontName = AtomicString("-apple-system", AtomicString::ConstructFromLiteral);
+
     NSFontManager *fontManager = [NSFontManager sharedFontManager];
     fontDescription.setIsAbsoluteSize(true);
-    fontDescription.setOneFamily([font webCoreFamilyName]);
+    fontDescription.setOneFamily(fontName);
     fontDescription.setSpecifiedSize([font pointSize]);
     fontDescription.setWeight(toFontWeight([fontManager weightOfFont:font]));
     fontDescription.setIsItalic([fontManager traitsOfFont:font] & NSItalicFontMask);
@@ -454,23 +465,21 @@ void RenderThemeMac::platformColorsDidChange()
     RenderTheme::platformColorsDidChange();
 }
 
-Color RenderThemeMac::systemColor(CSSValueID cssValueId) const
+Color RenderThemeMac::systemColor(CSSValueID cssValueID) const
 {
-    {
-        HashMap<int, RGBA32>::iterator it = m_systemColorCache.find(cssValueId);
-        if (it != m_systemColorCache.end())
-            return it->value;
-    }
+    auto addResult = m_systemColorCache.add(cssValueID, Color());
+    if (!addResult.isNewEntry)
+        return addResult.iterator->value;
 
     Color color;
-    switch (cssValueId) {
+    switch (cssValueID) {
     case CSSValueActiveborder:
         color = convertNSColorToColor([NSColor keyboardFocusIndicatorColor]);
         break;
     case CSSValueActivebuttontext:
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
         // There is no corresponding NSColor for this so we use a hard coded value.
-        color = 0xC0FFFFFF;
+        color = Color::white;
 #else
         color = convertNSColorToColor([NSColor controlTextColor]);
 #endif
@@ -567,17 +576,48 @@ Color RenderThemeMac::systemColor(CSSValueID cssValueId) const
     case CSSValueWindowtext:
         color = convertNSColorToColor([NSColor windowFrameTextColor]);
         break;
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
+    case CSSValueAppleWirelessPlaybackTargetActive:
+        color = convertNSColorToColor([NSColor systemBlueColor]);
+        break;
+    case CSSValueAppleSystemBlue:
+        color = convertNSColorToColor([NSColor systemBlueColor]);
+        break;
+    case CSSValueAppleSystemBrown:
+        color = convertNSColorToColor([NSColor systemBrownColor]);
+        break;
+    case CSSValueAppleSystemGray:
+        color = convertNSColorToColor([NSColor systemGrayColor]);
+        break;
+    case CSSValueAppleSystemGreen:
+        color = convertNSColorToColor([NSColor systemGreenColor]);
+        break;
+    case CSSValueAppleSystemOrange:
+        color = convertNSColorToColor([NSColor systemOrangeColor]);
+        break;
+    case CSSValueAppleSystemPink:
+        color = convertNSColorToColor([NSColor systemPinkColor]);
+        break;
+    case CSSValueAppleSystemPurple:
+        color = convertNSColorToColor([NSColor systemPurpleColor]);
+        break;
+    case CSSValueAppleSystemRed:
+        color = convertNSColorToColor([NSColor systemRedColor]);
+        break;
+    case CSSValueAppleSystemYellow:
+        color = convertNSColorToColor([NSColor systemYellowColor]);
+        break;
+#endif
     default:
         break;
     }
 
     if (!color.isValid())
-        color = RenderTheme::systemColor(cssValueId);
+        color = RenderTheme::systemColor(cssValueID);
 
-    if (color.isValid())
-        m_systemColorCache.set(cssValueId, color.rgb());
+    addResult.iterator->value = color;
 
-    return color;
+    return addResult.iterator->value;
 }
 
 bool RenderThemeMac::usesTestModeFocusRingColor() const
@@ -794,7 +834,7 @@ void RenderThemeMac::setFontFromControlSize(StyleResolver&, RenderStyle& style, 
     fontDescription.setIsAbsoluteSize(true);
 
     NSFont* font = [NSFont systemFontOfSize:[NSFont systemFontSizeForControlSize:controlSize]];
-    fontDescription.setOneFamily([font webCoreFamilyName]);
+    fontDescription.setOneFamily(AtomicString("-apple-system", AtomicString::ConstructFromLiteral));
     fontDescription.setComputedSize([font pointSize] * style.effectiveZoom());
     fontDescription.setSpecifiedSize([font pointSize] * style.effectiveZoom());
 
@@ -893,8 +933,10 @@ bool RenderThemeMac::paintMenuList(const RenderObject& renderer, const PaintInfo
 
     GraphicsContextStateSaver stateSaver(*paintInfo.context);
 
-    // On Leopard, the cell will draw outside of the given rect, so we have to clip to the rect
+    // Before Yosemite we did not want the cell to ever draw outside the given rectangle.
+#if __MAC_OS_X_VERSION_MIN_REQUIRED < 101000
     paintInfo.context->clip(inflatedRect);
+#endif
 
     if (zoomLevel != 1.0f) {
         inflatedRect.setWidth(inflatedRect.width() / zoomLevel);
@@ -1138,8 +1180,8 @@ const int styledPopupPaddingBottom = 2;
 
 static void TopGradientInterpolate(void*, const CGFloat* inData, CGFloat* outData)
 {
-    static float dark[4] = { 1.0f, 1.0f, 1.0f, 0.4f };
-    static float light[4] = { 1.0f, 1.0f, 1.0f, 0.15f };
+    static const float dark[4] = { 1.0f, 1.0f, 1.0f, 0.4f };
+    static const float light[4] = { 1.0f, 1.0f, 1.0f, 0.15f };
     float a = inData[0];
     int i = 0;
     for (i = 0; i < 4; i++)
@@ -1148,8 +1190,8 @@ static void TopGradientInterpolate(void*, const CGFloat* inData, CGFloat* outDat
 
 static void BottomGradientInterpolate(void*, const CGFloat* inData, CGFloat* outData)
 {
-    static float dark[4] = { 1.0f, 1.0f, 1.0f, 0.0f };
-    static float light[4] = { 1.0f, 1.0f, 1.0f, 0.3f };
+    static const float dark[4] = { 1.0f, 1.0f, 1.0f, 0.0f };
+    static const float light[4] = { 1.0f, 1.0f, 1.0f, 0.3f };
     float a = inData[0];
     int i = 0;
     for (i = 0; i < 4; i++)
@@ -1158,8 +1200,8 @@ static void BottomGradientInterpolate(void*, const CGFloat* inData, CGFloat* out
 
 static void MainGradientInterpolate(void*, const CGFloat* inData, CGFloat* outData)
 {
-    static float dark[4] = { 0.0f, 0.0f, 0.0f, 0.15f };
-    static float light[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    static const float dark[4] = { 0.0f, 0.0f, 0.0f, 0.15f };
+    static const float light[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
     float a = inData[0];
     int i = 0;
     for (i = 0; i < 4; i++)
@@ -1168,8 +1210,8 @@ static void MainGradientInterpolate(void*, const CGFloat* inData, CGFloat* outDa
 
 static void TrackGradientInterpolate(void*, const CGFloat* inData, CGFloat* outData)
 {
-    static float dark[4] = { 0.0f, 0.0f, 0.0f, 0.678f };
-    static float light[4] = { 0.0f, 0.0f, 0.0f, 0.13f };
+    static const float dark[4] = { 0.0f, 0.0f, 0.0f, 0.678f };
+    static const float light[4] = { 0.0f, 0.0f, 0.0f, 0.13f };
     float a = inData[0];
     int i = 0;
     for (i = 0; i < 4; i++)
@@ -1515,11 +1557,13 @@ bool RenderThemeMac::paintSliderThumb(const RenderObject& o, const PaintInfo& pa
     else
         m_isSliderThumbHorizontalPressed = pressed;
 
+    NSView *view = documentViewFor(o);
+
     if (pressed != oldPressed) {
         if (pressed)
-            [sliderThumbCell startTrackingAt:NSPoint() inView:nil];
+            [sliderThumbCell startTrackingAt:NSPoint() inView:view];
         else
-            [sliderThumbCell stopTracking:NSPoint() at:NSPoint() inView:nil mouseIsUp:YES];
+            [sliderThumbCell stopTracking:NSPoint() at:NSPoint() inView:view mouseIsUp:YES];
     }
 
     FloatRect bounds = r;
@@ -1539,7 +1583,7 @@ bool RenderThemeMac::paintSliderThumb(const RenderObject& o, const PaintInfo& pa
         paintInfo.context->translate(-unzoomedRect.x(), -unzoomedRect.y());
     }
 
-    [sliderThumbCell drawInteriorWithFrame:unzoomedRect inView:documentViewFor(o)];
+    [sliderThumbCell drawKnob:unzoomedRect];
     [sliderThumbCell setControlView:nil];
 
     return false;
@@ -1587,6 +1631,7 @@ void RenderThemeMac::setSearchCellState(const RenderObject& o, const IntRect&)
 {
     NSSearchFieldCell* search = this->search();
 
+    [search setPlaceholderString:@""];
     [search setControlSize:controlSizeForFont(o.style())];
 
     // Update the various states we respond to.
@@ -1890,11 +1935,6 @@ void RenderThemeMac::adjustSliderThumbSize(RenderStyle& style, Element*) const
         style.setWidth(Length(static_cast<int>(sliderThumbWidth * zoomLevel), Fixed));
         style.setHeight(Length(static_cast<int>(sliderThumbHeight * zoomLevel), Fixed));
     }
-}
-
-bool RenderThemeMac::shouldShowPlaceholderWhenFocused() const
-{
-    return true;
 }
 
 bool RenderThemeMac::shouldHaveCapsLockIndicator(HTMLInputElement& element) const
@@ -2336,135 +2376,15 @@ static void paintAttachmentIcon(const RenderAttachment& attachment, GraphicsCont
     icon->paint(context, layout.iconRect);
 }
 
-static void addAttachmentTitleBackgroundRightCorner(Path& path, const FloatRect* fromRect, const FloatRect* toRect)
-{
-    FloatSize horizontalRadius(attachmentTitleBackgroundRadius, 0);
-    FloatSize verticalRadius(0, attachmentTitleBackgroundRadius);
-
-    if (!fromRect) {
-        // For the first (top) rect:
-
-        path.moveTo(toRect->minXMinYCorner() + horizontalRadius);
-
-        // Across the top, towards the right.
-        path.addLineTo(toRect->maxXMinYCorner() - horizontalRadius);
-
-        // Arc the top corner.
-        path.addArcTo(toRect->maxXMinYCorner(), toRect->maxXMinYCorner() + verticalRadius, attachmentTitleBackgroundRadius);
-
-        // Down the right.
-        path.addLineTo(toRect->maxXMaxYCorner() - verticalRadius);
-    } else if (!toRect) {
-        // For the last rect:
-
-        // Arc the bottom corner.
-        path.addArcTo(fromRect->maxXMaxYCorner(), fromRect->maxXMaxYCorner() - horizontalRadius, attachmentTitleBackgroundRadius);
-    } else {
-        // For middle rects:
-
-        float widthDifference = toRect->width() - fromRect->width();
-
-        // Skip over very similar-width rects, because we can't make
-        // sensible curves between them.
-        if (fabs(widthDifference) < std::numeric_limits<float>::epsilon())
-            return;
-
-        if (widthDifference < 0) {
-            // Arc the outer corner.
-            path.addArcTo(FloatPoint(fromRect->maxX(), toRect->y()), FloatPoint(fromRect->maxX(), toRect->y()) - horizontalRadius, attachmentTitleBackgroundRadius);
-
-            // Across the bottom, towards the left.
-            path.addLineTo(toRect->maxXMinYCorner() + horizontalRadius);
-
-            // Arc the inner corner.
-            path.addArcTo(toRect->maxXMinYCorner(), toRect->maxXMinYCorner() + verticalRadius, attachmentTitleBackgroundRadius);
-        } else {
-            // Arc the inner corner.
-            path.addArcTo(FloatPoint(fromRect->maxX(), toRect->y()), FloatPoint(fromRect->maxX(), toRect->y()) + horizontalRadius, attachmentTitleBackgroundRadius);
-
-            // Across the bottom, towards the right.
-            path.addLineTo(toRect->maxXMinYCorner() - horizontalRadius);
-
-            // Arc the outer corner.
-            path.addArcTo(toRect->maxXMinYCorner(), toRect->maxXMinYCorner() + verticalRadius, attachmentTitleBackgroundRadius);
-        }
-
-        // Down the right.
-        path.addLineTo(toRect->maxXMaxYCorner() - verticalRadius);
-    }
-}
-
-static void addAttachmentTitleBackgroundLeftCorner(Path& path, const FloatRect* fromRect, const FloatRect* toRect)
-{
-    FloatSize horizontalRadius(attachmentTitleBackgroundRadius, 0);
-    FloatSize verticalRadius(0, attachmentTitleBackgroundRadius);
-
-    if (!fromRect) {
-        // For the first (bottom) rect:
-
-        // Across the bottom, towards the left.
-        path.addLineTo(toRect->minXMaxYCorner() + horizontalRadius);
-
-        // Arc the bottom corner.
-        path.addArcTo(toRect->minXMaxYCorner(), toRect->minXMaxYCorner() - verticalRadius, attachmentTitleBackgroundRadius);
-
-        // Up the left.
-        path.addLineTo(toRect->minXMinYCorner() + verticalRadius);
-    } else if (!toRect) {
-        // For the last (top) rect:
-
-        // Arc the top corner.
-        path.addArcTo(fromRect->minXMinYCorner(), fromRect->minXMinYCorner() + horizontalRadius, attachmentTitleBackgroundRadius);
-    } else {
-        // For middle rects:
-        float widthDifference = toRect->width() - fromRect->width();
-
-        // Skip over very similar-width rects, because we can't make
-        // sensible curves between them.
-        if (fabs(widthDifference) < std::numeric_limits<float>::epsilon())
-            return;
-
-        if (widthDifference < 0) {
-            // Arc the inner corner.
-            path.addArcTo(FloatPoint(fromRect->x(), toRect->maxY()), FloatPoint(fromRect->x(), toRect->maxY()) + horizontalRadius, attachmentTitleBackgroundRadius);
-
-            // Across the bottom, towards the right.
-            path.addLineTo(toRect->minXMaxYCorner() - horizontalRadius);
-
-            // Arc the outer corner.
-            path.addArcTo(toRect->minXMaxYCorner(), toRect->minXMaxYCorner() - verticalRadius, attachmentTitleBackgroundRadius);
-        } else {
-            // Arc the outer corner.
-            path.addArcTo(FloatPoint(fromRect->x(), toRect->maxY()), FloatPoint(fromRect->x(), toRect->maxY()) - horizontalRadius, attachmentTitleBackgroundRadius);
-
-            // Across the bottom, towards the left.
-            path.addLineTo(toRect->minXMaxYCorner() + horizontalRadius);
-
-            // Arc the inner corner.
-            path.addArcTo(toRect->minXMaxYCorner(), toRect->minXMaxYCorner() - verticalRadius, attachmentTitleBackgroundRadius);
-        }
-        
-        // Up the right.
-        path.addLineTo(toRect->minXMinYCorner() + verticalRadius);
-    }
-}
-
 static void paintAttachmentTitleBackground(const RenderAttachment& attachment, GraphicsContext& context, AttachmentLayout& layout)
 {
     if (layout.lines.isEmpty())
         return;
 
-    Path backgroundPath;
+    Vector<FloatRect> backgroundRects;
 
-    for (size_t i = 0; i <= layout.lines.size(); ++i)
-        addAttachmentTitleBackgroundRightCorner(backgroundPath, i ? &layout.lines[i - 1].backgroundRect : nullptr, i < layout.lines.size() ? &layout.lines[i].backgroundRect : nullptr);
-
-    for (size_t i = 0; i <= layout.lines.size(); ++i) {
-        size_t reverseIndex = layout.lines.size() - i;
-        addAttachmentTitleBackgroundLeftCorner(backgroundPath, reverseIndex < layout.lines.size() ? &layout.lines[reverseIndex].backgroundRect : nullptr, reverseIndex ? &layout.lines[reverseIndex - 1].backgroundRect : nullptr);
-    }
-
-    backgroundPath.closeSubpath();
+    for (size_t i = 0; i < layout.lines.size(); ++i)
+        backgroundRects.append(layout.lines[i].backgroundRect);
 
     Color backgroundColor;
     if (attachment.frame().selection().isFocusedAndActive())
@@ -2473,6 +2393,8 @@ static void paintAttachmentTitleBackground(const RenderAttachment& attachment, G
         backgroundColor = attachmentTitleInactiveBackgroundColor();
 
     context.setFillColor(backgroundColor, ColorSpaceDeviceRGB);
+
+    Path backgroundPath = PathUtilities::pathWithShrinkWrappedRects(backgroundRects, attachmentTitleBackgroundRadius);
     context.fillPath(backgroundPath);
 }
 

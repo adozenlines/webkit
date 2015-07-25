@@ -38,6 +38,7 @@
 #include "IconURL.h"
 #include "LayoutMilestones.h"
 #include "MixedContentChecker.h"
+#include "Page.h"
 #include "PageThrottler.h"
 #include "ResourceHandleTypes.h"
 #include "ResourceLoadNotifier.h"
@@ -109,7 +110,7 @@ public:
 
     // FIXME: These are all functions which start loads. We have too many.
     WEBCORE_EXPORT void loadURLIntoChildFrame(const URL&, const String& referer, Frame*);
-    WEBCORE_EXPORT void loadFrameRequest(const FrameLoadRequest&, PassRefPtr<Event>, PassRefPtr<FormState>); // Called by submitForm, calls loadPostRequest and loadURL.
+    WEBCORE_EXPORT void loadFrameRequest(const FrameLoadRequest&, Event*, PassRefPtr<FormState>); // Called by submitForm, calls loadPostRequest and loadURL.
 
     WEBCORE_EXPORT void load(const FrameLoadRequest&);
 
@@ -119,7 +120,7 @@ public:
     unsigned long loadResourceSynchronously(const ResourceRequest&, StoredCredentials, ClientCredentialPolicy, ResourceError&, ResourceResponse&, RefPtr<SharedBuffer>& data);
 
     void changeLocation(const FrameLoadRequest&);
-    WEBCORE_EXPORT void urlSelected(const URL&, const String& target, PassRefPtr<Event>, LockHistory, LockBackForwardList, ShouldSendReferrer);
+    WEBCORE_EXPORT void urlSelected(const URL&, const String& target, Event*, LockHistory, LockBackForwardList, ShouldSendReferrer, ShouldOpenExternalURLsPolicy);
     void submitForm(PassRefPtr<FormSubmission>);
 
     WEBCORE_EXPORT void reload(bool endToEndReload = false);
@@ -271,12 +272,7 @@ public:
     
     void started();
 
-    enum PageDismissalType {
-        NoDismissal = 0,
-        BeforeUnloadDismissal = 1,
-        PageHideDismissal = 2,
-        UnloadDismissal = 3
-    };
+    enum class PageDismissalType { None, BeforeUnload, PageHide, Unload };
     PageDismissalType pageDismissalEventBeingDispatched() const { return m_pageDismissalEventBeingDispatched; }
 
     WEBCORE_EXPORT NetworkingContext* networkingContext() const;
@@ -290,6 +286,9 @@ public:
     void setOverrideCachePolicyForTesting(ResourceRequestCachePolicy policy) { m_overrideCachePolicyForTesting = policy; }
     void setOverrideResourceLoadPriorityForTesting(ResourceLoadPriority priority) { m_overrideResourceLoadPriorityForTesting = priority; }
     WEBCORE_EXPORT void clearTestingOverrides();
+
+    const URL& provisionalLoadErrorBeingHandledURL() const { return m_provisionalLoadErrorBeingHandledURL; }
+    void setProvisionalLoadErrorBeingHandledURL(const URL& url) { m_provisionalLoadErrorBeingHandledURL = url; }
 
 private:
     enum FormSubmissionCacheLoadPolicy {
@@ -341,7 +340,7 @@ private:
 
     void dispatchDidCommitLoad();
 
-    void urlSelected(const FrameLoadRequest&, PassRefPtr<Event>);
+    void urlSelected(const FrameLoadRequest&, Event*);
 
     void loadWithDocumentLoader(DocumentLoader*, FrameLoadType, PassRefPtr<FormState>, AllowNavigationToInvalidURL); // Calls continueLoadAfterNavigationPolicy
     void load(DocumentLoader*);                                                         // Calls loadWithDocumentLoader   
@@ -349,10 +348,8 @@ private:
     void loadWithNavigationAction(const ResourceRequest&, const NavigationAction&,      // Calls loadWithDocumentLoader
         LockHistory, FrameLoadType, PassRefPtr<FormState>, AllowNavigationToInvalidURL);
 
-    void loadPostRequest(const ResourceRequest&, const String& referrer,                // Called by loadFrameRequest, calls loadWithNavigationAction
-        const String& frameName, LockHistory, FrameLoadType, PassRefPtr<Event>, PassRefPtr<FormState>, AllowNavigationToInvalidURL, NewFrameOpenerPolicy);
-    void loadURL(const URL&, const String& referrer, const String& frameName,          // Called by loadFrameRequest, calls loadWithNavigationAction or dispatches to navigation policy delegate
-        LockHistory, FrameLoadType, PassRefPtr<Event>, PassRefPtr<FormState>, AllowNavigationToInvalidURL, NewFrameOpenerPolicy);
+    void loadPostRequest(const FrameLoadRequest&, const String& referrer, FrameLoadType, Event*, PassRefPtr<FormState>);
+    void loadURL(const FrameLoadRequest&, const String& referrer, FrameLoadType, Event*, PassRefPtr<FormState>);
 
     bool shouldReload(const URL& currentURL, const URL& destinationURL);
 
@@ -376,6 +373,8 @@ private:
     bool shouldTreatURLAsSameAsCurrent(const URL&) const;
 
     void dispatchGlobalObjectAvailableInAllWorlds();
+
+    void applyShouldOpenExternalURLsPolicyToNewDocumentLoader(DocumentLoader&, ShouldOpenExternalURLsPolicy propagatedPolicy);
 
     Frame& m_frame;
     FrameLoaderClient& m_client;
@@ -402,7 +401,7 @@ private:
     RefPtr<DocumentLoader> m_provisionalDocumentLoader;
     RefPtr<DocumentLoader> m_policyDocumentLoader;
 
-    bool m_delegateIsHandlingProvisionalLoadError;
+    URL m_provisionalLoadErrorBeingHandledURL;
 
     bool m_quickRedirectComing;
     bool m_sentRedirectNotification;
@@ -414,7 +413,8 @@ private:
 
     bool m_didCallImplicitClose;
     bool m_wasUnloadEventEmitted;
-    PageDismissalType m_pageDismissalEventBeingDispatched;
+
+    PageDismissalType m_pageDismissalEventBeingDispatched { PageDismissalType::None };
     bool m_isComplete;
 
     RefPtr<SerializedScriptValue> m_pendingStateObject;
@@ -455,7 +455,7 @@ private:
 //
 // FIXME: Consider making this function part of an appropriate class (not FrameLoader)
 // and moving it to a more appropriate location.
-PassRefPtr<Frame> createWindow(Frame* openerFrame, Frame* lookupFrame, const FrameLoadRequest&, const WindowFeatures&, bool& created);
+RefPtr<Frame> createWindow(Frame& openerFrame, Frame& lookupFrame, const FrameLoadRequest&, const WindowFeatures&, bool& created);
 
 } // namespace WebCore
 

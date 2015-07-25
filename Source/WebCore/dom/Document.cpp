@@ -3,7 +3,7 @@
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
  *           (C) 2001 Dirk Mueller (mueller@kde.org)
  *           (C) 2006 Alexey Proskuryakov (ap@webkit.org)
- * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2011, 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2004-2015 Apple Inc. All rights reserved.
  * Copyright (C) 2008, 2009 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
  * Copyright (C) 2008, 2009, 2011, 2012 Google Inc. All rights reserved.
  * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
@@ -112,6 +112,7 @@
 #include "PageGroup.h"
 #include "PageTransitionEvent.h"
 #include "PlatformLocale.h"
+#include "PlatformMediaSessionManager.h"
 #include "PlatformStrategies.h"
 #include "PlugInsResources.h"
 #include "PluginDocument.h"
@@ -231,6 +232,10 @@
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
 #include "MediaPlaybackTargetClient.h"
+#endif
+
+#if ENABLE(MEDIA_SESSION)
+#include "MediaSession.h"
 #endif
 
 using namespace WTF;
@@ -628,6 +633,10 @@ Document::~Document()
     if (m_cachedResourceLoader->document() == this)
         m_cachedResourceLoader->setDocument(nullptr);
 
+#if ENABLE(VIDEO)
+    PlatformMediaSessionManager::sharedManager().stopAllMediaPlaybackForDocument(this);
+#endif
+    
     // We must call clearRareData() here since a Document class inherits TreeScope
     // as well as Node. See a comment on TreeScope.h for the reason.
     if (hasRareData())
@@ -1429,6 +1438,14 @@ RefPtr<Range> Document::caretRangeFromPoint(const LayoutPoint& clientPoint)
     return Range::create(*this, rangeCompliantPosition, rangeCompliantPosition);
 }
 
+Element* Document::scrollingElement()
+{
+    // FIXME: When we fix https://bugs.webkit.org/show_bug.cgi?id=106133, this should be replaced with the full implementation
+    // of Document.scrollingElement() as specified at http://dev.w3.org/csswg/cssom-view/#dom-document-scrollingelement.
+
+    return body();
+}
+
 /*
  * Performs three operations:
  *  1. Convert control characters to spaces
@@ -1597,6 +1614,25 @@ bool Document::hidden() const
     return pageVisibilityState() != PageVisibilityStateVisible;
 }
 
+
+#if ENABLE(VIDEO)
+void Document::registerForAllowsMediaDocumentInlinePlaybackChangedCallbacks(HTMLMediaElement& element)
+{
+    m_allowsMediaDocumentInlinePlaybackElements.add(&element);
+}
+
+void Document::unregisterForAllowsMediaDocumentInlinePlaybackChangedCallbacks(HTMLMediaElement& element)
+{
+    m_allowsMediaDocumentInlinePlaybackElements.remove(&element);
+}
+
+void Document::allowsMediaDocumentInlinePlaybackChanged()
+{
+    for (auto* element : m_allowsMediaDocumentInlinePlaybackElements)
+        element->allowsMediaDocumentInlinePlaybackChanged();
+}
+#endif
+
 #if ENABLE(CSP_NEXT)
 DOMSecurityPolicy& Document::securityPolicy()
 {
@@ -1730,6 +1766,7 @@ void Document::recalcStyle(Style::Change change)
         return;
 
     FrameView& frameView = m_renderView->frameView();
+    Ref<FrameView> protect(frameView);
     if (frameView.isPainting())
         return;
     
@@ -1748,6 +1785,8 @@ void Document::recalcStyle(Style::Change change)
 
     m_styleSheetCollection.flushPendingUpdates();
 
+    frameView.willRecalcStyle();
+
     InspectorInstrumentationCookie cookie = InspectorInstrumentation::willRecalculateStyle(*this);
 
     // FIXME: We never reset this flags.
@@ -1757,6 +1796,7 @@ void Document::recalcStyle(Style::Change change)
     // i.e. updating the flag here would be too late.
 
     m_inStyleRecalc = true;
+    bool updatedCompositingLayers = false;
     {
         Style::PostResolutionCallbackDisabler disabler(*this);
         WidgetHierarchyUpdatesSuspensionScope suspendWidgetHierarchyUpdates;
@@ -1771,7 +1811,7 @@ void Document::recalcStyle(Style::Change change)
 
         Style::resolveTree(*this, change);
 
-        frameView.updateCompositingLayersAfterStyleChange();
+        updatedCompositingLayers = frameView.updateCompositingLayersAfterStyleChange();
 
         clearNeedsStyleRecalc();
         clearChildNeedsStyleRecalc();
@@ -1797,8 +1837,11 @@ void Document::recalcStyle(Style::Change change)
     // Some animated images may now be inside the viewport due to style recalc,
     // resume them if necessary if there is no layout pending. Otherwise, we'll
     // check if they need to be resumed after layout.
-    if (!frameView.needsLayout())
+    if (updatedCompositingLayers && !frameView.needsLayout())
         frameView.viewportContentsChanged();
+
+    if (!frameView.needsLayout())
+        frameView.frame().selection().updateAppearanceAfterLayout();
 
     // As a result of the style recalculation, the currently hovered element might have been
     // detached (for example, by setting display:none in the :hover style), schedule another mouseMove event
@@ -1937,7 +1980,7 @@ bool Document::updateLayoutIfDimensionsOutOfDate(Element& element, DimensionsChe
 
     bool isVertical = renderer && !renderer->isHorizontalWritingMode();
     bool checkingLogicalWidth = ((dimensionsCheck & WidthDimensionsCheck) && !isVertical) || ((dimensionsCheck & HeightDimensionsCheck) && isVertical);
-    bool checkingLogicalHeight = ((dimensionsCheck & HeightDimensionsCheck) && !isVertical) || ((dimensionsCheck & WidthDimensionsCheck) && !isVertical);
+    bool checkingLogicalHeight = ((dimensionsCheck & HeightDimensionsCheck) && !isVertical) || ((dimensionsCheck & WidthDimensionsCheck) && isVertical);
     bool hasSpecifiedLogicalHeight = renderer && renderer->style().logicalMinHeight() == Length(0, Fixed) && renderer->style().logicalHeight().isFixed() && renderer->style().logicalMaxHeight().isAuto();
     
     if (!requireFullLayout) {
@@ -2242,6 +2285,15 @@ void Document::prepareForDestruction()
     if (m_mediaQueryMatcher)
         m_mediaQueryMatcher->documentDestroyed();
 
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
+    if (!m_clientToIDMap.isEmpty() && page()) {
+        Vector<WebCore::MediaPlaybackTargetClient*> clients;
+        copyKeysToVector(m_clientToIDMap, clients);
+        for (auto client : clients)
+            removePlaybackTargetPickerClient(*client);
+    }
+#endif
+
     disconnectFromFrame();
 
     m_hasPreparedForDestruction = true;
@@ -2396,7 +2448,7 @@ void Document::detachParser()
     if (!m_parser)
         return;
     m_parser->detach();
-    m_parser.clear();
+    m_parser = nullptr;
 }
 
 void Document::cancelParsing()
@@ -2731,11 +2783,24 @@ double Document::minimumTimerInterval() const
     return page->settings().minimumDOMTimerInterval();
 }
 
-double Document::timerAlignmentInterval() const
+void Document::setTimerThrottlingEnabled(bool shouldThrottle)
 {
+    if (m_isTimerThrottlingEnabled == shouldThrottle)
+        return;
+
+    m_isTimerThrottlingEnabled = shouldThrottle;
+    didChangeTimerAlignmentInterval();
+}
+
+double Document::timerAlignmentInterval(bool hasReachedMaxNestingLevel) const
+{
+    // Apply Document-level DOMTimer throttling only if timers have reached their maximum nesting level as the Page may still be visible.
+    if (m_isTimerThrottlingEnabled && hasReachedMaxNestingLevel)
+        return DOMTimer::hiddenPageAlignmentInterval();
+
     Page* page = this->page();
     if (!page)
-        return ScriptExecutionContext::timerAlignmentInterval();
+        return ScriptExecutionContext::timerAlignmentInterval(hasReachedMaxNestingLevel);
     return page->settings().domTimerAlignmentInterval();
 }
 
@@ -2982,6 +3047,25 @@ void Document::processHttpEquiv(const String& equiv, const String& content)
 {
     ASSERT(!equiv.isNull() && !content.isNull());
 
+    HttpEquivPolicy policy = httpEquivPolicy();
+    if (policy != HttpEquivPolicy::Enabled) {
+        String reason;
+        switch (policy) {
+        case HttpEquivPolicy::Enabled:
+            ASSERT_NOT_REACHED();
+            break;
+        case HttpEquivPolicy::DisabledBySettings:
+            reason = "by the embedder.";
+            break;
+        case HttpEquivPolicy::DisabledByContentDispositionAttachmentSandbox:
+            reason = "for documents with Content-Disposition: attachment.";
+            break;
+        }
+        String message = "http-equiv '" + equiv + "' is disabled " + reason;
+        addConsoleMessage(MessageSource::Security, MessageLevel::Error, message);
+        return;
+    }
+
     Frame* frame = this->frame();
 
     HTTPHeaderName headerName;
@@ -3011,7 +3095,7 @@ void Document::processHttpEquiv(const String& equiv, const String& content)
             else
                 completedURL = completeURL(urlString);
             if (!protocolIsJavaScript(completedURL))
-                frame->navigationScheduler().scheduleRedirect(delay, completedURL);
+                frame->navigationScheduler().scheduleRedirect(this, delay, completedURL);
             else {
                 String message = "Refused to refresh " + m_url.stringCenterEllipsizedToLength() + " to a javascript: URL";
                 addConsoleMessage(MessageSource::Security, MessageLevel::Error, message);
@@ -3049,7 +3133,7 @@ void Document::processHttpEquiv(const String& equiv, const String& content)
                 // Stopping the loader isn't enough, as we're already parsing the document; to honor the header's
                 // intent, we must navigate away from the possibly partially-rendered document to a location that
                 // doesn't inherit the parent's SecurityOrigin.
-                frame->navigationScheduler().scheduleLocationChange(securityOrigin(), SecurityOrigin::urlWithUniqueSecurityOrigin(), String());
+                frame->navigationScheduler().scheduleLocationChange(this, securityOrigin(), SecurityOrigin::urlWithUniqueSecurityOrigin(), String());
                 addConsoleMessage(MessageSource::Security, MessageLevel::Error, message, requestIdentifier);
             }
         }
@@ -4848,15 +4932,8 @@ void Document::initSecurityContext()
     setCookieURL(m_url);
     enforceSandboxFlags(m_frame->loader().effectiveSandboxFlags());
 
-#if PLATFORM(IOS)
-    // On iOS we display attachments inline regardless of whether the response includes
-    // the HTTP header "Content-Disposition: attachment". So, we enforce a unique
-    // security origin for such documents. As an optimization, we don't need to parse
-    // the responde header (i.e. call ResourceResponse::isAttachment()) for a synthesized
-    // document because such documents cannot be an attachment.
-    if (!m_isSynthesized && m_frame->loader().activeDocumentLoader()->response().isAttachment())
-        enforceSandboxFlags(SandboxOrigin);
-#endif
+    if (shouldEnforceContentDispositionAttachmentSandbox())
+        enforceSandboxFlags(SandboxAll);
 
     setSecurityOriginPolicy(SecurityOriginPolicy::create(isSandboxed(SandboxOrigin) ? SecurityOrigin::createUnique() : SecurityOrigin::create(m_url)));
     setContentSecurityPolicy(std::make_unique<ContentSecurityPolicy>(this));
@@ -5838,7 +5915,7 @@ void Document::clearScriptedAnimationController()
     // FIXME: consider using ActiveDOMObject.
     if (m_scriptedAnimationController)
         m_scriptedAnimationController->clearDocumentPointer();
-    m_scriptedAnimationController.clear();
+    m_scriptedAnimationController = nullptr;
 }
 #endif
     
@@ -5949,15 +6026,19 @@ void Document::didAddWheelEventHandler(Node& node)
 
     m_wheelEventTargets->add(&node);
 
-    if (Document* parent = parentDocument()) {
-        parent->didAddWheelEventHandler(*this);
-        return;
-    }
-
     wheelEventHandlersChanged();
 
     if (Frame* frame = this->frame())
         DebugPageOverlays::didChangeEventHandlers(*frame);
+}
+
+HttpEquivPolicy Document::httpEquivPolicy() const
+{
+    if (shouldEnforceContentDispositionAttachmentSandbox())
+        return HttpEquivPolicy::DisabledByContentDispositionAttachmentSandbox;
+    if (page() && !page()->settings().httpEquivEnabled())
+        return HttpEquivPolicy::DisabledBySettings;
+    return HttpEquivPolicy::Enabled;
 }
 
 static bool removeHandlerFromSet(EventTargetSet& handlerSet, Node& node, EventHandlerRemoval removal)
@@ -5978,11 +6059,6 @@ void Document::didRemoveWheelEventHandler(Node& node, EventHandlerRemoval remova
 
     if (!removeHandlerFromSet(*m_wheelEventTargets, node, removal))
         return;
-
-    if (Document* parent = parentDocument()) {
-        parent->didRemoveWheelEventHandler(*this);
-        return;
-    }
 
     wheelEventHandlersChanged();
 
@@ -6266,7 +6342,7 @@ void Document::updateHoverActiveState(const HitTestRequest& request, Element* in
             curr->setActive(false);
             m_userActionElements.setInActiveChain(curr, false);
         }
-        m_activeElement.clear();
+        m_activeElement = nullptr;
     } else {
         Element* newActiveElement = innerElementInDocument;
         if (!oldActiveElement && newActiveElement && request.active() && !request.touchMove()) {
@@ -6478,7 +6554,7 @@ void Document::ensurePlugInsInjectedScript(DOMWrapperWorld& world)
     if (!jsString)
         jsString = String(plugInsJavaScript, sizeof(plugInsJavaScript));
 
-    m_frame->mainFrame().script().evaluateInWorld(ScriptSourceCode(jsString), world);
+    frame()->script().evaluateInWorld(ScriptSourceCode(jsString), world);
 
     m_hasInjectedPlugInsScript = true;
 }
@@ -6540,7 +6616,9 @@ void Document::addPlaybackTargetPickerClient(MediaPlaybackTargetClient& client)
     if (!page)
         return;
 
-    ASSERT(!m_clientToIDMap.contains(&client));
+    // FIXME: change this back to an ASSERT once https://webkit.org/b/144970 is fixed.
+    if (m_clientToIDMap.contains(&client))
+        return;
 
     uint64_t contextId = nextPlaybackTargetClientContextId();
     m_clientToIDMap.add(&client, contextId);
@@ -6571,7 +6649,6 @@ void Document::showPlaybackTargetPicker(MediaPlaybackTargetClient& client, bool 
         return;
 
     auto it = m_clientToIDMap.find(&client);
-    ASSERT(it != m_clientToIDMap.end());
     if (it == m_clientToIDMap.end())
         return;
 
@@ -6585,7 +6662,6 @@ void Document::playbackTargetPickerClientStateDidChange(MediaPlaybackTargetClien
         return;
 
     auto it = m_clientToIDMap.find(&client);
-    ASSERT(it != m_clientToIDMap.end());
     if (it == m_clientToIDMap.end())
         return;
 
@@ -6619,5 +6695,36 @@ void Document::setShouldPlayToPlaybackTarget(uint64_t clientId, bool shouldPlay)
     it->value->setShouldPlayToPlaybackTarget(shouldPlay);
 }
 #endif // ENABLE(WIRELESS_PLAYBACK_TARGET)
+
+#if ENABLE(MEDIA_SESSION)
+MediaSession& Document::defaultMediaSession()
+{
+    if (!m_defaultMediaSession)
+        m_defaultMediaSession = adoptRef(*new MediaSession(*this));
+
+    return *m_defaultMediaSession;
+}
+#endif
+
+ShouldOpenExternalURLsPolicy Document::shouldOpenExternalURLsPolicyToPropagate() const
+{
+    if (DocumentLoader* documentLoader = loader())
+        return documentLoader->shouldOpenExternalURLsPolicyToPropagate();
+
+    return ShouldOpenExternalURLsPolicy::ShouldNotAllow;
+}
+
+bool Document::shouldEnforceContentDispositionAttachmentSandbox() const
+{
+    if (m_isSynthesized)
+        return false;
+
+    bool contentDispositionAttachmentSandboxEnabled = settings() && settings()->contentDispositionAttachmentSandboxEnabled();
+    bool responseIsAttachment = false;
+    if (DocumentLoader* documentLoader = m_frame ? m_frame->loader().activeDocumentLoader() : nullptr)
+        responseIsAttachment = documentLoader->response().isAttachment();
+
+    return contentDispositionAttachmentSandboxEnabled && responseIsAttachment;
+}
 
 } // namespace WebCore

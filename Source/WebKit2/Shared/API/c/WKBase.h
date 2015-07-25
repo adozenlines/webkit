@@ -34,7 +34,7 @@
 #include <WebKit/WKBaseGtk.h>
 #endif
 
-#if defined(WTF_USE_SOUP)
+#if defined(USE_SOUP)
 #include <WebKit/WKBaseSoup.h>
 #endif
 
@@ -112,6 +112,7 @@ typedef const struct OpaqueWKIconDatabase* WKIconDatabaseRef;
 typedef const struct OpaqueWKInspector* WKInspectorRef;
 typedef const struct OpaqueWKKeyValueStorageManager* WKKeyValueStorageManagerRef;
 typedef const struct OpaqueWKMediaCacheManager* WKMediaCacheManagerRef;
+typedef const struct OpaqueWKMediaSessionMetadata* WKMediaSessionMetadataRef;
 typedef const struct OpaqueWKNavigationAction* WKNavigationActionRef;
 typedef const struct OpaqueWKNavigationData* WKNavigationDataRef;
 typedef const struct OpaqueWKNavigation* WKNavigationRef;

@@ -4,9 +4,9 @@ list(APPEND WTF_SOURCES
     efl/RunLoopEfl.cpp
     efl/WorkQueueEfl.cpp
 
-    gobject/GMainLoopSource.cpp
-    gobject/GRefPtr.cpp
-    gobject/GThreadSafeMainLoopSource.cpp
+    glib/GMainLoopSource.cpp
+    glib/GRefPtr.cpp
+    glib/GThreadSafeMainLoopSource.cpp
 )
 
 list(APPEND WTF_LIBRARIES
@@ -19,6 +19,9 @@ list(APPEND WTF_LIBRARIES
 
 list(APPEND WTF_INCLUDE_DIRECTORIES
     "${WTF_DIR}/wtf/efl"
+)
+
+list(APPEND WTF_SYSTEM_INCLUDE_DIRECTORIES
     ${ECORE_EVAS_INCLUDE_DIRS}
     ${ECORE_IMF_INCLUDE_DIRS}
     ${ECORE_INCLUDE_DIRS}

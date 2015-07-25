@@ -30,12 +30,14 @@
 #if PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 80000
 
 #include <WebCore/EventListener.h>
-#include <WebCore/HTMLMediaElement.h>
+#include <WebCore/HTMLMediaElementEnums.h>
 #include <WebCore/PlatformLayer.h>
 #include <WebCore/WebVideoFullscreenInterface.h>
+#include <functional>
+#include <objc/objc.h>
+#include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 #include <wtf/RetainPtr.h>
-#include <wtf/ThreadSafeRefCounted.h>
 
 OBJC_CLASS WebAVPlayerController;
 OBJC_CLASS AVPlayerViewController;
@@ -43,8 +45,8 @@ OBJC_CLASS UIViewController;
 OBJC_CLASS UIWindow;
 OBJC_CLASS UIView;
 OBJC_CLASS CALayer;
-OBJC_CLASS WebAVVideoLayer;
-OBJC_CLASS WebCALayerHostWrapper;
+OBJC_CLASS WebAVPlayerLayerView;
+OBJC_CLASS WebAVPlayerLayer;
 
 namespace WTF {
 class String;
@@ -66,14 +68,14 @@ public:
 
 class WEBCORE_EXPORT WebVideoFullscreenInterfaceAVKit
     : public WebVideoFullscreenInterface
-    , public ThreadSafeRefCounted<WebVideoFullscreenInterfaceAVKit> {
+    , public RefCounted<WebVideoFullscreenInterfaceAVKit> {
 
 public:
     static Ref<WebVideoFullscreenInterfaceAVKit> create()
     {
         return adoptRef(*new WebVideoFullscreenInterfaceAVKit());
     }
-    virtual ~WebVideoFullscreenInterfaceAVKit() { }
+    virtual ~WebVideoFullscreenInterfaceAVKit();
     WEBCORE_EXPORT void setWebVideoFullscreenModel(WebVideoFullscreenModel*);
     WEBCORE_EXPORT void setWebVideoFullscreenChangeObserver(WebVideoFullscreenChangeObserver*);
     
@@ -89,7 +91,7 @@ public:
     WEBCORE_EXPORT virtual void setLegibleMediaSelectionOptions(const Vector<WTF::String>& options, uint64_t selectedIndex) override;
     WEBCORE_EXPORT virtual void setExternalPlayback(bool enabled, ExternalPlaybackTargetType, WTF::String localizedDeviceName) override;
     
-    WEBCORE_EXPORT virtual void setupFullscreen(PlatformLayer&, const IntRect& initialRect, UIView *, HTMLMediaElement::VideoFullscreenMode, bool allowOptimizedFullscreen);
+    WEBCORE_EXPORT virtual void setupFullscreen(UIView&, const IntRect& initialRect, UIView *, HTMLMediaElementEnums::VideoFullscreenMode, bool allowsPictureInPicturePlayback);
     WEBCORE_EXPORT virtual void enterFullscreen();
     WEBCORE_EXPORT virtual void exitFullscreen(const IntRect& finalRect);
     WEBCORE_EXPORT virtual void cleanupFullscreen();
@@ -97,39 +99,40 @@ public:
     WEBCORE_EXPORT virtual void requestHideAndExitFullscreen();
     WEBCORE_EXPORT virtual void preparedToReturnToInline(bool visible, const IntRect& inlineRect);
 
-    HTMLMediaElement::VideoFullscreenMode mode() const { return m_mode; }
-    bool allowOptimizedFullscreen() const { return m_allowOptimizedFullscreen; }
-    void setIsOptimized(bool);
-    WEBCORE_EXPORT bool mayAutomaticallyShowVideoOptimized() const;
+    enum class ExitFullScreenReason {
+        DoneButtonTapped,
+        FullScreenButtonTapped,
+        PinchGestureHandled,
+        RemoteControlStopEventReceived,
+        PictureInPictureStarted
+    };
+
+    bool shouldExitFullscreenWithReason(ExitFullScreenReason);
+    HTMLMediaElementEnums::VideoFullscreenMode mode() const { return m_mode; }
+    bool allowsPictureInPicturePlayback() const { return m_allowsPictureInPicturePlayback; }
+    WEBCORE_EXPORT bool mayAutomaticallyShowVideoPictureInPicture() const;
     void fullscreenMayReturnToInline(std::function<void(bool)> callback);
 
-    void willStartOptimizedFullscreen();
-    void didStartOptimizedFullscreen();
-    void willStopOptimizedFullscreen();
-    void didStopOptimizedFullscreen();
-    void willCancelOptimizedFullscreen();
-    void didCancelOptimizedFullscreen();
-    void prepareForOptimizedFullscreenStopWithCompletionHandler(void (^)(BOOL));
+    void willStartPictureInPicture();
+    void didStartPictureInPicture();
+    void failedToStartPictureInPicture();
+    void willStopPictureInPicture();
+    void didStopPictureInPicture();
+    void prepareForPictureInPictureStopWithCompletionHandler(void (^)(BOOL));
 
-    void setMode(HTMLMediaElement::VideoFullscreenMode);
-    void clearMode(HTMLMediaElement::VideoFullscreenMode);
-    bool hasMode(HTMLMediaElement::VideoFullscreenMode mode) const { return m_mode & mode; }
-    bool isMode(HTMLMediaElement::VideoFullscreenMode mode) const { return m_mode == mode; }
+    void setMode(HTMLMediaElementEnums::VideoFullscreenMode);
+    void clearMode(HTMLMediaElementEnums::VideoFullscreenMode);
+    bool hasMode(HTMLMediaElementEnums::VideoFullscreenMode mode) const { return m_mode & mode; }
+    bool isMode(HTMLMediaElementEnums::VideoFullscreenMode mode) const { return m_mode == mode; }
 
 protected:
     WEBCORE_EXPORT WebVideoFullscreenInterfaceAVKit();
     void beginSession();
-    void setupFullscreenInternal(PlatformLayer&, const IntRect& initialRect, UIView *, HTMLMediaElement::VideoFullscreenMode, bool allowOptimizedFullscreen);
-    void enterFullscreenOptimized();
+    void enterPictureInPicture();
     void enterFullscreenStandard();
-    void exitFullscreenInternal(const IntRect& finalRect);
-    void cleanupFullscreenInternal();
 
     RetainPtr<WebAVPlayerController> m_playerController;
     RetainPtr<AVPlayerViewController> m_playerViewController;
-    RetainPtr<CALayer> m_videoLayer;
-    RetainPtr<WebAVVideoLayer> m_videoLayerContainer;
-    RetainPtr<WebCALayerHostWrapper> m_layerHostWrapper;
     WebVideoFullscreenModel* m_videoFullscreenModel { nullptr };
     WebVideoFullscreenChangeObserver* m_fullscreenChangeObserver { nullptr };
 
@@ -138,9 +141,10 @@ protected:
     RetainPtr<UIViewController> m_viewController;
     RetainPtr<UIView> m_parentView;
     RetainPtr<UIWindow> m_parentWindow;
-    HTMLMediaElement::VideoFullscreenMode m_mode { HTMLMediaElement::VideoFullscreenModeNone };
+    RetainPtr<WebAVPlayerLayerView> m_playerLayerView;
+    HTMLMediaElementEnums::VideoFullscreenMode m_mode { HTMLMediaElementEnums::VideoFullscreenModeNone };
     std::function<void(bool)> m_prepareToInlineCallback;
-    bool m_allowOptimizedFullscreen { false };
+    bool m_allowsPictureInPicturePlayback { false };
     bool m_exitRequested { false };
     bool m_exitCompleted { false };
     bool m_enterRequested { false };

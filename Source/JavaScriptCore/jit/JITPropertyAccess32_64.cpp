@@ -57,6 +57,28 @@ void JIT::emit_op_put_by_index(Instruction* currentInstruction)
     callOperation(operationPutByIndex, regT1, regT0, property, regT3, regT2);
 }
 
+void JIT::emit_op_put_getter_by_id(Instruction* currentInstruction)
+{
+    int base = currentInstruction[1].u.operand;
+    int property = currentInstruction[2].u.operand;
+    int getter = currentInstruction[3].u.operand;
+
+    emitLoadPayload(base, regT1);
+    emitLoadPayload(getter, regT3);
+    callOperation(operationPutGetterById, regT1, &m_codeBlock->identifier(property), regT3);
+}
+
+void JIT::emit_op_put_setter_by_id(Instruction* currentInstruction)
+{
+    int base = currentInstruction[1].u.operand;
+    int property = currentInstruction[2].u.operand;
+    int setter = currentInstruction[3].u.operand;
+
+    emitLoadPayload(base, regT1);
+    emitLoadPayload(setter, regT3);
+    callOperation(operationPutSetterById, regT1, &m_codeBlock->identifier(property), regT3);
+}
+
 void JIT::emit_op_put_getter_setter(Instruction* currentInstruction)
 {
     int base = currentInstruction[1].u.operand;
@@ -235,21 +257,15 @@ void JIT::emitSlow_op_get_by_val(Instruction* currentInstruction, Vector<SlowCas
     failed.link(this);
     notString.link(this);
     nonCell.link(this);
-    
-    Jump skipProfiling = jump();
 
     linkSlowCase(iter); // vector length check
     linkSlowCase(iter); // empty value
-    
-    emitArrayProfileOutOfBoundsSpecialCase(profile);
-    
-    skipProfiling.link(this);
     
     Label slowPath = label();
     
     emitLoad(base, regT1, regT0);
     emitLoad(property, regT3, regT2);
-    Call call = callOperation(operationGetByValDefault, dst, regT1, regT0, regT3, regT2);
+    Call call = callOperation(operationGetByValDefault, dst, regT1, regT0, regT3, regT2, profile);
 
     m_byValCompilationInfo[m_byValInstructionIndex].slowPathTarget = slowPath;
     m_byValCompilationInfo[m_byValInstructionIndex].returnAddress = call;
@@ -442,6 +458,7 @@ void JIT::emitSlow_op_put_by_val(Instruction* currentInstruction, Vector<SlowCas
     emitLoad(value, regT0, regT1);
     addCallArgument(regT1);
     addCallArgument(regT0);
+    addCallArgument(TrustedImmPtr(profile));
     Call call = appendCallWithExceptionCheck(isDirect ? operationDirectPutByVal : operationPutByVal);
 #else
     // The register selection below is chosen to reduce register swapping on ARM.
@@ -449,7 +466,7 @@ void JIT::emitSlow_op_put_by_val(Instruction* currentInstruction, Vector<SlowCas
     emitLoad(base, regT2, regT1);
     emitLoad(property, regT3, regT0);
     emitLoad(value, regT5, regT4);
-    Call call = callOperation(isDirect ? operationDirectPutByVal : operationPutByVal, regT2, regT1, regT3, regT0, regT5, regT4);
+    Call call = callOperation(isDirect ? operationDirectPutByVal : operationPutByVal, regT2, regT1, regT3, regT0, regT5, regT4, profile);
 #endif
 
     m_byValCompilationInfo[m_byValInstructionIndex].slowPathTarget = slowPath;
@@ -513,9 +530,6 @@ void JIT::emit_op_put_by_id(Instruction* currentInstruction)
     emitLoad2(base, regT1, regT0, value, regT3, regT2);
     
     emitJumpSlowCaseIfNotJSCell(base, regT1);
-    
-    emitLoad(base, regT1, regT0);
-    emitLoad(value, regT3, regT2);
 
     JITPutByIdGenerator gen(
         m_codeBlock, CodeOrigin(m_bytecodeOffset), RegisterSet::specialRegisters(),
@@ -537,7 +551,10 @@ void JIT::emitSlow_op_put_by_id(Instruction* currentInstruction, Vector<SlowCase
     linkSlowCase(iter);
     
     Label coldPathBegin(this);
-    
+
+    // JITPutByIdGenerator only preserve the value and the base's payload, we have to reload the tag.
+    emitLoadTag(base, regT1);
+
     JITPutByIdGenerator& gen = m_putByIds[m_putByIdIndex++];
     
     Call call = callOperation(
@@ -842,21 +859,6 @@ void JIT::emit_op_put_to_arguments(Instruction* currentInstruction)
     emitLoad(value, regT1, regT2);
     store32(regT1, Address(regT0, DirectArguments::storageOffset() + index * sizeof(WriteBarrier<Unknown>) + TagOffset));
     store32(regT2, Address(regT0, DirectArguments::storageOffset() + index * sizeof(WriteBarrier<Unknown>) + PayloadOffset));
-}
-
-void JIT::emit_op_init_global_const(Instruction* currentInstruction)
-{
-    WriteBarrier<Unknown>* variablePointer = currentInstruction[1].u.variablePointer;
-    int value = currentInstruction[2].u.operand;
-
-    JSGlobalObject* globalObject = m_codeBlock->globalObject();
-
-    emitWriteBarrier(globalObject, value, ShouldFilterValue);
-
-    emitLoad(value, regT1, regT0);
-    
-    store32(regT1, variablePointer->tagPointer());
-    store32(regT0, variablePointer->payloadPointer());
 }
 
 } // namespace JSC

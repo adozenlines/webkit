@@ -645,12 +645,12 @@ void TestRunner::setTabKeyCyclesThroughElements(bool enabled)
 
 void TestRunner::setSerializeHTTPLoads()
 {
-    WKBundleSetSerialLoadingEnabled(InjectedBundle::singleton().bundle(), true);
+    // WK2 doesn't reorder loads.
 }
 
 void TestRunner::dispatchPendingLoadRequests()
 {
-    WKBundleDispatchPendingLoadRequests(InjectedBundle::singleton().bundle());
+    // WK2 doesn't keep pending requests.
 }
 
 void TestRunner::setCacheModel(int model)
@@ -764,14 +764,14 @@ void TestRunner::queueForwardNavigation(unsigned howFarForward)
     InjectedBundle::singleton().queueForwardNavigation(howFarForward);
 }
 
-void TestRunner::queueLoad(JSStringRef url, JSStringRef target)
+void TestRunner::queueLoad(JSStringRef url, JSStringRef target, bool shouldOpenExternalURLs)
 {
     auto& injectedBundle = InjectedBundle::singleton();
     WKRetainPtr<WKURLRef> baseURLWK(AdoptWK, WKBundleFrameCopyURL(WKBundlePageGetMainFrame(injectedBundle.page()->page())));
     WKRetainPtr<WKURLRef> urlWK(AdoptWK, WKURLCreateWithBaseURL(baseURLWK.get(), toWTFString(toWK(url)).utf8().data()));
     WKRetainPtr<WKStringRef> urlStringWK(AdoptWK, WKURLCopyString(urlWK.get()));
 
-    injectedBundle.queueLoad(urlStringWK.get(), toWK(target).get());
+    injectedBundle.queueLoad(urlStringWK.get(), toWK(target).get(), shouldOpenExternalURLs);
 }
 
 void TestRunner::queueLoadHTMLString(JSStringRef content, JSStringRef baseURL, JSStringRef unreachableURL)

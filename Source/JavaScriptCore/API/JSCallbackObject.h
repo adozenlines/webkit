@@ -107,7 +107,7 @@ public:
         }
 
     private:
-        typedef HashMap<RefPtr<StringImpl>, WriteBarrier<Unknown>, IdentifierRepHash> PrivatePropertyMap;
+        typedef HashMap<RefPtr<UniquedStringImpl>, WriteBarrier<Unknown>, IdentifierRepHash> PrivatePropertyMap;
         PrivatePropertyMap m_propertyMap;
     };
     std::unique_ptr<JSPrivatePropertyMap> m_privateProperties;
@@ -125,7 +125,7 @@ protected:
 
 public:
     typedef Parent Base;
-    static const unsigned StructureFlags = Base::StructureFlags | ProhibitsPropertyCaching | OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | ImplementsHasInstance | OverridesHasInstance | OverridesGetPropertyNames;
+    static const unsigned StructureFlags = Base::StructureFlags | ProhibitsPropertyCaching | OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | ImplementsHasInstance | OverridesHasInstance | OverridesGetPropertyNames | TypeOfShouldCallGetCallData;
 
     ~JSCallbackObject();
 

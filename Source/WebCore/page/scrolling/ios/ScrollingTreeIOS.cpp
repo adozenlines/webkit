@@ -41,9 +41,9 @@
 
 namespace WebCore {
 
-RefPtr<ScrollingTreeIOS> ScrollingTreeIOS::create(AsyncScrollingCoordinator* scrollingCoordinator)
+Ref<ScrollingTreeIOS> ScrollingTreeIOS::create(AsyncScrollingCoordinator* scrollingCoordinator)
 {
-    return adoptRef(new ScrollingTreeIOS(scrollingCoordinator));
+    return adoptRef(*new ScrollingTreeIOS(scrollingCoordinator));
 }
 
 ScrollingTreeIOS::ScrollingTreeIOS(AsyncScrollingCoordinator* scrollingCoordinator)
@@ -116,6 +116,17 @@ FloatRect ScrollingTreeIOS::fixedPositionRect()
     // the ScrollingCoordinator.
     ASSERT_NOT_REACHED();
     return FloatRect();
+}
+
+void ScrollingTreeIOS::currentSnapPointIndicesDidChange(WebCore::ScrollingNodeID nodeID, unsigned horizontal, unsigned vertical)
+{
+    if (!m_scrollingCoordinator)
+        return;
+    
+    RefPtr<AsyncScrollingCoordinator> scrollingCoordinator = m_scrollingCoordinator;
+    callOnMainThread([scrollingCoordinator, nodeID, horizontal, vertical] {
+        scrollingCoordinator->setActiveScrollSnapIndices(nodeID, horizontal, vertical);
+    });
 }
 
 } // namespace WebCore

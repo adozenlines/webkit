@@ -28,14 +28,16 @@
 
 #if ENABLE(CONTENT_EXTENSIONS)
 
+#include "CombinedFiltersAlphabet.h"
+#include "ContentExtensionsDebugging.h"
 #include "NFA.h"
+#include <wtf/Forward.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
 
 namespace ContentExtensions {
 
-class Term;
 struct PrefixTreeVertex;
 
 class WEBCORE_EXPORT CombinedURLFilters {
@@ -43,15 +45,23 @@ public:
     CombinedURLFilters();
     ~CombinedURLFilters();
 
-    void addPattern(uint64_t patternId, const Vector<Term>& pattern);
+    void addPattern(uint64_t actionId, const Vector<Term>& pattern);
+    void addDomain(uint64_t actionId, const String& domain);
 
-    void processNFAs(std::function<void(NFA&&)> handler) const;
-    void clear();
+    void processNFAs(size_t maxNFASize, std::function<void(NFA&&)> handler);
+    bool isEmpty() const;
 
+#if CONTENT_EXTENSIONS_PERFORMANCE_REPORTING
     size_t memoryUsed() const;
+#endif
+#if CONTENT_EXTENSIONS_STATE_MACHINE_DEBUGGING
+    void print() const;
+#endif
     
 private:
+    CombinedFiltersAlphabet m_alphabet;
     std::unique_ptr<PrefixTreeVertex> m_prefixTreeRoot;
+    HashMap<const PrefixTreeVertex*, ActionList> m_actions;
 };
 
 } // namespace ContentExtensions

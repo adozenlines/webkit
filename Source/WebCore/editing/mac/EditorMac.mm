@@ -179,10 +179,6 @@ NSDictionary* Editor::fontAttributesForSelectionStart() const
         [result setObject:s.get() forKey:NSShadowAttributeName];
     }
 
-    int decoration = style->textDecorationsInEffect();
-    if (decoration & TextDecorationLineThrough)
-        [result setObject:[NSNumber numberWithInt:NSUnderlineStyleSingle] forKey:NSStrikethroughStyleAttributeName];
-
     int superscriptInt = 0;
     switch (style->verticalAlign()) {
         case BASELINE:
@@ -204,8 +200,7 @@ NSDictionary* Editor::fontAttributesForSelectionStart() const
     if (superscriptInt)
         [result setObject:[NSNumber numberWithInt:superscriptInt] forKey:NSSuperscriptAttributeName];
 
-    if (decoration & TextDecorationUnderline)
-        [result setObject:[NSNumber numberWithInt:NSUnderlineStyleSingle] forKey:NSUnderlineStyleAttributeName];
+    getTextDecorationAttributesRespectingTypingStyle(*style, result);
 
     if (nodeToRemove)
         nodeToRemove->remove(ASSERT_NO_EXCEPTION);
@@ -341,7 +336,7 @@ static PassRefPtr<SharedBuffer> dataInRTFDFormat(NSAttributedString *string)
         return nullptr;
 
     BEGIN_BLOCK_OBJC_EXCEPTIONS;
-    return SharedBuffer::wrapNSData([string RTFDFromRange:NSMakeRange(0, length) documentAttributes:nil]);
+    return SharedBuffer::wrapNSData([string RTFDFromRange:NSMakeRange(0, length) documentAttributes:@{ }]);
     END_BLOCK_OBJC_EXCEPTIONS;
 
     return nullptr;
@@ -354,7 +349,7 @@ static PassRefPtr<SharedBuffer> dataInRTFFormat(NSAttributedString *string)
         return nullptr;
 
     BEGIN_BLOCK_OBJC_EXCEPTIONS;
-    return SharedBuffer::wrapNSData([string RTFFromRange:NSMakeRange(0, length) documentAttributes:nil]);
+    return SharedBuffer::wrapNSData([string RTFFromRange:NSMakeRange(0, length) documentAttributes:@{ }]);
     END_BLOCK_OBJC_EXCEPTIONS;
 
     return nullptr;

@@ -607,12 +607,6 @@ _llint_op_enter:
     dispatch(1)
 
 
-_llint_op_create_lexical_environment:
-    traceExecution()
-    callSlowPath(_llint_slow_path_create_lexical_environment)
-    dispatch(3)
-
-
 _llint_op_get_scope:
     traceExecution()
     loadp Callee[cfr], t0
@@ -631,14 +625,18 @@ _llint_op_create_this:
     loadp FunctionRareData::m_allocationProfile + ObjectAllocationProfile::m_allocator[t4], t1
     loadp FunctionRareData::m_allocationProfile + ObjectAllocationProfile::m_structure[t4], t2
     btpz t1, .opCreateThisSlow
+    loadpFromInstruction(4, t4)
+    bpeq t4, 1, .hasSeenMultipleCallee
+    bpneq t4, t0, .opCreateThisSlow
+.hasSeenMultipleCallee:
     allocateJSObject(t1, t2, t0, t3, .opCreateThisSlow)
     loadisFromInstruction(1, t1)
     storeq t0, [cfr, t1, 8]
-    dispatch(4)
+    dispatch(5)
 
 .opCreateThisSlow:
     callSlowPath(_slow_path_create_this)
-    dispatch(4)
+    dispatch(5)
 
 
 _llint_op_to_this:
@@ -674,9 +672,9 @@ _llint_op_new_object:
 
 _llint_op_check_tdz:
     traceExecution()
-    loadpFromInstruction(1, t0)
-    loadq [cfr, t0, 8], t0
-    bqneq t0, ValueEmpty, .opNotTDZ
+    loadisFromInstruction(1, t0)
+    loadConstantOrVariable(t0, t1)
+    bqneq t1, ValueEmpty, .opNotTDZ
     callSlowPath(_slow_path_throw_tdz_error)
 
 .opNotTDZ:
@@ -1237,16 +1235,6 @@ macro storePropertyAtVariableOffset(propertyOffsetAsInt, objectAndStorage, value
 .ready:
     storeq value, (firstOutOfLineOffset - 2) * 8[objectAndStorage, propertyOffsetAsInt, 8]
 end
-
-_llint_op_init_global_const:
-    traceExecution()
-    writeBarrierOnGlobalObject(2)
-    loadisFromInstruction(2, t1)
-    loadpFromInstruction(1, t0)
-    loadConstantOrVariable(t1, t2)
-    storeq t2, [t0]
-    dispatch(5)
-
 
 macro getById(getPropertyStorage)
     traceExecution()
@@ -1816,12 +1804,18 @@ _llint_op_catch:
     loadp VM::targetInterpreterPCForThrow[t3], PC
     subp PB, PC
     rshiftp 3, PC
+
     loadq VM::m_exception[t3], t0
     storeq 0, VM::m_exception[t3]
     loadisFromInstruction(1, t2)
     storeq t0, [cfr, t2, 8]
+
+    loadq Exception::m_value[t0], t3
+    loadisFromInstruction(2, t2)
+    storeq t3, [cfr, t2, 8]
+
     traceExecution()
-    dispatch(2)
+    dispatch(3)
 
 
 _llint_op_end:
@@ -2053,7 +2047,6 @@ _llint_op_get_from_scope:
 .gGlobalVarWithVarInjectionChecks:
     bineq t0, GlobalVarWithVarInjectionChecks, .gClosureVarWithVarInjectionChecks
     varInjectionCheck(.gDynamic)
-    loadVariable(2, t0)
     getGlobalVar()
     dispatch(8)
 
@@ -2183,6 +2176,15 @@ _llint_op_put_to_arguments:
     loadConstantOrVariable(t3, t2)
     storeq t2, DirectArguments_storage[t0, t1, 8]
     dispatch(4)
+
+
+_llint_op_get_parent_scope:
+    traceExecution()
+    loadVariable(2, t0)
+    loadp JSScope::m_next[t0], t0
+    loadisFromInstruction(1, t1)
+    storeq t0, [cfr, t1, 8]
+    dispatch(3)
 
 
 _llint_op_profile_type:

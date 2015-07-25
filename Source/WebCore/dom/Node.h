@@ -58,10 +58,11 @@ class IntRect;
 class KeyboardEvent;
 class MathMLQualifiedName;
 class NSResolver;
-class NamedNodeMap;
 class NameNodeList;
+class NamedNodeMap;
 class NodeList;
 class NodeListsNodeData;
+class NodeOrString;
 class NodeRareData;
 class QualifiedName;
 class RadioNodeList;
@@ -193,7 +194,6 @@ public:
     WEBCORE_EXPORT bool removeChild(Node* child, ExceptionCode&);
     WEBCORE_EXPORT bool appendChild(PassRefPtr<Node> newChild, ExceptionCode&);
 
-    WEBCORE_EXPORT void remove(ExceptionCode&);
     bool hasChildNodes() const { return firstChild(); }
 
     enum class CloningOperation {
@@ -222,6 +222,16 @@ public:
     
     Node* lastDescendant() const;
     Node* firstDescendant() const;
+
+    // From the NonDocumentTypeChildNode - https://dom.spec.whatwg.org/#nondocumenttypechildnode
+    Element* previousElementSibling() const;
+    Element* nextElementSibling() const;
+
+    // From the ChildNode - https://dom.spec.whatwg.org/#childnode
+    void before(Vector<NodeOrString>&&, ExceptionCode&);
+    void after(Vector<NodeOrString>&&, ExceptionCode&);
+    void replaceWith(Vector<NodeOrString>&&, ExceptionCode&);
+    WEBCORE_EXPORT void remove(ExceptionCode&);
 
     // Other methods (not part of DOM)
 
@@ -398,6 +408,7 @@ public:
     { 
         return getFlag(InDocumentFlag);
     }
+    bool isInUserAgentShadowTree() const;
     bool isInShadowTree() const { return getFlag(IsInShadowTreeFlag); }
     bool isInTreeScope() const { return getFlag(static_cast<NodeFlags>(InDocumentFlag | IsInShadowTreeFlag)); }
 
@@ -444,7 +455,7 @@ public:
     }
 
     // Use these two methods with caution.
-    RenderBox* renderBox() const;
+    WEBCORE_EXPORT RenderBox* renderBox() const;
     RenderBoxModelObject* renderBoxModelObject() const;
     
     // Wrapper for nodes that don't have a renderer, but still cache the style (like HTMLOptionElement).
@@ -464,17 +475,17 @@ public:
     // Implementation can determine the type of subtree by seeing insertionPoint->inDocument().
     // For a performance reason, notifications are delivered only to ContainerNode subclasses if the insertionPoint is out of document.
     //
-    // There are another callback named didNotifyDescendantInsertions(), which is called after all the descendant is notified.
-    // Only a few subclasses actually need this. To utilize this, the node should return InsertionShouldCallDidNotifyDescendantInsertions
+    // There is another callback named finishedInsertingSubtree(), which is called after all descendants are notified.
+    // Only a few subclasses actually need this. To utilize this, the node should return InsertionShouldCallFinishedInsertingSubtree
     // from insrtedInto().
     //
     enum InsertionNotificationRequest {
         InsertionDone,
-        InsertionShouldCallDidNotifySubtreeInsertions
+        InsertionShouldCallFinishedInsertingSubtree
     };
 
     virtual InsertionNotificationRequest insertedInto(ContainerNode& insertionPoint);
-    virtual void didNotifySubtreeInsertions(ContainerNode*) { }
+    virtual void finishedInsertingSubtree() { }
 
     // Notifies the node that it is no longer part of the tree.
     //

@@ -509,7 +509,11 @@ static inline const FilterOperations& filterOperationsAt(const KeyframeValueList
 
 int GraphicsLayer::validateFilterOperations(const KeyframeValueList& valueList)
 {
+#if ENABLE(FILTERS_LEVEL_2)
+    ASSERT(valueList.property() == AnimatedPropertyWebkitFilter || valueList.property() == AnimatedPropertyWebkitBackdropFilter);
+#else
     ASSERT(valueList.property() == AnimatedPropertyWebkitFilter);
+#endif
 
     if (valueList.size() < 2)
         return -1;
@@ -775,6 +779,15 @@ void GraphicsLayer::dumpProperties(TextStream& ts, int indent, LayerTreeAsTextBe
         ts << "[" << m_childrenTransform.m21() << " " << m_childrenTransform.m22() << " " << m_childrenTransform.m23() << " " << m_childrenTransform.m24() << "] ";
         ts << "[" << m_childrenTransform.m31() << " " << m_childrenTransform.m32() << " " << m_childrenTransform.m33() << " " << m_childrenTransform.m34() << "] ";
         ts << "[" << m_childrenTransform.m41() << " " << m_childrenTransform.m42() << " " << m_childrenTransform.m43() << " " << m_childrenTransform.m44() << "])\n";
+    }
+
+    if (m_maskLayer) {
+        writeIndent(ts, indent + 1);
+        ts << "(mask layer";
+        if (behavior & LayerTreeAsTextDebug)
+            ts << " " << m_maskLayer;
+        ts << ")\n";
+        m_maskLayer->dumpLayer(ts, indent + 2, behavior);
     }
 
     if (m_replicaLayer) {

@@ -54,12 +54,14 @@
 #include "RenderIterator.h"
 #include "RenderLayer.h"
 #include "RenderLayerBacking.h"
+#include "RenderMultiColumnFlowThread.h"
 #include "RenderNamedFlowFragment.h"
 #include "RenderNamedFlowThread.h" 
 #include "RenderSVGResourceContainer.h"
 #include "RenderScrollbarPart.h"
 #include "RenderTheme.h"
 #include "RenderView.h"
+#include "RenderWidget.h"
 #include "SVGRenderSupport.h"
 #include "Settings.h"
 #include "StyleResolver.h"
@@ -542,7 +544,7 @@ static inline bool objectIsRelayoutBoundary(const RenderElement* object)
     if (!object->hasOverflowClip())
         return false;
 
-    if (object->style().width().isIntrinsicOrAuto() || object->style().height().isIntrinsicOrAuto() || object->style().height().isPercent())
+    if (object->style().width().isIntrinsicOrAuto() || object->style().height().isIntrinsicOrAuto() || object->style().height().isPercentOrCalculated())
         return false;
 
     // Table parts can't be relayout roots since the table is responsible for layouting all the parts.
@@ -1569,9 +1571,17 @@ void RenderObject::showRenderSubTreeAndMark(const RenderObject* markedObject, in
 SelectionSubtreeRoot& RenderObject::selectionRoot() const
 {
     RenderFlowThread* flowThread = flowThreadContainingBlock();
-    if (is<RenderNamedFlowThread>(flowThread))
-        return downcast<RenderNamedFlowThread>(*flowThread);
+    if (!flowThread)
+        return view();
 
+    if (is<RenderNamedFlowThread>(*flowThread))
+        return downcast<RenderNamedFlowThread>(*flowThread);
+    if (is<RenderMultiColumnFlowThread>(*flowThread)) {
+        if (!flowThread->containingBlock())
+            return view();
+        return flowThread->containingBlock()->selectionRoot();
+    }
+    ASSERT_NOT_REACHED();
     return view();
 }
 
@@ -2024,6 +2034,10 @@ void RenderObject::destroy()
 #endif
 
     willBeDestroyed();
+    if (is<RenderWidget>(*this)) {
+        downcast<RenderWidget>(*this).deref();
+        return;
+    }
     delete this;
 }
 

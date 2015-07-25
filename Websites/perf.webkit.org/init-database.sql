@@ -53,7 +53,7 @@ CREATE TABLE tracker_repositories (
 
 CREATE TABLE builders (
     builder_id serial PRIMARY KEY,
-    builder_name varchar(64) NOT NULL UNIQUE,
+    builder_name varchar(256) NOT NULL UNIQUE,
     builder_password_hash character(64),
     builder_build_url varchar(1024));
 
@@ -200,8 +200,7 @@ CREATE TABLE bugs (
     bug_id serial PRIMARY KEY,
     bug_task integer REFERENCES analysis_tasks NOT NULL,
     bug_tracker integer REFERENCES bug_trackers NOT NULL,
-    bug_number integer NOT NULL,
-    CONSTRAINT bug_task_and_tracker_must_be_unique UNIQUE(bug_task, bug_tracker));
+    bug_number integer NOT NULL);
 
 CREATE TABLE build_triggerables (
     triggerable_id serial PRIMARY KEY,

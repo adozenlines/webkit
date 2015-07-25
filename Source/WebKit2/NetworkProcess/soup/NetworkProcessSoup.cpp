@@ -38,8 +38,9 @@
 #include <WebCore/ResourceHandle.h>
 #include <WebCore/SoupNetworkSession.h>
 #include <libsoup/soup.h>
-#include <wtf/gobject/GRefPtr.h>
-#include <wtf/gobject/GUniquePtr.h>
+#include <wtf/RAMSize.h>
+#include <wtf/glib/GRefPtr.h>
+#include <wtf/glib/GUniquePtr.h>
 
 using namespace WebCore;
 
@@ -59,25 +60,6 @@ static uint64_t getCacheDiskFreeSize(SoupCache* cache)
 }
 #endif
 
-static uint64_t getMemorySize()
-{
-    static uint64_t kDefaultMemorySize = 512;
-#if !OS(WINDOWS)
-    long pageSize = sysconf(_SC_PAGESIZE);
-    if (pageSize == -1)
-        return kDefaultMemorySize;
-
-    long physPages = sysconf(_SC_PHYS_PAGES);
-    if (physPages == -1)
-        return kDefaultMemorySize;
-
-    return ((pageSize / 1024) * physPages) / 1024;
-#else
-    // Fallback to default for other platforms.
-    return kDefaultMemorySize;
-#endif
-}
-
 void NetworkProcess::userPreferredLanguagesChanged(const Vector<String>& languages)
 {
     SoupNetworkSession::defaultSession().setAcceptLanguages(languages);
@@ -90,16 +72,15 @@ void NetworkProcess::platformInitializeNetworkProcess(const NetworkProcessCreati
 
 #if ENABLE(NETWORK_CACHE)
     // Clear the old soup cache if it exists.
-    SoupNetworkSession::defaultSession().clearCache(m_diskCacheDirectory);
+    SoupNetworkSession::defaultSession().clearCache(WebCore::directoryName(m_diskCacheDirectory));
 
     NetworkCache::singleton().initialize(m_diskCacheDirectory, parameters.shouldEnableNetworkCacheEfficacyLogging);
 #else
     // We used to use the given cache directory for the soup cache, but now we use a subdirectory to avoid
     // conflicts with other cache files in the same directory. Remove the old cache files if they still exist.
-    SoupNetworkSession::defaultSession().clearCache(parameters.diskCacheDirectory);
+    SoupNetworkSession::defaultSession().clearCache(WebCore::directoryName(m_diskCacheDirectory));
 
-    String diskCachePath = WebCore::pathByAppendingComponent(parameters.diskCacheDirectory, "webkit");
-    GRefPtr<SoupCache> soupCache = adoptGRef(soup_cache_new(diskCachePath.utf8().data(), SOUP_CACHE_SINGLE_USER));
+    GRefPtr<SoupCache> soupCache = adoptGRef(soup_cache_new(m_diskCacheDirectory.utf8().data(), SOUP_CACHE_SINGLE_USER));
     SoupNetworkSession::defaultSession().setCache(soupCache.get());
     // Set an initial huge max_size for the SoupCache so the call to soup_cache_load() won't evict any cached
     // resource. The final size of the cache will be set by NetworkProcess::platformSetCacheModel().
@@ -133,13 +114,13 @@ void NetworkProcess::platformSetCacheModel(CacheModel cacheModel)
     unsigned long urlCacheDiskCapacity = 0;
 
 #if ENABLE(NETWORK_CACHE)
-    uint64_t diskFreeSize = WebCore::getVolumeFreeSizeForPath(m_diskCacheDirectory.utf8().data()) / 1024 / 1024;
+    uint64_t diskFreeSize = WebCore::getVolumeFreeSizeForPath(m_diskCacheDirectory.utf8().data()) / WTF::MB;
 #else
     SoupCache* cache = SoupNetworkSession::defaultSession().cache();
-    uint64_t diskFreeSize = getCacheDiskFreeSize(cache) / 1024 / 1024;
+    uint64_t diskFreeSize = getCacheDiskFreeSize(cache) / WTF::MB;
 #endif
 
-    uint64_t memSize = getMemorySize();
+    uint64_t memSize = WTF::ramSize() / WTF::MB;
     calculateCacheSizes(cacheModel, memSize, diskFreeSize,
         cacheTotalCapacity, cacheMinDeadCapacity, cacheMaxDeadCapacity, deadDecodedDataDeletionInterval,
         pageCacheCapacity, urlCacheMemoryCapacity, urlCacheDiskCapacity);
@@ -172,12 +153,13 @@ void NetworkProcess::clearCacheForAllOrigins(uint32_t cachesToClear)
     clearDiskCache(std::chrono::system_clock::time_point::min(), [] { });
 }
 
-void NetworkProcess::clearDiskCache(std::chrono::system_clock::time_point /* modifiedSince */, std::function<void ()> /* completionHandler */)
+void NetworkProcess::clearDiskCache(std::chrono::system_clock::time_point modifiedSince, std::function<void ()> completionHandler)
 {
-    // FIXME: Find a way to only clear a part of the cache based on the date.
 #if ENABLE(NETWORK_CACHE)
-    NetworkCache::singleton().clear();
+    NetworkCache::singleton().clear(modifiedSince, WTF::move(completionHandler));
 #else
+    UNUSED_PARAM(modifiedSince);
+    UNUSED_PARAM(completionHandler);
     soup_cache_clear(SoupNetworkSession::defaultSession().cache());
 #endif
 }

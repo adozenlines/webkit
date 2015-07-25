@@ -93,7 +93,7 @@ private:
 
 #if PLATFORM(IOS)
     LazyInitialized<RetainPtr<WKWebViewContentProviderRegistry>> _contentProviderRegistry;
-    BOOL _allowsAlternateFullscreen;
+    BOOL _alwaysRunsAtForegroundPriority;
 #endif
 }
 
@@ -103,11 +103,14 @@ private:
         return nil;
     
 #if PLATFORM(IOS)
-    _mediaPlaybackRequiresUserAction = YES;
-    _mediaPlaybackAllowsAirPlay = YES;
-    _allowsAlternateFullscreen = YES;
+    _requiresUserActionForMediaPlayback = YES;
+    _allowsPictureInPictureMediaPlayback = YES;
 #endif
-    
+
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
+    _allowsAirPlayForMediaPlayback = YES;
+#endif
+
     return self;
 }
 
@@ -137,10 +140,13 @@ private:
 
 #if PLATFORM(IOS)
     configuration->_allowsInlineMediaPlayback = self->_allowsInlineMediaPlayback;
-    configuration->_allowsAlternateFullscreen = self->_allowsAlternateFullscreen;
-    configuration->_mediaPlaybackRequiresUserAction = self->_mediaPlaybackRequiresUserAction;
-    configuration->_mediaPlaybackAllowsAirPlay = self->_mediaPlaybackAllowsAirPlay;
+    configuration->_allowsPictureInPictureMediaPlayback = self->_allowsPictureInPictureMediaPlayback;
+    configuration->_alwaysRunsAtForegroundPriority = _alwaysRunsAtForegroundPriority;
+    configuration->_requiresUserActionForMediaPlayback = self->_requiresUserActionForMediaPlayback;
     configuration->_selectionGranularity = self->_selectionGranularity;
+#endif
+#if ENABLE(WIRELESS_TARGET_PLAYBACK)
+    configuration->_allowsAirPlayForMediaPlayback = self->_allowsAirPlayForMediaPlayback;
 #endif
 
     return configuration;
@@ -310,16 +316,42 @@ static NSString *defaultApplicationNameForUserAgent()
 }
 
 #if PLATFORM(IOS)
-- (BOOL)_allowsAlternateFullscreen
+- (BOOL)_alwaysRunsAtForegroundPriority
 {
-    return _allowsAlternateFullscreen;
+    return _alwaysRunsAtForegroundPriority;
 }
 
-- (void)_setAllowsAlternateFullscreen:(BOOL)allowed
+- (void)_setAlwaysRunsAtForegroundPriority:(BOOL)alwaysRunsAtForegroundPriority
 {
-    _allowsAlternateFullscreen = allowed;
+    _alwaysRunsAtForegroundPriority = alwaysRunsAtForegroundPriority;
 }
 #endif
+
+@end
+
+@implementation WKWebViewConfiguration (WKDeprecated)
+
+#if PLATFORM(IOS)
+- (BOOL)mediaPlaybackAllowsAirPlay
+{
+    return self.allowsAirPlayForMediaPlayback;
+}
+
+- (void)setMediaPlaybackAllowsAirPlay:(BOOL)allowed
+{
+    self.allowsAirPlayForMediaPlayback = allowed;
+}
+
+- (BOOL)mediaPlaybackRequiresUserAction
+{
+    return self.requiresUserActionForMediaPlayback;
+}
+
+- (void)setMediaPlaybackRequiresUserAction:(BOOL)required
+{
+    self.requiresUserActionForMediaPlayback = required;
+}
+#endif // PLATFORM(IOS)
 
 @end
 

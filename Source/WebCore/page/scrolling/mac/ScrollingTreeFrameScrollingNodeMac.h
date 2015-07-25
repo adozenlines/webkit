@@ -39,7 +39,7 @@ namespace WebCore {
 
 class ScrollingTreeFrameScrollingNodeMac : public ScrollingTreeFrameScrollingNode, private ScrollControllerClient {
 public:
-    WEBCORE_EXPORT static PassRefPtr<ScrollingTreeFrameScrollingNode> create(ScrollingTree&, ScrollingNodeID);
+    WEBCORE_EXPORT static Ref<ScrollingTreeFrameScrollingNode> create(ScrollingTree&, ScrollingNodeID);
     virtual ~ScrollingTreeFrameScrollingNodeMac();
 
 private:
@@ -79,10 +79,16 @@ private:
 
     bool isAlreadyPinnedInDirectionOfGesture(const PlatformWheelEvent&, ScrollEventAxis);
 
+    void deferTestsForReason(WheelEventTestTrigger::ScrollableAreaIdentifier, WheelEventTestTrigger::DeferTestTriggerReason) const override;
+    void removeTestDeferralForReason(WheelEventTestTrigger::ScrollableAreaIdentifier, WheelEventTestTrigger::DeferTestTriggerReason) const override;
+
 #if ENABLE(CSS_SCROLL_SNAP) && PLATFORM(MAC)
     LayoutUnit scrollOffsetOnAxis(ScrollEventAxis) const override;
     void immediateScrollOnAxis(ScrollEventAxis, float delta) override;
     float pageScaleFactor() const override;
+    void startScrollSnapTimer() override;
+    void stopScrollSnapTimer() override;
+    LayoutSize scrollExtent() const override;
 #endif
 
     void logExposedUnfilledArea();
@@ -99,8 +105,9 @@ private:
     RetainPtr<ScrollbarPainter> m_verticalScrollbarPainter;
     RetainPtr<ScrollbarPainter> m_horizontalScrollbarPainter;
     FloatPoint m_probableMainThreadScrollPosition;
-    bool m_lastScrollHadUnfilledPixels;
-    bool m_hadFirstUpdate;
+    bool m_lastScrollHadUnfilledPixels { false };
+    bool m_hadFirstUpdate { false };
+    bool m_expectsWheelEventTestTrigger { false };
 };
 
 } // namespace WebCore

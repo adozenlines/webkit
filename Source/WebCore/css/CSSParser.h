@@ -98,7 +98,7 @@ public:
         CSSParserValue& value() const { return m_value; }
         operator CSSParserValue&() { return m_value; }
 
-        CSSCalcValue* calculation() const { return m_calculation.get(); }
+        RefPtr<CSSCalcValue> calculation() const { return m_calculation; }
         void setCalculation(RefPtr<CSSCalcValue>&& calculation)
         {
             ASSERT(isCalculation(m_value));
@@ -121,6 +121,7 @@ public:
     static ParseResult parseValue(MutableStyleProperties*, CSSPropertyID, const String&, bool important, CSSParserMode, StyleSheetContents*);
 
     static bool parseColor(RGBA32& color, const String&, bool strict = false);
+    static bool isValidSystemColorValue(CSSValueID);
     static bool parseSystemColor(RGBA32& color, const String&, Document*);
     static PassRefPtr<CSSValueList> parseFontFaceValue(const AtomicString&);
     PassRefPtr<CSSPrimitiveValue> parseValidPrimitive(CSSValueID ident, ValueWithCalculation&);
@@ -146,7 +147,6 @@ public:
 
     PassRefPtr<CSSValue> parseBackgroundColor();
 
-#if ENABLE(PICTURE_SIZES)
     struct SourceSize {
         std::unique_ptr<MediaQueryExp> expression;
         RefPtr<CSSValue> length;
@@ -156,10 +156,7 @@ public:
     };
     Vector<SourceSize> parseSizesAttribute(StringView);
     SourceSize sourceSize(std::unique_ptr<MediaQueryExp>&&, CSSParserValue&);
-#endif
 
-    // FIXME: Maybe these two methods could be combined into one.
-    bool parseMaskImage(CSSParserValueList&, RefPtr<CSSValue>&);
     bool parseFillImage(CSSParserValueList&, RefPtr<CSSValue>&);
 
     enum FillPositionFlag { InvalidFillPosition = 0, AmbiguousFillPosition = 1, XFillPosition = 2, YFillPosition = 4 };
@@ -170,8 +167,8 @@ public:
     void parse2ValuesFillPosition(CSSParserValueList&, RefPtr<CSSValue>&, RefPtr<CSSValue>&);
     bool isPotentialPositionValue(CSSParserValue&);
     void parseFillPosition(CSSParserValueList&, RefPtr<CSSValue>&, RefPtr<CSSValue>&);
-    void parse3ValuesFillPosition(CSSParserValueList&, RefPtr<CSSValue>&, RefPtr<CSSValue>&, PassRefPtr<CSSPrimitiveValue>, PassRefPtr<CSSPrimitiveValue>);
-    void parse4ValuesFillPosition(CSSParserValueList&, RefPtr<CSSValue>&, RefPtr<CSSValue>&, PassRefPtr<CSSPrimitiveValue>, PassRefPtr<CSSPrimitiveValue>);
+    void parse3ValuesFillPosition(CSSParserValueList&, RefPtr<CSSValue>&, RefPtr<CSSValue>&, RefPtr<CSSPrimitiveValue>&&, RefPtr<CSSPrimitiveValue>&&);
+    void parse4ValuesFillPosition(CSSParserValueList&, RefPtr<CSSValue>&, RefPtr<CSSValue>&, RefPtr<CSSPrimitiveValue>&&, RefPtr<CSSPrimitiveValue>&&);
 
     void parseFillRepeat(RefPtr<CSSValue>&, RefPtr<CSSValue>&);
     PassRefPtr<CSSValue> parseFillSize(CSSPropertyID, bool &allowComma);
@@ -230,6 +227,7 @@ public:
 
     bool parseLegacyPosition(CSSPropertyID, bool important);
     bool parseItemPositionOverflowPosition(CSSPropertyID, bool important);
+    PassRefPtr<CSSValue> parseContentDistributionOverflowPosition();
 
 #if ENABLE(CSS_SHAPES)
     PassRefPtr<CSSValue> parseShapeProperty(CSSPropertyID);
@@ -290,6 +288,7 @@ public:
 
     // Image generators
     bool parseCanvas(CSSParserValueList&, RefPtr<CSSValue>&);
+    bool parseNamedImage(CSSParserValueList&, RefPtr<CSSValue>&);
 
     bool parseDeprecatedGradient(CSSParserValueList&, RefPtr<CSSValue>&);
     bool parseDeprecatedLinearGradient(CSSParserValueList&, RefPtr<CSSValue>&, CSSGradientRepeat repeating);
@@ -394,9 +393,7 @@ public:
     RefPtr<StyleRuleBase> m_rule;
     RefPtr<StyleKeyframe> m_keyframe;
     std::unique_ptr<MediaQuery> m_mediaQuery;
-#if ENABLE(PICTURE_SIZES)
     std::unique_ptr<Vector<SourceSize>> m_sourceSizeList;
-#endif
     std::unique_ptr<CSSParserValueList> m_valueList;
     bool m_supportsCondition;
 
@@ -551,8 +548,7 @@ private:
     void setupParser(const char* prefix, unsigned prefixLength, StringView, const char* suffix, unsigned suffixLength);
     bool inShorthand() const { return m_inParseShorthand; }
 
-    bool validateWidth(ValueWithCalculation&);
-    bool validateHeight(ValueWithCalculation&);
+    bool isValidSize(ValueWithCalculation&);
 
     void deleteFontFaceOnlyValues();
 

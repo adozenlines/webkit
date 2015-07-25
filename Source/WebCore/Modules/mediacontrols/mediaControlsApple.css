@@ -71,16 +71,14 @@ video::-webkit-media-controls-panel,
 audio::-webkit-media-controls-panel {
     box-sizing: border-box;
     position: relative;
-    z-index: 0;
     bottom: 0;
     width: 100%;
-    min-height: 45px;
-    height: 45px;
+    min-height: 25px;
+    height: 25px;
     line-height: 25px;
     -webkit-user-select: none;
     -webkit-user-drag: element;
     background-color: transparent;
-    padding-top: 20px;
 
     display: -webkit-flex;
     -webkit-flex-direction: row;
@@ -90,11 +88,15 @@ audio::-webkit-media-controls-panel {
     direction: ltr;
 
     transition: opacity 0.25s linear;
+    
+    -webkit-text-zoom: reset
 }
 
 video::-webkit-media-controls-panel {
-    cursor: none;
     opacity: 0;
+    padding-top: 20px;
+    min-height: 45px;
+    height: 45px;
 }
 
 video::-webkit-media-controls-panel.show,
@@ -110,13 +112,16 @@ audio::-webkit-media-controls-panel-background-container {
     left: 0;
     top: 0;
     width: 100%;
+}
+
+video::-webkit-media-controls-panel-background-container {
+    z-index: 0;
+}
+
+video::-webkit-media-controls-panel-background-container {
     min-height: 45px;
     height: 45px;
     -webkit-clip-path: inset(20px 0px 0px 0px);
-}
-
-audio::-webkit-media-controls-panel-background-container {
-    background-color: black;
 }
 
 video::-webkit-media-controls-panel-tint,
@@ -125,6 +130,10 @@ audio::-webkit-media-controls-panel-tint {
     left: 0;
     top: 0;
     width: 100%;
+    background-color: transparent;
+}
+
+video::-webkit-media-controls-panel-tint {
     min-height: 45px;
     height: 45px;
     background-color: rgb(41, 41, 41);
@@ -137,6 +146,12 @@ audio::-webkit-media-controls-panel-background {
     left: 0;
     top: 0;
     width: 100%;
+    min-height: 25px;
+    height: 25px;
+    background-color: rgb(41, 41, 41);
+}
+
+video::-webkit-media-controls-panel-background {
     min-height: 45px;
     height: 45px;
     background-color: rgba(30, 30, 30, 0.45);
@@ -155,8 +170,15 @@ audio::-webkit-media-controls-panel button {
     background-origin: content-box;
     background-repeat: no-repeat;
     background-position: center;
-    -webkit-transform: translateZ(0);
+}
+
+audio::-webkit-media-controls-panel button {
+    z-index: 0;
+}
+
+video::-webkit-media-controls-panel button {
     mix-blend-mode: plus-lighter;
+    -webkit-transform: translateZ(0);
 }
 
 video::-webkit-media-controls-panel button:focus,
@@ -171,13 +193,15 @@ audio::-webkit-media-controls-rewind-button {
     min-width: 16px;
     height: 18px;
     margin-bottom: 1px;
-    margin-left: 16px;
+    margin-left: 8px;
+    margin-right: 8px;
 }
 
 video::-webkit-media-controls-play-button,
 audio::-webkit-media-controls-play-button {
     background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 15" fill="rgba(255,255,255,0.45)"><rect x="0" y="1" width="4" height="13"/><rect x="8" y="1" width="4" height="13"/></svg>');
-    margin-left: 16px;
+    margin-left: 8px;
+    margin-right: 8px;
     width: 12px;
     min-width: 12px;
 }
@@ -193,7 +217,8 @@ audio::-webkit-media-controls-panel .mute-box {
     width: 14px;
     min-width: 14px;
     height: 25px;
-    margin-right: 16px;
+    margin-right: 8px;
+    margin-left: 8px;
     position: relative;
     display: -webkit-flex;
     -webkit-flex-direction: column;
@@ -213,16 +238,13 @@ video::-webkit-media-controls-panel .volume-box,
 audio::-webkit-media-controls-panel .volume-box {
     position: absolute;
     box-sizing: border-box;
-    height: 63px;
-    bottom: 0;
-    left: 0;
-    
-    -webkit-clip-path: inset(20px 20px 20px 20px round 0px 4px 4px 0px);
-    -webkit-transform: rotate(-90deg) translateY(-51.5px) translateX(31.5px);
+    width: 63px;
+    bottom: 5px;
+    left: -25px;
 
+    -webkit-clip-path: inset(20px 20px 20px 20px round 4px 4px 0px 0px);
     background-color: transparent;
-    border-bottom-right-radius: 4px;
-    border-top-right-radius: 4px;
+    overflow: hidden;
 
     display: -webkit-flex;
     -webkit-flex-direction: row;
@@ -230,8 +252,8 @@ audio::-webkit-media-controls-panel .volume-box {
     -webkit-justify-content: flex-end;
 
     opacity: 0;
-    /* make zero width (rather than display:none) for AX and FKA */
-    width: 0; /* will become 101px when shown */
+    /* make zero height (rather than display:none) for AX and FKA */
+    height: 0px; /* will become 116px when shown */
 
 }
 
@@ -249,6 +271,10 @@ audio::-webkit-media-controls-volume-slider-container-background {
     border-bottom-right-radius: 4px;
     border-top-right-radius: 4px;
     background-color: rgba(30, 30, 30, 0.45);
+}
+
+video::-webkit-media-controls-volume-slider-container-background {
+    background-color: rgba(30, 30, 30, 0.45);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
 }
 
@@ -262,6 +288,9 @@ audio::-webkit-media-controls-volume-slider-container-tint {
     border-bottom-right-radius: 4px;
     border-top-right-radius: 4px;
     background-color: rgb(41, 41, 41);
+}
+
+video::-webkit-media-controls-volume-slider-container-tint {
     mix-blend-mode: lighten;
 }
 
@@ -274,7 +303,7 @@ audio::-webkit-media-controls-panel .volume-box:hover,
 audio::-webkit-media-controls-panel .volume-box:active {
     opacity: 1;
     /* resize to usable amount (rather than display:none) for AX and FKA */
-    width: 116px;
+    height: 116px;
 }
 
 audio::-webkit-media-controls-volume-slider,
@@ -282,13 +311,19 @@ video::-webkit-media-controls-volume-slider {
     -webkit-appearance: none !important;
     box-sizing: border-box !important;
     height: 9px !important;
+    min-width: 64px !important;
     width: 64px !important;
     padding: 0 !important;
-    margin-right: 30px !important;
+    margin: 0 !important;
 
     background-color: transparent !important;
     background-size: 100% 100%;
     background-repeat: no-repeat;
+    -webkit-transform-origin: 0 0;
+    -webkit-transform: rotate(-90deg) translateY(28px) translateX(-40px);
+}
+
+video::-webkit-media-controls-volume-slider {
     mix-blend-mode: plus-lighter;
 }
 
@@ -308,22 +343,23 @@ video::-webkit-media-controls-volume-min-button {
 
 video::-webkit-media-controls-wireless-playback-picker-button,
 audio::-webkit-media-controls-wireless-playback-picker-button {
-    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 15" stroke="rgba(255,255,255,0.45)"><defs> <clipPath fill-rule="evenodd" id="cut-hole"><path d="M 0,0.5 L 16,0.5 L 16,15.5 L 0,15.5 z M 0,14.5 L 16,14.5 L 8,5 z"/></clipPath></defs><rect fill="none" clip-path="url(#cut-hole)" x="0.5" y="2" width="15" height="8"/><path stroke="none" fill="rgba(255,255,255,0.45)" d="M 3.5,13.25 L 12.5,13.25 L 8,8 z"/></svg>');
-    margin-right: 16px;
+    margin-right: 8px;
+    margin-left: 8px;
     width: 16px;
     min-width: 16px;
 }
 
 video::-webkit-media-controls-wireless-playback-picker-button.playing,
 audio::-webkit-media-controls-wireless-playback-picker-button.playing {
-    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 15" stroke="rgb(0,172,245)"><defs> <clipPath fill-rule="evenodd" id="cut-hole"><path d="M 0,0.5 L 16,0.5 L 16,15.5 L 0,15.5 z M 0,14.5 L 16,14.5 L 8,5 z"/></clipPath></defs><rect fill="none" clip-path="url(#cut-hole)" x="0.5" y="2" width="15" height="8"/><path stroke="none" fill="rgb(0,172,245)" d="M 3.5,13.25 L 12.5,13.25 L 8,8 z"/></svg>');
+    mix-blend-mode: normal;
 }
 
 video::-webkit-media-controls-toggle-closed-captions-button,
 audio::-webkit-media-controls-toggle-closed-captions-button {
     width: 16px;
     min-width: 16px;
-    margin-right: 16px;
+    margin-right: 8px;
+    margin-left: 8px;
     background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 15" stroke="rgba(255,255,255,0.45)"  fill="none"><defs> <clipPath id="cut-hole"><rect x="0" y="1" width="16" height="10"/><rect x="0" y="11" width="9" height="1"/><rect x="11" y="11" width="5" height="1"/></clipPath></defs> <rect x="0.5" y="1.5" rx="1" ry="1" width="15" height="10" clip-path="url(#cut-hole)"/><path d="M 2,6.5 h 4"/><path d="M 7,6.5 h 7"/><path d="M 3,8.5 h 2"/><path d="M 6,8.5 h 3"/><path d="M 10,8.5 h 3"/><path d="M 8.5,11.5 L 8.5,13.75 L 11,11"/></svg>');
     outline: 0;
 }
@@ -420,32 +456,27 @@ audio::-webkit-media-controls-closed-captions-container li.selected:hover::befor
 
 video::-webkit-media-controls-fullscreen-button,
 audio::-webkit-media-controls-fullscreen-button {
-    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 15" stroke="rgba(255,255,255,0.45)" stroke-width="1.25" fill="none"><path d="M 7,1.5 L 12.5,1.5 L 12.5,7"/><path d="M 0.5,8 L 0.5,13.5 L 6,13.5"/><path stroke-linecap="round" d="M 12.5,1.5 L 7.5,6.5"/><path stroke-linecap="round" d="M 0.5,13.5 L 5.5,8.5"/></svg>');
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 15" stroke="rgba(255,255,255,0.45)" fill="none"><path d="M 7,1.5 L 12.5,1.5 L 12.5,7"/><path d="M 0.5,8 L 0.5,13.5 L 6,13.5"/><path stroke-linecap="round" d="M 12.5,1.5 L 7.5,6.5"/><path stroke-linecap="round" d="M 0.5,13.5 L 5.5,8.5"/></svg>');
     margin-right: 7px;
+    margin-left: 8px;
     width: 14px;
     min-width: 14px;
 }
 
 video::-webkit-media-controls-fullscreen-button.exit,
 audio::-webkit-media-controls-fullscreen-button.exit {
-    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 15" stroke="rgba(255,255,255,0.45)" stroke-width="1.25" fill="none"><path d="M 7.5,0.5 L 7.5,6 L 13,6"/><path d="M 0,8 L 5.5,8 L 5.5,13.5"/><path stroke-linecap="round" d="M 7.5,6 L 12.5,1"/><path stroke-linecap="round" d="M 5.5,8 L 0.5,13"/></svg>');
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 15" stroke="rgba(255,255,255,0.45)" fill="none"><path d="M 7.5,1 L 7.5,6.5 L 13,6.5"/><path d="M 0,8.5 L 5.5,8.5 L 5.5,14"/><path stroke-linecap="round" d="M 7.5,6.5 L 12.5,1.5"/><path stroke-linecap="round" d="M 5.5,8.5 L 0.5,13.5"/></svg>');
     margin-right: 11px;
+    margin-left: 0px;
     margin-top: 6px;
-}
-
-video::-webkit-media-controls-optimized-fullscreen-button,
-audio::-webkit-media-controls-optimized-fullscreen-button {
-    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15 15" transform="rotate(90,0,0)"><linearGradient id="gradient" x2="0" y2="100%" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="rgb(216, 216, 216)"/><stop offset="0.4375" stop-color="rgb(216, 216, 216)"/><stop offset="0.4375" stop-color="rgb(208, 208, 208)"/><stop offset="0.5" stop-color="rgb(208, 208, 208)"/><stop offset="0.5" stop-color="rgb(200, 200, 200)"/><stop offset="1" stop-color="rgb(208, 208, 208)"/></linearGradient><path d="M 7,8 m 0,6 -2,-2 -2,2 c 0,0 -1,1 -2,0 -1,-1 0,-2 0,-2 l 2,-2 -2,-2 6,0 z" style="fill:url(#gradient) "/><path d="M 8,7 m 0,-6 2,2 2,-2 c 0,0 1,-1 2,0 1,1 0,2 0,2 l -2,2 2,2 -6,0 z" style="fill:url(#gradient) "/></svg>');
-    margin: 0 7px;
 }
 
 video::-webkit-media-controls-status-display,
 audio::-webkit-media-controls-status-display {
     cursor: default;
     overflow: hidden;
-    color: white;
-    opacity: .45;
-    mix-blend-mode: plus-lighter;
+    color: rgb(156, 156, 156);
+    opacity: 0.99;
 
     letter-spacing: normal;
     word-spacing: normal;
@@ -459,6 +490,13 @@ audio::-webkit-media-controls-status-display {
 
     -webkit-flex: 1 1 0;
 }
+
+video::-webkit-media-controls-status-display {
+    color: white;
+    opacity: .45;
+    mix-blend-mode: plus-lighter;
+}
+
 video::-webkit-media-controls-timeline,
 audio::-webkit-media-controls-timeline {
     -webkit-appearance: none !important;
@@ -468,16 +506,19 @@ audio::-webkit-media-controls-timeline {
     background-size: 100% 100% !important;
     background-repeat: no-repeat;
     background-color: transparent;
-    mix-blend-mode: plus-lighter;
-
 }
+
+video::-webkit-media-controls-timeline {
+    mix-blend-mode: plus-lighter;
+}
+
 video::-webkit-media-controls-timeline::-webkit-slider-thumb,
 audio::-webkit-media-controls-timeline::-webkit-slider-thumb {
     -webkit-appearance: none !important;
-    width:3px !important;
+    width: 3px !important;
     height: 15px !important;
 }
- 
+
 video::-webkit-media-controls-current-time-display,
 video::-webkit-media-controls-time-remaining-display,
 audio::-webkit-media-controls-current-time-display,
@@ -486,10 +527,8 @@ audio::-webkit-media-controls-time-remaining-display {
     -webkit-flex: 0 0 0;
     display: -webkit-flex;
     cursor: default;
-    overflow-y: hidden;
-    overflow-x: hidden;
-    color: white;
-    opacity: .45;
+    overflow: hidden;
+    color: rgb(156, 156, 156);
     letter-spacing: normal;
     word-spacing: normal;
     line-height: normal;
@@ -498,8 +537,17 @@ audio::-webkit-media-controls-time-remaining-display {
     text-decoration: none;
     position: relative;
     bottom: 0.5px;
-    font-family: -apple-system-font-monospaced-numbers;
-    -webkit-text-size-adjust:none;
+    font-family: -apple-system-monospaced-numbers;
+    font-size: 11px !important;
+    font-style: normal !important;
+    font-weight: normal !important;
+    -webkit-text-size-adjust: none;
+}
+
+video::-webkit-media-controls-current-time-display,
+video::-webkit-media-controls-time-remaining-display {
+    color: white;
+    opacity: .45;
     mix-blend-mode: plus-lighter;
 }
 
@@ -515,7 +563,7 @@ audio::-webkit-media-controls-current-time-display {
 video::-webkit-media-controls-time-remaining-display,
 audio::-webkit-media-controls-time-remaining-display {
     margin-left: 8px;
-    margin-right: 16px;
+    margin-right: 8px;
     width: 37px;
     min-width: 37px;
     -webkit-justify-content: flex-start;
@@ -594,27 +642,29 @@ audio::-webkit-media-controls-panel.hidden {
 }
 
 video::-webkit-media-controls-panel .hidden,
-audio::-webkit-media-controls-panel .hidden {
+audio::-webkit-media-controls-panel .hidden,
+video::-webkit-media-controls-panel .dropped,
+audio::-webkit-media-controls-panel .dropped {
     display: none;
 }
 
 /* Full Screen */
 
-/* 
+/*
     Page stylesheets are not allowed to override the style of media
     controls while in full screen mode, so many if not all the rules
     defined in this section will be marked as !important to enforce
-    this restriction 
+    this restriction
 */
 
 video:-webkit-full-screen::-webkit-media-controls-panel {
     -webkit-align-items: flex-start !important;
     -webkit-justify-content: flex-end !important;
     -webkit-clip-path: inset(20px round 6px);
-    
+
     width: 480px !important;
     height: 104px !important;
-    margin: 0 auto 32px auto !important;
+    margin: 0 auto 12px auto !important;
     padding: 20px;
     padding-top: 30px !important;
 
@@ -669,8 +719,11 @@ video:-webkit-full-screen::-webkit-media-controls-panel .volume-box {
 }
 
 video:-webkit-full-screen::-webkit-media-controls-volume-slider {
+    -webkit-transform: none;
     background-color: transparent;
+    min-width: 60px !important;
     width: 60px !important;
+    height: 9px !important;
     margin: 0 !important;
 }
 
@@ -693,7 +746,7 @@ video:-webkit-full-screen::-webkit-media-controls-volume-min-button {
 
 video:-webkit-full-screen::-webkit-media-controls-play-button {
     position: absolute;
-    
+
     background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 23" fill="rgba(255,255,255,0.45)"><path d="M 0,0 0,22 8,22 8,0 z"/><path d="M 13,0 13,22 21,22 21,0 z"/></svg>');
 
     width: 21px;
@@ -768,12 +821,14 @@ video:-webkit-full-screen::-webkit-media-controls-toggle-closed-captions-button,
 audio:-webkit-full-screen::-webkit-media-controls-toggle-closed-captions-button {
     margin-top: 6px;
     margin-right:24px;
+    margin-left: 0px;
 }
 
 video:-webkit-full-screen::-webkit-media-controls-wireless-playback-picker-button,
 audio:-webkit-full-screen::-webkit-media-controls-wireless-playback-picker-button {
     margin-top: 6px;
     margin-right:24px;
+    margin-left: 0px;
 }
 
 video:-webkit-full-screen::-webkit-media-controls-closed-captions-container {
@@ -905,12 +960,12 @@ video:-webkit-full-screen::-webkit-media-controls-seek-forward-button:active {
 
 video::-webkit-media-controls-fullscreen-button:active,
 audio::-webkit-media-controls-fullscreen-button:active {
-    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 15" stroke="white" stroke-width="1.25" fill="none"><path d="M 7,1.5 L 12.5,1.5 L 12.5,7"/><path d="M 0.5,8 L 0.5,13.5 L 6,13.5"/><path stroke-linecap="round" d="M 12.5,1.5 L 7.5,6.5"/><path stroke-linecap="round" d="M 0.5,13.5 L 5.5,8.5"/></svg>');
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 15" stroke="white" fill="none"><path d="M 7,1.5 L 12.5,1.5 L 12.5,7"/><path d="M 0.5,8 L 0.5,13.5 L 6,13.5"/><path stroke-linecap="round" d="M 12.5,1.5 L 7.5,6.5"/><path stroke-linecap="round" d="M 0.5,13.5 L 5.5,8.5"/></svg>');
 }
 
 video::-webkit-media-controls-panel button.exit:active,
 audio::-webkit-media-controls-panel button.exit:active {
-    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 15" stroke="white" stroke-width="1.25" fill="none"><path d="M 7.5,0.5 L 7.5,6 L 13,6"/><path d="M 0,8 L 5.5,8 L 5.5,13.5"/><path stroke-linecap="round" d="M 7.5,6 L 12.5,1"/><path stroke-linecap="round" d="M 5.5,8 L 0.5,13"/></svg>');
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 15" stroke="white" fill="none"><path d="M 7.5,1 L 7.5,6.5 L 13,6.5"/><path d="M 0,8.5 L 5.5,8.5 L 5.5,14"/><path stroke-linecap="round" d="M 7.5,6.5 L 12.5,1.5"/><path stroke-linecap="round" d="M 5.5,8.5 L 0.5,13.5"/></svg>');
 }
 
 video::-webkit-media-controls-wireless-playback-picker-button:active,
@@ -928,13 +983,13 @@ audio::-webkit-media-controls-wireless-playback-status {
     top: 0px;
     width: 100%;
     height: 100%;
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 131 90"><g fill="none" stroke="rgb(146,146,146)" stroke-width="4"><rect x="2" y="2" width="127" height="76"/><line x1="30" y1="88" x2="101" y2="88"/></g></svg>');
-    background-color: black;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 131 90"><g fill="none" stroke="-apple-system-gray" stroke-width="4"><rect x="2" y="2" width="127" height="76"/><line x1="30" y1="88" x2="101" y2="88"/></g></svg>');
+    background-color: rgb(51, 51, 53);
     background-repeat: no-repeat;
     background-position: 50% calc(.5 * (100% - 25px) - 21pt);
     background-size: 131px auto;
-    color: rgb(145,145,145);
-    font: -webkit-small-control;
+    color: -apple-system-gray;
+    font-family: -apple-system;
     vertical-align: text-bottom;
 }
 
@@ -955,7 +1010,7 @@ audio::-webkit-media-controls-wireless-playback-text-top {
     top: 15pt;
     width: 100%;
     line-height: 12pt;
-    height: 12pt;
+    height: 13pt;
     font-size: 12pt;
     text-align: center;
     margin: 0px;
@@ -968,7 +1023,7 @@ audio::-webkit-media-controls-wireless-playback-text-bottom {
     left: 5%;
     width: 90%;
     line-height: 10pt;
-    height: 10pt;
+    height: 11pt;
     font-size: 10pt;
     text-align: center;
     white-space: nowrap;
@@ -979,7 +1034,7 @@ audio::-webkit-media-controls-wireless-playback-text-bottom {
 
 video::-webkit-media-controls-wireless-playback-status.small,
 audio::-webkit-media-controls-wireless-playback-status.small {
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 62 43"><g fill="none" stroke="rgb(146,146,146)" stroke-width="2"><rect x="1" y="1" width="60" height="36"/><line x1="14" y1="42" x2="48" y2="42"/></g></svg>');
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 62 43"><g fill="none" stroke="-apple-system-gray" stroke-width="2"><rect x="1" y="1" width="60" height="36"/><line x1="14" y1="42" x2="48" y2="42"/></g></svg>');
     background-position: 50% calc(.5 * (100% - 25px) - 5pt);
     background-size: 62px auto;
 }

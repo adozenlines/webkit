@@ -30,6 +30,7 @@
 
 namespace WebCore {
 
+class CachedResource;
 class StyleSheetContents;
     
 // FIXME: The current CSSValue and subclasses should be turned into internal types (StyleValue).
@@ -78,6 +79,7 @@ public:
     bool isFontValue() const { return m_classType == FontClass; }
     bool isImageGeneratorValue() const { return m_classType >= CanvasClass && m_classType <= RadialGradientClass; }
     bool isGradientValue() const { return m_classType >= LinearGradientClass && m_classType <= RadialGradientClass; }
+    bool isNamedImageValue() const { return m_classType == NamedImageClass; }
 #if ENABLE(CSS_IMAGE_SET)
     bool isImageSetValue() const { return m_classType == ImageSetClass; }
 #endif
@@ -96,6 +98,7 @@ public:
     bool isCalcValue() const {return m_classType == CalculationClass; }
     bool isFilterImageValue() const { return m_classType == FilterImageClass; }
     bool isWebKitCSSFilterValue() const { return m_classType == WebKitCSSFilterClass; }
+    bool isContentDistributionValue() const { return m_classType == CSSContentDistributionClass; }
 #if ENABLE(CSS_GRID_LAYOUT)
     bool isGridTemplateAreasValue() const { return m_classType == GridTemplateAreasClass; }
     bool isGridLineNamesValue() const { return m_classType == GridLineNamesClass; }
@@ -103,7 +106,6 @@ public:
     bool isSVGColor() const { return m_classType == SVGColorClass || m_classType == SVGPaintClass; }
     bool isSVGPaint() const { return m_classType == SVGPaintClass; }
     bool isUnicodeRangeValue() const { return m_classType == UnicodeRangeClass; }
-    bool isWebKitCSSResourceValue() const { return m_classType == WebKitCSSResourceClass; }
 
 #if ENABLE(CSS_ANIMATIONS_LEVEL_2)
     bool isAnimationTriggerScrollValue() const { return m_classType == AnimationTriggerScrollClass; }
@@ -121,7 +123,7 @@ public:
 
     void addSubresourceStyleURLs(ListHashSet<URL>&, const StyleSheetContents*) const;
 
-    bool hasFailedOrCanceledSubresources() const;
+    bool traverseSubresources(const std::function<bool (const CachedResource&)>& handler) const;
 
     bool equals(const CSSValue&) const;
 
@@ -137,6 +139,7 @@ protected:
 
         // Image generator classes.
         CanvasClass,
+        NamedImageClass,
         CrossfadeClass,
         FilterImageClass,
         LinearGradientClass,
@@ -167,11 +170,12 @@ protected:
 #endif
         SVGColorClass,
         SVGPaintClass,
-        WebKitCSSResourceClass,
 
 #if ENABLE(CSS_ANIMATIONS_LEVEL_2)
         AnimationTriggerScrollClass,
 #endif
+
+        CSSContentDistributionClass,
 
         // List class types must appear after ValueListClass.
         ValueListClass,
@@ -183,7 +187,6 @@ protected:
 #if ENABLE(CSS_GRID_LAYOUT)
         GridLineNamesClass,
 #endif
-
         // Do not append non-list class types here.
     };
 

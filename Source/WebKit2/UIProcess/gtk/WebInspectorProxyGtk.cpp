@@ -37,7 +37,7 @@
 #include <WebCore/NotImplemented.h>
 #include <glib/gi18n-lib.h>
 #include <gtk/gtk.h>
-#include <wtf/gobject/GUniquePtr.h>
+#include <wtf/glib/GUniquePtr.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
@@ -50,6 +50,11 @@ static void inspectorViewDestroyed(GtkWidget*, gpointer userData)
     // Inform WebProcess about webinspector closure. Not doing so,
     // results in failure of subsequent invocation of webinspector.
     inspectorProxy->close();
+}
+
+static unsigned long long exceededDatabaseQuota(WKPageRef, WKFrameRef, WKSecurityOriginRef, WKStringRef, WKStringRef, unsigned long long, unsigned long long, unsigned long long currentDatabaseUsage, unsigned long long expectedUsage, const void*)
+{
+    return std::max<unsigned long long>(expectedUsage, currentDatabaseUsage * 1.25);
 }
 
 void WebInspectorProxy::initializeInspectorClientGtk(const WKInspectorClientGtkBase* inspectorClient)
@@ -75,17 +80,61 @@ WebPageProxy* WebInspectorProxy::platformCreateInspectorPage()
     m_inspectorView = GTK_WIDGET(webkitWebViewBaseCreate(&inspectorProcessPool(), preferences.get(), pageGroup.get(), nullptr, nullptr));
     g_object_add_weak_pointer(G_OBJECT(m_inspectorView), reinterpret_cast<void**>(&m_inspectorView));
 
-    return webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(m_inspectorView));
-}
+    WKPageUIClientV2 uiClient = {
+        { 2, this },
+        nullptr, // createNewPage_deprecatedForUseWithV0
+        nullptr, // showPage
+        nullptr, // closePage
+        nullptr, // takeFocus
+        nullptr, // focus
+        nullptr, // unfocus
+        nullptr, // runJavaScriptAlert
+        nullptr, // runJavaScriptConfirm
+        nullptr, // runJavaScriptPrompt
+        nullptr, // setStatusText
+        nullptr, // mouseDidMoveOverElement_deprecatedForUseWithV0
+        nullptr, // missingPluginButtonClicked_deprecatedForUseWithV0
+        nullptr, // didNotHandleKeyEvent
+        nullptr, // didNotHandleWheelEvent
+        nullptr, // areToolbarsVisible
+        nullptr, // setToolbarsVisible
+        nullptr, // isMenuBarVisible
+        nullptr, // setMenuBarVisible
+        nullptr, // isStatusBarVisible
+        nullptr, // setStatusBarVisible
+        nullptr, // isResizable
+        nullptr, // setResizable
+        nullptr, // getWindowFrame,
+        nullptr, // setWindowFrame,
+        nullptr, // runBeforeUnloadConfirmPanel
+        nullptr, // didDraw
+        nullptr, // pageDidScroll
+        exceededDatabaseQuota,
+        nullptr, // runOpenPanel,
+        nullptr, // decidePolicyForGeolocationPermissionRequest
+        nullptr, // headerHeight
+        nullptr, // footerHeight
+        nullptr, // drawHeader
+        nullptr, // drawFooter
+        nullptr, // printFrame
+        nullptr, // runModal
+        nullptr, // unused
+        nullptr, // saveDataToFileInDownloadsFolder
+        nullptr, // shouldInterruptJavaScript
+        nullptr, // createPage
+        nullptr, // mouseDidMoveOverElement
+        nullptr, // decidePolicyForNotificationPermissionRequest
+        nullptr, // unavailablePluginButtonClicked_deprecatedForUseWithV1
+        nullptr, // showColorPicker
+        nullptr, // hideColorPicker
+        nullptr, // unavailablePluginButtonClicked
+    };
 
-void WebInspectorProxy::dockButtonClicked(GtkWidget* button, WebInspectorProxy* inspector)
-{
-    if (button == inspector->m_dockBottomButton)
-        inspector->attach(AttachmentSide::Bottom);
-    else if (button == inspector->m_dockRightButton)
-        inspector->attach(AttachmentSide::Right);
-    else
-        ASSERT_NOT_REACHED();
+    WebPageProxy* inspectorPage = webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(m_inspectorView));
+    ASSERT(inspectorPage);
+    WKPageSetPageUIClient(toAPI(inspectorPage), &uiClient.base);
+
+    return inspectorPage;
 }
 
 void WebInspectorProxy::createInspectorWindow()
@@ -103,25 +152,6 @@ void WebInspectorProxy::createInspectorWindow()
 #if GTK_CHECK_VERSION(3, 10, 0)
     m_headerBar = gtk_header_bar_new();
     gtk_header_bar_set_show_close_button(GTK_HEADER_BAR(m_headerBar), TRUE);
-
-    m_dockBottomButton = gtk_button_new();
-    g_object_add_weak_pointer(G_OBJECT(m_dockBottomButton), reinterpret_cast<void**>(&m_dockBottomButton));
-    g_signal_connect(m_dockBottomButton, "clicked", G_CALLBACK(dockButtonClicked), this);
-    gtk_widget_set_sensitive(m_dockBottomButton, canAttach());
-    gtk_button_set_relief(GTK_BUTTON(m_dockBottomButton), GTK_RELIEF_NONE);
-    gtk_button_set_image(GTK_BUTTON(m_dockBottomButton), gtk_image_new_from_resource("/org/webkitgtk/inspector/UserInterface/Images/DockBottom.svg"));
-    gtk_header_bar_pack_start(GTK_HEADER_BAR(m_headerBar), m_dockBottomButton);
-    gtk_widget_show(m_dockBottomButton);
-
-    m_dockRightButton = gtk_button_new();
-    g_object_add_weak_pointer(G_OBJECT(m_dockRightButton), reinterpret_cast<void**>(&m_dockRightButton));
-    g_signal_connect(m_dockRightButton, "clicked", G_CALLBACK(dockButtonClicked), this);
-    gtk_widget_set_sensitive(m_dockRightButton, canAttach());
-    gtk_button_set_relief(GTK_BUTTON(m_dockRightButton), GTK_RELIEF_NONE);
-    gtk_button_set_image(GTK_BUTTON(m_dockRightButton), gtk_image_new_from_resource("/org/webkitgtk/inspector/UserInterface/Images/DockRight.svg"));
-    gtk_header_bar_pack_start(GTK_HEADER_BAR(m_headerBar), m_dockRightButton);
-    gtk_widget_show(m_dockRightButton);
-
     gtk_window_set_titlebar(GTK_WINDOW(m_inspectorWindow), m_headerBar);
     gtk_widget_show(m_headerBar);
 #endif
@@ -310,6 +340,11 @@ void WebInspectorProxy::platformSetToolbarHeight(unsigned)
     notImplemented();
 }
 
+void WebInspectorProxy::platformStartWindowDrag()
+{
+    notImplemented();
+}
+
 void WebInspectorProxy::platformSave(const String&, const String&, bool, bool)
 {
     notImplemented();
@@ -323,10 +358,6 @@ void WebInspectorProxy::platformAppend(const String&, const String&)
 void WebInspectorProxy::platformAttachAvailabilityChanged(bool available)
 {
     m_client.didChangeAttachAvailability(this, available);
-    if (m_dockBottomButton && m_dockRightButton) {
-        gtk_widget_set_sensitive(m_dockBottomButton, available);
-        gtk_widget_set_sensitive(m_dockRightButton, available);
-    }
 }
 
 } // namespace WebKit

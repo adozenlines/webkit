@@ -42,7 +42,7 @@ class ExecutableBase;
 class InternalFunction;
 class JSFunction;
 class Structure;
-struct CallLinkInfo;
+class CallLinkInfo;
 
 class CallLinkStatus {
 public:
@@ -81,7 +81,7 @@ public:
         bool m_takesSlowPath;
         bool m_badFunction;
     };
-    static ExitSiteData computeExitSiteData(const ConcurrentJITLocker&, CodeBlock*, unsigned bytecodeIndex, ExitingJITType = ExitFromAnything);
+    static ExitSiteData computeExitSiteData(const ConcurrentJITLocker&, CodeBlock*, unsigned bytecodeIndex);
     
 #if ENABLE(JIT)
     // Computes the status assuming that we never took slow path and never previously

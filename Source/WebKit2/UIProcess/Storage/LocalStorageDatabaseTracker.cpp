@@ -26,7 +26,6 @@
 #include "config.h"
 #include "LocalStorageDatabaseTracker.h"
 
-#include "LocalStorageDetails.h"
 #include <WebCore/FileSystem.h>
 #include <WebCore/SQLiteStatement.h>
 #include <WebCore/SecurityOrigin.h>
@@ -167,9 +166,9 @@ Vector<Ref<SecurityOrigin>> LocalStorageDatabaseTracker::deleteDatabasesModified
     return deletedDatabaseOrigins;
 }
 
-Vector<RefPtr<WebCore::SecurityOrigin>> LocalStorageDatabaseTracker::origins() const
+Vector<Ref<WebCore::SecurityOrigin>> LocalStorageDatabaseTracker::origins() const
 {
-    Vector<RefPtr<SecurityOrigin>> origins;
+    Vector<Ref<SecurityOrigin>> origins;
     origins.reserveInitialCapacity(m_origins.size());
 
     for (const String& origin : m_origins)
@@ -178,15 +177,15 @@ Vector<RefPtr<WebCore::SecurityOrigin>> LocalStorageDatabaseTracker::origins() c
     return origins;
 }
 
-Vector<LocalStorageDetails> LocalStorageDatabaseTracker::details()
+Vector<LocalStorageDatabaseTracker::OriginDetails> LocalStorageDatabaseTracker::originDetails()
 {
-    Vector<LocalStorageDetails> result;
+    Vector<OriginDetails> result;
     result.reserveInitialCapacity(m_origins.size());
 
     for (const String& origin : m_origins) {
         String filePath = pathForDatabaseWithOriginIdentifier(origin);
 
-        LocalStorageDetails details;
+        OriginDetails details;
         details.originIdentifier = origin.isolatedCopy();
         details.creationTime = fileCreationTime(filePath);
         details.modificationTime = fileModificationTime(filePath);

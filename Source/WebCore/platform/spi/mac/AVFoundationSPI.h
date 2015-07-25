@@ -49,4 +49,28 @@
 
 #endif
 
+#endif // ENABLE(WIRELESS_PLAYBACK_TARGET) && !PLATFORM(IOS)
+
+#if PLATFORM(IOS)
+
+#if HAVE(AVKIT) && USE(APPLE_INTERNAL_SDK)
+
+#import <AVFoundation/AVPlayerLayer_Private.h>
+#import <AVKit/AVPlayerViewController_WebKitOnly.h>
+
+#else
+
+#import <AVFoundation/AVPlayerLayer.h>
+
 #endif
+
+#if !HAVE(AVKIT) || !USE(APPLE_INTERNAL_SDK) || __IPHONE_OS_VERSION_MIN_REQUIRED < 90000
+
+@interface AVPlayerLayer (AVPlayerLayerPictureInPictureModeSupportPrivate)
+- (void)setPIPModeEnabled:(BOOL)flag;
+@end
+
+#endif
+
+#endif // PLATFORM(IOS)
+

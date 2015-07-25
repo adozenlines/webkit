@@ -297,8 +297,8 @@ EncodedJSValue JIT_OPERATION operationGetByVal(ExecState* exec, EncodedJSValue e
         } else if (property.isString()) {
             Structure& structure = *base->structure(vm);
             if (JSCell::canUseFastGetOwnProperty(structure)) {
-                if (AtomicStringImpl* existingAtomicString = asString(property)->toExistingAtomicString(exec)) {
-                    if (JSValue result = base->fastGetOwnProperty(vm, structure, existingAtomicString))
+                if (RefPtr<AtomicStringImpl> existingAtomicString = asString(property)->toExistingAtomicString(exec)) {
+                    if (JSValue result = base->fastGetOwnProperty(vm, structure, existingAtomicString.get()))
                         return JSValue::encode(result);
                 }
             }
@@ -331,8 +331,8 @@ EncodedJSValue JIT_OPERATION operationGetByValCell(ExecState* exec, JSCell* base
     } else if (property.isString()) {
         Structure& structure = *base->structure(vm);
         if (JSCell::canUseFastGetOwnProperty(structure)) {
-            if (AtomicStringImpl* existingAtomicString = asString(property)->toExistingAtomicString(exec)) {
-                if (JSValue result = base->fastGetOwnProperty(vm, structure, existingAtomicString))
+            if (RefPtr<AtomicStringImpl> existingAtomicString = asString(property)->toExistingAtomicString(exec)) {
+                if (JSValue result = base->fastGetOwnProperty(vm, structure, existingAtomicString.get()))
                     return JSValue::encode(result);
             }
         }
@@ -762,11 +762,13 @@ char* JIT_OPERATION operationNewFloat64ArrayWithOneArgument(
     return newTypedArrayWithOneArgument<JSFloat64Array>(exec, structure, encodedValue);
 }
 
-JSCell* JIT_OPERATION operationCreateActivationDirect(ExecState* exec, Structure* structure, JSScope* scope, SymbolTable* table)
+JSCell* JIT_OPERATION operationCreateActivationDirect(ExecState* exec, Structure* structure, JSScope* scope, SymbolTable* table, EncodedJSValue initialValueEncoded)
 {
+    JSValue initialValue = JSValue::decode(initialValueEncoded);
+    ASSERT(initialValue == jsUndefined() || initialValue == jsTDZValue());
     VM& vm = exec->vm();
     NativeCallFrameTracer tracer(&vm, exec);
-    return JSLexicalEnvironment::create(vm, structure, scope, table);
+    return JSLexicalEnvironment::create(vm, structure, scope, table, initialValue);
 }
 
 JSCell* JIT_OPERATION operationCreateDirectArguments(ExecState* exec, Structure* structure, int32_t length, int32_t minCapacity)
@@ -860,21 +862,84 @@ JSCell* JIT_OPERATION operationCreateClonedArgumentsDuringExit(ExecState* exec, 
     return result;
 }
 
-size_t JIT_OPERATION operationIsObjectOrNull(ExecState* exec, EncodedJSValue value)
-{
-    return jsIsObjectTypeOrNull(exec, JSValue::decode(value));
-}
-
-size_t JIT_OPERATION operationIsFunction(EncodedJSValue value)
-{
-    return jsIsFunctionType(JSValue::decode(value));
-}
-
-JSCell* JIT_OPERATION operationTypeOf(ExecState* exec, JSCell* value)
+size_t JIT_OPERATION operationObjectIsObject(ExecState* exec, JSGlobalObject* globalObject, JSCell* object)
 {
     VM& vm = exec->vm();
     NativeCallFrameTracer tracer(&vm, exec);
-    return jsTypeStringForValue(exec, JSValue(value)).asCell();
+
+    ASSERT(jsDynamicCast<JSObject*>(object));
+    
+    if (object->structure(vm)->masqueradesAsUndefined(globalObject))
+        return false;
+    if (object->type() == JSFunctionType)
+        return false;
+    if (object->inlineTypeFlags() & TypeOfShouldCallGetCallData) {
+        CallData callData;
+        if (object->methodTable(vm)->getCallData(object, callData) != CallTypeNone)
+            return false;
+    }
+    
+    return true;
+}
+
+size_t JIT_OPERATION operationObjectIsFunction(ExecState* exec, JSGlobalObject* globalObject, JSCell* object)
+{
+    VM& vm = exec->vm();
+    NativeCallFrameTracer tracer(&vm, exec);
+
+    ASSERT(jsDynamicCast<JSObject*>(object));
+    
+    if (object->structure(vm)->masqueradesAsUndefined(globalObject))
+        return false;
+    if (object->type() == JSFunctionType)
+        return true;
+    if (object->inlineTypeFlags() & TypeOfShouldCallGetCallData) {
+        CallData callData;
+        if (object->methodTable(vm)->getCallData(object, callData) != CallTypeNone)
+            return true;
+    }
+    
+    return false;
+}
+
+JSCell* JIT_OPERATION operationTypeOfObject(ExecState* exec, JSGlobalObject* globalObject, JSCell* object)
+{
+    VM& vm = exec->vm();
+    NativeCallFrameTracer tracer(&vm, exec);
+
+    ASSERT(jsDynamicCast<JSObject*>(object));
+    
+    if (object->structure(vm)->masqueradesAsUndefined(globalObject))
+        return vm.smallStrings.undefinedString();
+    if (object->type() == JSFunctionType)
+        return vm.smallStrings.functionString();
+    if (object->inlineTypeFlags() & TypeOfShouldCallGetCallData) {
+        CallData callData;
+        if (object->methodTable(vm)->getCallData(object, callData) != CallTypeNone)
+            return vm.smallStrings.functionString();
+    }
+    
+    return vm.smallStrings.objectString();
+}
+
+int32_t JIT_OPERATION operationTypeOfObjectAsTypeofType(ExecState* exec, JSGlobalObject* globalObject, JSCell* object)
+{
+    VM& vm = exec->vm();
+    NativeCallFrameTracer tracer(&vm, exec);
+
+    ASSERT(jsDynamicCast<JSObject*>(object));
+    
+    if (object->structure(vm)->masqueradesAsUndefined(globalObject))
+        return static_cast<int32_t>(TypeofType::Undefined);
+    if (object->type() == JSFunctionType)
+        return static_cast<int32_t>(TypeofType::Function);
+    if (object->inlineTypeFlags() & TypeOfShouldCallGetCallData) {
+        CallData callData;
+        if (object->methodTable(vm)->getCallData(object, callData) != CallTypeNone)
+            return static_cast<int32_t>(TypeofType::Function);
+    }
+    
+    return static_cast<int32_t>(TypeofType::Object);
 }
 
 char* JIT_OPERATION operationAllocatePropertyStorageWithInitialCapacity(ExecState* exec)
@@ -949,17 +1014,6 @@ char* JIT_OPERATION operationEnsureContiguous(ExecState* exec, JSCell* cell)
         return 0;
     
     return reinterpret_cast<char*>(asObject(cell)->ensureContiguous(vm).data());
-}
-
-char* JIT_OPERATION operationRageEnsureContiguous(ExecState* exec, JSCell* cell)
-{
-    VM& vm = exec->vm();
-    NativeCallFrameTracer tracer(&vm, exec);
-    
-    if (!cell->isObject())
-        return 0;
-    
-    return reinterpret_cast<char*>(asObject(cell)->rageEnsureContiguous(vm).data());
 }
 
 char* JIT_OPERATION operationEnsureArrayStorage(ExecState* exec, JSCell* cell)
@@ -1299,7 +1353,7 @@ static void triggerFTLReplacementCompile(VM* vm, CodeBlock* codeBlock, JITCode* 
         Operands<JSValue>(), ToFTLDeferredCompilationCallback::create(codeBlock));
 }
 
-void JIT_OPERATION triggerTierUpNow(ExecState* exec)
+static void triggerTierUpNowCommon(ExecState* exec, bool inLoop)
 {
     VM* vm = &exec->vm();
     NativeCallFrameTracer tracer(vm, exec);
@@ -1318,8 +1372,20 @@ void JIT_OPERATION triggerTierUpNow(ExecState* exec)
             *codeBlock, ": Entered triggerTierUpNow with executeCounter = ",
             jitCode->tierUpCounter, "\n");
     }
-    
+    if (inLoop)
+        jitCode->nestedTriggerIsSet = 1;
+
     triggerFTLReplacementCompile(vm, codeBlock, jitCode);
+}
+
+void JIT_OPERATION triggerTierUpNow(ExecState* exec)
+{
+    triggerTierUpNowCommon(exec, false);
+}
+
+void JIT_OPERATION triggerTierUpNowInLoop(ExecState* exec)
+{
+    triggerTierUpNowCommon(exec, true);
 }
 
 char* JIT_OPERATION triggerOSREntryNow(
@@ -1336,6 +1402,7 @@ char* JIT_OPERATION triggerOSREntryNow(
     }
     
     JITCode* jitCode = codeBlock->jitCode()->dfg();
+    jitCode->nestedTriggerIsSet = 0;
     
     if (Options::verboseOSR()) {
         dataLog(
@@ -1382,7 +1449,7 @@ char* JIT_OPERATION triggerOSREntryNow(
         
         // OSR entry failed. Oh no! This implies that we need to retry. We retry
         // without exponential backoff and we only do this for the entry code block.
-        jitCode->osrEntryBlock.clear();
+        jitCode->osrEntryBlock = nullptr;
         jitCode->osrEntryRetry = 0;
         return 0;
     }

@@ -91,17 +91,20 @@ void CSSFontFaceSrcValue::addSubresourceStyleURLs(ListHashSet<URL>& urls, const 
         addSubresourceURL(urls, styleSheet->completeURL(m_resource));
 }
 
-bool CSSFontFaceSrcValue::hasFailedOrCanceledSubresources() const
+bool CSSFontFaceSrcValue::traverseSubresources(const std::function<bool (const CachedResource&)>& handler) const
 {
     if (!m_cachedFont)
         return false;
-    return m_cachedFont->loadFailedOrCanceled();
+    return handler(*m_cachedFont);
 }
 
-CachedFont* CSSFontFaceSrcValue::cachedFont(Document* document, bool isSVG)
+CachedFont* CSSFontFaceSrcValue::cachedFont(Document* document, bool isSVG, bool isInitiatingElementInUserAgentShadowTree)
 {
     if (!m_cachedFont) {
-        CachedResourceRequest request(ResourceRequest(document->completeURL(m_resource)));
+        ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
+        options.setContentSecurityPolicyImposition(isInitiatingElementInUserAgentShadowTree ? ContentSecurityPolicyImposition::SkipPolicyCheck : ContentSecurityPolicyImposition::DoPolicyCheck);
+
+        CachedResourceRequest request(ResourceRequest(document->completeURL(m_resource)), options);
         request.setInitiator(cachedResourceRequestInitiators().css);
         m_cachedFont = document->cachedResourceLoader().requestFont(request, isSVG);
     }

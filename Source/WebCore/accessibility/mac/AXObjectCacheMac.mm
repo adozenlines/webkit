@@ -60,6 +60,10 @@
 #define NSAccessibilityTextSelectionGranularity @"AXTextSelectionGranularity"
 #endif
 
+#ifndef NSAccessibilityTextSelectionChangedFocus
+#define NSAccessibilityTextSelectionChangedFocus @"AXTextSelectionChangedFocus"
+#endif
+
 #ifndef NSAccessibilityTextEditType
 #define NSAccessibilityTextEditType @"AXTextEditType"
 #endif
@@ -224,7 +228,7 @@ void AXObjectCache::postTextStateChangePlatformNotification(AccessibilityObject*
         return;
 
     NSMutableDictionary *userInfo = [[NSMutableDictionary alloc] initWithCapacity:5];
-    if (intent.isSynchronizing)
+    if (m_isSynchronizingSelection)
         [userInfo setObject:[NSNumber numberWithBool:YES] forKey:NSAccessibilityTextStateSyncKey];
     if (intent.type != AXTextStateChangeTypeUnknown) {
         [userInfo setObject:[NSNumber numberWithInt:intent.type] forKey:NSAccessibilityTextStateChangeTypeKey];
@@ -249,6 +253,8 @@ void AXObjectCache::postTextStateChangePlatformNotification(AccessibilityObject*
         case AXTextStateChangeTypeEdit:
             break;
         }
+        if (intent.selection.focusChange)
+            [userInfo setObject:[NSNumber numberWithBool:intent.selection.focusChange] forKey:NSAccessibilityTextSelectionChangedFocus];
     }
     if (!selection.isNone()) {
         if (id textMarkerRange = [object->wrapper() textMarkerRangeFromVisiblePositions:selection.visibleStart() endPosition:selection.visibleEnd()])
@@ -333,6 +339,9 @@ void AXObjectCache::frameLoadingEventPlatformNotification(AccessibilityObject* a
 void AXObjectCache::platformHandleFocusedUIElementChanged(Node*, Node*)
 {
     wkAccessibilityHandleFocusChanged();
+    // AXFocusChanged is a test specific notification name and not something a real AT will be listening for
+    if (UNLIKELY(axShouldRepostNotificationsForTests))
+        [rootWebArea()->wrapper() accessibilityPostedNotification:@"AXFocusChanged" userInfo:nil];
 }
 
 void AXObjectCache::handleScrolledToAnchor(const Node*)

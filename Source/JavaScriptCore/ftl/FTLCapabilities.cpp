@@ -63,6 +63,7 @@ inline CapabilityLevel canCompile(Node* node)
     case BitLShift:
     case BitURShift:
     case CheckStructure:
+    case DoubleAsInt32:
     case ArrayifyToStructure:
     case PutStructure:
     case GetButterfly:
@@ -89,6 +90,7 @@ inline CapabilityLevel canCompile(Node* node)
     case ArithSin:
     case ArithCos:
     case ArithPow:
+    case ArithRound:
     case ArithSqrt:
     case ArithLog:
     case ArithFRound:
@@ -122,7 +124,6 @@ inline CapabilityLevel canCompile(Node* node)
     case GetTypedArrayByteOffset:
     case NotifyWrite:
     case StoreBarrier:
-    case StoreBarrierWithNullCheck:
     case Call:
     case Construct:
     case CallVarargs:
@@ -181,14 +182,17 @@ inline CapabilityLevel canCompile(Node* node)
     case BottomValue:
     case PhantomNewObject:
     case PhantomNewFunction:
+    case PhantomCreateActivation:
     case PutHint:
     case CheckStructureImmediate:
     case MaterializeNewObject:
+    case MaterializeCreateActivation:
     case PhantomDirectArguments:
     case PhantomClonedArguments:
     case GetMyArgumentByVal:
     case ForwardVarargs:
     case Switch:
+    case TypeOf:
         // These are OK.
         break;
     case Identity:
@@ -325,6 +329,10 @@ inline CapabilityLevel canCompile(Node* node)
             break;
         if (node->isBinaryUseKind(StringIdentUse))
             break;
+        if (node->isBinaryUseKind(ObjectUse, UntypedUse))
+            break;
+        if (node->isBinaryUseKind(UntypedUse, ObjectUse))
+            break;
         if (node->isBinaryUseKind(ObjectUse))
             break;
         if (node->isBinaryUseKind(BooleanUse))
@@ -396,6 +404,7 @@ CapabilityLevel canCompile(Graph& graph)
                 case KnownInt32Use:
                 case Int52RepUse:
                 case NumberUse:
+                case RealNumberUse:
                 case DoubleRepUse:
                 case DoubleRepRealUse:
                 case BooleanUse:

@@ -31,7 +31,7 @@ WebInspector.RenderingFrameTimelineView = function(timeline, extraArguments)
 
     this.navigationSidebarTreeOutline.element.classList.add("rendering-frame");
 
-    var columns = {location: {}, startTime: {}, layoutTime: {}, scriptTime: {}, otherTime: {}, totalTime: {}};
+    var columns = {location: {}, startTime: {}, scriptTime: {}, paintTime: {}, layoutTime: {}, otherTime: {}, totalTime: {}};
 
     columns.location.title = WebInspector.UIString("Location");
 
@@ -39,16 +39,20 @@ WebInspector.RenderingFrameTimelineView = function(timeline, extraArguments)
     columns.startTime.width = "15%";
     columns.startTime.aligned = "right";
 
-    columns.layoutTime.title = WebInspector.UIString("Layout");
-    columns.layoutTime.width = "15%";
-    columns.layoutTime.aligned = "right";
-
-    columns.scriptTime.title = WebInspector.UIString("Script");
-    columns.scriptTime.width = "15%";
+    columns.scriptTime.title = WebInspector.RenderingFrameTimelineRecord.displayNameForTaskType(WebInspector.RenderingFrameTimelineRecord.TaskType.Script);
+    columns.scriptTime.width = "10%";
     columns.scriptTime.aligned = "right";
 
-    columns.otherTime.title = WebInspector.UIString("Other");
-    columns.otherTime.width = "15%";
+    columns.layoutTime.title = WebInspector.RenderingFrameTimelineRecord.displayNameForTaskType(WebInspector.RenderingFrameTimelineRecord.TaskType.Layout);
+    columns.layoutTime.width = "10%";
+    columns.layoutTime.aligned = "right";
+
+    columns.paintTime.title = WebInspector.RenderingFrameTimelineRecord.displayNameForTaskType(WebInspector.RenderingFrameTimelineRecord.TaskType.Paint);
+    columns.paintTime.width = "10%";
+    columns.paintTime.aligned = "right";
+
+    columns.otherTime.title = WebInspector.RenderingFrameTimelineRecord.displayNameForTaskType(WebInspector.RenderingFrameTimelineRecord.TaskType.Other);
+    columns.otherTime.width = "10%";
     columns.otherTime.aligned = "right";
 
     columns.totalTime.title = WebInspector.UIString("Total Time");
@@ -86,18 +90,22 @@ WebInspector.RenderingFrameTimelineView.prototype = {
     {
         WebInspector.ContentView.prototype.shown.call(this);
 
-        WebInspector.renderingFrameDetailsSidebarPanel.renderingFrameTimeline = this.representedObject;
-
         this._dataGrid.shown();
     },
 
     hidden: function()
     {
-        WebInspector.renderingFrameDetailsSidebarPanel.renderingFrameTimeline = null;
-
         this._dataGrid.hidden();
 
         WebInspector.ContentView.prototype.hidden.call(this);
+    },
+
+    closed: function()
+    {
+        console.assert(this.representedObject instanceof WebInspector.Timeline);
+        this.representedObject.removeEventListener(null, null, this);
+
+        this._dataGrid.closed();
     },
 
     updateLayout: function()
@@ -154,14 +162,22 @@ WebInspector.RenderingFrameTimelineView.prototype = {
 
     // Protected
 
+    canShowContentViewForTreeElement: function(treeElement)
+    {
+        if (treeElement instanceof WebInspector.ProfileNodeTreeElement)
+            return !!treeElement.profileNode.sourceCodeLocation;
+        return WebInspector.TimelineView.prototype.canShowContentViewForTreeElement(treeElement);
+    },
+
     showContentViewForTreeElement: function(treeElement)
     {
-        if (treeElement instanceof WebInspector.ProfileNodeTreeElement && treeElement.profileNode.sourceCodeLocation) {
-            WebInspector.showOriginalOrFormattedSourceCodeLocation(treeElement.profileNode.sourceCodeLocation);
-            return true;
+        if (treeElement instanceof WebInspector.ProfileNodeTreeElement) {
+            if (treeElement.profileNode.sourceCodeLocation)
+                WebInspector.showOriginalOrFormattedSourceCodeLocation(treeElement.profileNode.sourceCodeLocation);
+            return;
         }
 
-        return WebInspector.TimelineView.prototype.showContentViewForTreeElement.call(this, treeElement);
+        WebInspector.TimelineView.prototype.showContentViewForTreeElement.call(this, treeElement);
     },
 
     treeElementSelected: function(treeElement, selectedByUser)
@@ -209,6 +225,7 @@ WebInspector.RenderingFrameTimelineView.prototype = {
 
                     this._dataGrid.addRowInSortOrder(layoutTreeElement, layoutDataGridNode, treeElement);
                 } else if (childRecord.type === WebInspector.TimelineRecord.Type.Script) {
+                    var rootNodes = [];
                     if (childRecord.profile) {
                         // FIXME: Support using the bottom-up tree once it is implemented.
                         rootNodes = childRecord.profile.topDownRootNodes;

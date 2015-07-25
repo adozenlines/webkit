@@ -95,9 +95,10 @@ namespace DFG {
             (node), __FILE__, __LINE__, WTF_PRETTY_FUNCTION, #assertion); \
     } while (false)
 
-#define DFG_CRASH(graph, node, reason)                                  \
-    (graph).handleAssertionFailure(                                     \
-        (node), __FILE__, __LINE__, WTF_PRETTY_FUNCTION, (reason));
+#define DFG_CRASH(graph, node, reason) do {                             \
+        (graph).handleAssertionFailure(                                 \
+            (node), __FILE__, __LINE__, WTF_PRETTY_FUNCTION, (reason)); \
+    } while (false)
 
 struct InlineVariableData {
     InlineCallFrame* inlineCallFrame;
@@ -185,9 +186,8 @@ public:
 
     void dethread();
     
-    FrozenValue* freezeFragile(JSValue value);
-    FrozenValue* freeze(JSValue value); // We use weak freezing by default. Shorthand for freezeFragile(value)->strengthenTo(WeakValue);
-    FrozenValue* freezeStrong(JSValue value); // Shorthand for freezeFragile(value)->strengthenTo(StrongValue).
+    FrozenValue* freeze(JSValue); // We use weak freezing by default.
+    FrozenValue* freezeStrong(JSValue); // Shorthand for freeze(value)->strengthenTo(StrongValue).
     
     void convertToConstant(Node* node, FrozenValue* value);
     void convertToConstant(Node* node, JSValue value);
@@ -314,12 +314,17 @@ public:
             && !hasExitSite(negate, Int52Overflow)
             && negate->canSpeculateInt52(pass);
     }
+
+    bool roundShouldSpeculateInt32(Node* arithRound, PredictionPass pass)
+    {
+        ASSERT(arithRound->op() == ArithRound);
+        return arithRound->canSpeculateInt32(pass) && !hasExitSite(arithRound->origin.semantic, Overflow) && !hasExitSite(arithRound->origin.semantic, NegativeZero);
+    }
     
     static const char *opName(NodeType);
     
     StructureSet* addStructureSet(const StructureSet& structureSet)
     {
-        ASSERT(structureSet.size());
         m_structureSet.append(structureSet);
         return &m_structureSet.last();
     }
@@ -358,16 +363,6 @@ public:
     CodeBlock* baselineCodeBlockFor(const CodeOrigin& codeOrigin)
     {
         return baselineCodeBlockForOriginAndBaselineCodeBlock(codeOrigin, m_profiledBlock);
-    }
-    
-    SymbolTable* symbolTableFor(InlineCallFrame* inlineCallFrame)
-    {
-        return baselineCodeBlockFor(inlineCallFrame)->symbolTable();
-    }
-    
-    SymbolTable* symbolTableFor(const CodeOrigin& codeOrigin)
-    {
-        return symbolTableFor(codeOrigin.inlineCallFrame);
     }
     
     bool isStrictModeFor(CodeOrigin codeOrigin)
@@ -437,7 +432,7 @@ public:
     
     void killBlock(BlockIndex blockIndex)
     {
-        m_blocks[blockIndex].clear();
+        m_blocks[blockIndex] = nullptr;
     }
     
     void killBlock(BasicBlock* basicBlock)
@@ -793,13 +788,13 @@ public:
     
     NodeAllocator& m_allocator;
 
-    Operands<FrozenValue*> m_mustHandleValues;
-    
     Vector< RefPtr<BasicBlock> , 8> m_blocks;
     Vector<Edge, 16> m_varArgChildren;
 
     HashMap<EncodedJSValue, FrozenValue*, EncodedJSValueHash, EncodedJSValueHashTraits> m_frozenValueMap;
     Bag<FrozenValue> m_frozenValues;
+
+    Vector<uint32_t> m_uint32ValuesInUse;
     
     Bag<StorageAccessData> m_storageAccessData;
     
@@ -889,7 +884,7 @@ private:
         if (operandResultType != NodeResultInt32 && immediateValue.isDouble())
             return DontSpeculateInt32;
         
-        if (jsNumber(immediateValue.asNumber()).isInt32() || immediateValue.isBoolean())
+        if (immediateValue.isBoolean() || jsNumber(immediateValue.asNumber()).isInt32())
             return add->canSpeculateInt32(source) ? SpeculateInt32 : DontSpeculateInt32;
         
         double doubleImmediate = immediateValue.asDouble();

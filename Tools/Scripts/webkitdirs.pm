@@ -292,12 +292,6 @@ sub determineConfiguration
     } else {
         $configuration = "Release";
     }
-
-    if ($configuration && isWinCairo()) {
-        unless ($configuration =~ /_WinCairo$/) {
-            $configuration .= "_WinCairo";
-        }
-    }
 }
 
 sub determineArchitecture
@@ -674,7 +668,7 @@ sub XcodeOptions
     my @architectureOption = ($architecture ? "ARCHS=$architecture" : ());
     my @asanOption = ($asanIsEnabled ? ("-xcconfig", sourceDir() . "/Tools/asan/asan.xcconfig", "ASAN_IGNORE=" . sourceDir() . "/Tools/asan/webkit-asan-ignore.txt") : ());
 
-    return (@baseProductDirOption, "-configuration", $configuration, @architectureOption, @sdkOption, @asanOption, argumentsForXcode());
+    return ("-UseSanitizedBuildSystemEnvironment=YES", @baseProductDirOption, "-configuration", $configuration, @architectureOption, @sdkOption, @asanOption, argumentsForXcode());
 }
 
 sub XcodeOptionString
@@ -715,8 +709,6 @@ sub determinePassedConfiguration
     } elsif (checkForArgumentAndRemoveFromARGV("--profile") || checkForArgumentAndRemoveFromARGV("--profiling")) {
         $passedConfiguration = "Profiling";
     }
-
-    $passedConfiguration .= "_WinCairo" if (defined($passedConfiguration) && isWinCairo());
 }
 
 sub passedConfiguration
@@ -1725,6 +1717,9 @@ sub isCachedArgumentfileOutOfDate($@)
 
 sub jhbuildWrapperPrefixIfNeeded()
 {
+    if (isWindows()) {
+        return ();
+    }
     if (-e getJhbuildPath()) {
         my @prefix = (File::Spec->catfile(sourceDir(), "Tools", "jhbuild", "jhbuild-wrapper"));
         if (isEfl()) {
@@ -1863,7 +1858,7 @@ sub generateBuildSystemFromCMakeProject
     # Compiler options to keep floating point values consistent
     # between 32-bit and 64-bit architectures.
     determineArchitecture();
-    if ($architecture ne "x86_64" && !isARM() && !isCrossCompilation()) {
+    if ($architecture ne "x86_64" && !isARM() && !isCrossCompilation() && !isWindows()) {
         $ENV{'CXXFLAGS'} = "-march=pentium4 -msse2 -mfpmath=sse " . ($ENV{'CXXFLAGS'} || "");
     }
 
@@ -2115,16 +2110,17 @@ sub relaunchIOSSimulator($)
     my ($simulatedDevice) = @_;
     quitIOSSimulator($simulatedDevice->{UDID});
 
-    chomp(my $developerDirectory = $ENV{DEVELOPER_DIR} || `xcode-select --print-path`);
-    my $iosSimulatorPath = File::Spec->catfile($developerDirectory, "Applications", "iOS Simulator.app");
+    # FIXME: <rdar://problem/20916140> Switch to using CoreSimulator.framework for launching and quitting iOS Simulator
+    my $iosSimulatorBundleID = "com.apple.iphonesimulator";
+    system("open", "-b", $iosSimulatorBundleID, "--args", "-CurrentDeviceUDID", $simulatedDevice->{UDID}) == 0 or die "Failed to open $iosSimulatorBundleID: $!";
 
-    system("open", "-a", $iosSimulatorPath, "--args", "-CurrentDeviceUDID", $simulatedDevice->{UDID}) == 0 or die "Failed to open $iosSimulatorPath: $!";
     waitUntilIOSSimulatorDeviceIsInState($simulatedDevice->{UDID}, SIMULATOR_DEVICE_STATE_BOOTED);
 }
 
 sub quitIOSSimulator(;$)
 {
     my ($waitForShutdownOfSimulatedDeviceUDID) = @_;
+    # FIXME: <rdar://problem/20916140> Switch to using CoreSimulator.framework for launching and quitting iOS Simulator
     exitStatus(system {"osascript"} "osascript", "-e", 'tell application id "com.apple.iphonesimulator" to quit') == 0 or die "Failed to quit iOS Simulator: $!";
     if (!defined($waitForShutdownOfSimulatedDeviceUDID)) {
         return;
@@ -2493,7 +2489,7 @@ sub runGitUpdate()
     # Doing a git fetch first allows setups with svn-remote.svn.fetch = trunk:refs/remotes/origin/master
     # to perform the rebase much much faster.
     system("git", "fetch");
-    if (isGitSVN()) {
+    if (isGitSVNDirectory(".")) {
         system("git", "svn", "rebase") == 0 or die;
     } else {
         # This will die if branch.$BRANCHNAME.merge isn't set, which is

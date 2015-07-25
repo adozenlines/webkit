@@ -15,11 +15,12 @@ else ()
     set(CODE_GENERATOR_PREPROCESSOR_WITH_LINEMARKERS "${CMAKE_CXX_COMPILER} -E -x c++")
 endif ()
 
-if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-    set(CMAKE_CXX_ARCHIVE_CREATE "<CMAKE_AR> cruT <TARGET> <LINK_FLAGS> <OBJECTS>")
-    set(CMAKE_C_ARCHIVE_CREATE "<CMAKE_AR> cruT <TARGET> <LINK_FLAGS> <OBJECTS>")
-    set(CMAKE_CXX_ARCHIVE_APPEND "<CMAKE_AR> ruT <TARGET> <LINK_FLAGS> <OBJECTS>")
-    set(CMAKE_C_ARCHIVE_APPEND "<CMAKE_AR> ruT <TARGET> <LINK_FLAGS> <OBJECTS>")
+execute_process(COMMAND ${CMAKE_AR} -V OUTPUT_VARIABLE AR_VERSION)
+if ("${AR_VERSION}" MATCHES "^GNU ar")
+    set(CMAKE_CXX_ARCHIVE_CREATE "<CMAKE_AR> crT <TARGET> <LINK_FLAGS> <OBJECTS>")
+    set(CMAKE_C_ARCHIVE_CREATE "<CMAKE_AR> crT <TARGET> <LINK_FLAGS> <OBJECTS>")
+    set(CMAKE_CXX_ARCHIVE_APPEND "<CMAKE_AR> rT <TARGET> <LINK_FLAGS> <OBJECTS>")
+    set(CMAKE_C_ARCHIVE_APPEND "<CMAKE_AR> rT <TARGET> <LINK_FLAGS> <OBJECTS>")
 endif ()
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -61,14 +62,16 @@ if (WTF_CPU_ARM64_CORTEXA53)
     if (CXX_ACCEPTS_MFIX_CORTEX_A53_835769)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mfix-cortex-a53-835769")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfix-cortex-a53-835769")
-        message(STATUS "Enabling Cortex-A53 workaround for compiler")
+        message(STATUS "Enabling Cortex-A53 workaround for compiler and disabling GNU gold linker, because it doesn't support this workaround.")
     endif ()
 endif ()
 
 EXPOSE_VARIABLE_TO_BUILD(WTF_CPU_ARM64_CORTEXA53)
 
 # Use ld.gold if it is available and isn't disabled explicitly
-option(USE_LD_GOLD "Use GNU gold linker" ON)
+include(CMakeDependentOption)
+CMAKE_DEPENDENT_OPTION(USE_LD_GOLD "Use GNU gold linker" ON
+                       "NOT CXX_ACCEPTS_MFIX_CORTEX_A53_835769" OFF)
 if (USE_LD_GOLD)
     execute_process(COMMAND ${CMAKE_C_COMPILER} -fuse-ld=gold -Wl,--version ERROR_QUIET OUTPUT_VARIABLE LD_VERSION)
     if ("${LD_VERSION}" MATCHES "GNU gold")
@@ -102,7 +105,11 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" AND "${LOWERCASE_CMAKE_HOST_SYSTEM
     set(CMAKE_SHARED_LINKER_FLAGS_DEBUG "-Wl,--no-keep-memory ${CMAKE_SHARED_LINKER_FLAGS_DEBUG}")
 endif ()
 
-if (UNIX AND NOT APPLE)
+if (NOT MSVC)
+    string(REGEX MATCHALL "-fsanitize=[^ ]*" ENABLED_COMPILER_SANITIZERS ${CMAKE_CXX_FLAGS})
+endif ()
+
+if (UNIX AND NOT APPLE AND NOT ENABLED_COMPILER_SANITIZERS)
     set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined ${CMAKE_SHARED_LINKER_FLAGS}")
 endif ()
 

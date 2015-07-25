@@ -26,6 +26,8 @@
 #ifndef WebGLVertexArrayObject_h
 #define WebGLVertexArrayObject_h
 
+#if ENABLE(WEBGL2)
+
 #include "WebGLBuffer.h"
 #include "WebGLContextObject.h"
 #include "WebGLVertexArrayObjectBase.h"
@@ -39,7 +41,7 @@ class WebGL2RenderingContext;
 
 class WebGLVertexArrayObject final : public WebGLVertexArrayObjectBase {
 public:
-    static PassRefPtr<WebGLVertexArrayObject> create(WebGLRenderingContextBase*, VAOType);
+    static Ref<WebGLVertexArrayObject> create(WebGLRenderingContextBase*, VAOType);
     virtual ~WebGLVertexArrayObject();
 private:
     WebGLVertexArrayObject(WebGLRenderingContextBase*, VAOType);
@@ -48,5 +50,7 @@ private:
 };
 
 } // namespace WebCore
+
+#endif // WEBGL2
 
 #endif // WebGLVertexArrayObject_h

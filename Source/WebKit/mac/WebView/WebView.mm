@@ -79,7 +79,6 @@
 #import "WebKitLogging.h"
 #import "WebKitNSStringExtras.h"
 #import "WebKitStatisticsPrivate.h"
-#import "WebKitSystemBits.h"
 #import "WebKitVersionChecks.h"
 #import "WebLocalizableStrings.h"
 #import "WebNSDataExtras.h"
@@ -91,7 +90,6 @@
 #import "WebNodeHighlight.h"
 #import "WebNotificationClient.h"
 #import "WebPDFView.h"
-#import "WebPanelAuthenticationHandler.h"
 #import "WebPlatformStrategies.h"
 #import "WebPluginDatabase.h"
 #import "WebPolicyDelegate.h"
@@ -114,6 +112,7 @@
 #import <CoreFoundation/CFSet.h>
 #import <Foundation/NSURLConnection.h>
 #import <JavaScriptCore/APICast.h>
+#import <JavaScriptCore/Exception.h>
 #import <JavaScriptCore/JSValueRef.h>
 #import <WebCore/AlternativeTextUIController.h>
 #import <WebCore/AnimationController.h>
@@ -123,7 +122,6 @@
 #import <WebCore/CFNetworkSPI.h>
 #import <WebCore/Chrome.h>
 #import <WebCore/ColorMac.h>
-#import <WebCore/Cursor.h>
 #import <WebCore/DatabaseManager.h>
 #import <WebCore/Document.h>
 #import <WebCore/DocumentLoader.h>
@@ -212,7 +210,6 @@
 #import <wtf/StdLibExtras.h>
 
 #if !PLATFORM(IOS)
-#import "WebActionMenuController.h"
 #import "WebContextMenuClient.h"
 #import "WebFullScreenController.h"
 #import "WebImmediateActionController.h"
@@ -223,7 +220,6 @@
 #import "WebPDFView.h"
 #import <WebCore/LookupSPI.h>
 #import <WebCore/NSImmediateActionGestureRecognizerSPI.h>
-#import <WebCore/NSViewSPI.h>
 #import <WebCore/SoftLinking.h>
 #import <WebCore/TextIndicator.h>
 #import <WebCore/TextIndicatorWindow.h>
@@ -247,7 +243,6 @@
 #import "WebStorageManagerPrivate.h"
 #import "WebUIKitSupport.h"
 #import "WebVisiblePosition.h"
-#import <WebCore/DispatchSPI.h>
 #import <WebCore/EventNames.h>
 #import <WebCore/FontCache.h>
 #import <WebCore/GraphicsLayer.h>
@@ -855,6 +850,16 @@ static bool shouldAllowDisplayAndRunningOfInsecureContent()
     return shouldAllowDisplayAndRunningOfInsecureContent;
 }
 
+static bool shouldAllowPictureInPictureMediaPlayback()
+{
+#if PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 90000
+    static bool shouldAllowPictureInPictureMediaPlayback = iosExecutableWasLinkedOnOrAfterVersion(wkIOSSystemVersion_9_0);
+    return shouldAllowPictureInPictureMediaPlayback;
+#else
+    return false;
+#endif
+}
+
 #if ENABLE(GAMEPAD)
 static void WebKitInitializeGamepadProviderIfNecessary()
 {
@@ -899,17 +904,11 @@ static void WebKitInitializeGamepadProviderIfNecessary()
     [frameView release];
 
 #if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
-    if ([self respondsToSelector:@selector(_setActionMenu:)]) {
-        RetainPtr<NSMenu> actionMenu = adoptNS([[NSMenu alloc] init]);
-        self._actionMenu = actionMenu.get();
-        _private->actionMenuController = [[WebActionMenuController alloc] initWithWebView:self];
-        self._actionMenu.autoenablesItems = NO;
-    }
-
     if (Class gestureClass = NSClassFromString(@"NSImmediateActionGestureRecognizer")) {
-        RetainPtr<NSImmediateActionGestureRecognizer> recognizer = adoptNS([(NSImmediateActionGestureRecognizer *)[gestureClass alloc] initWithTarget:nil action:NULL]);
+        RetainPtr<NSImmediateActionGestureRecognizer> recognizer = adoptNS([(NSImmediateActionGestureRecognizer *)[gestureClass alloc] init]);
         _private->immediateActionController = [[WebImmediateActionController alloc] initWithWebView:self recognizer:recognizer.get()];
         [recognizer setDelegate:_private->immediateActionController];
+        [recognizer setDelaysPrimaryMouseButtonEvents:NO];
     }
 #endif
 
@@ -1086,6 +1085,10 @@ static void WebKitInitializeGamepadProviderIfNecessary()
 
     _private->page->setDeviceScaleFactor([self _deviceScaleFactor]);
 #endif
+
+#if PLATFORM(IOS)
+    _private->page->settings().setContentDispositionAttachmentSandboxEnabled(true);
+#endif
 }
 
 - (id)_initWithFrame:(NSRect)f frameName:(NSString *)frameName groupName:(NSString *)groupName
@@ -1233,6 +1236,9 @@ static void WebKitInitializeGamepadProviderIfNecessary()
     // FIXME: this is a workaround for <rdar://problem/11820090> Quoted text changes in size when replying to certain email
     _private->page->settings().setMinimumFontSize([_private->preferences minimumFontSize]);
 
+    // This is a workaround for <rdar://problem/21309911>.
+    _private->page->settings().setHttpEquivEnabled([_private->preferences httpEquivEnabled]);
+
     _private->page->setGroupName(groupName);
 
 #if ENABLE(REMOTE_INSPECTOR)
@@ -1282,7 +1288,7 @@ static void WebKitInitializeGamepadProviderIfNecessary()
         [WebView _handleMemoryWarning];
     }, shouldAutoClearPressureOnMemoryRelease);
 
-    static dispatch_source_t memoryNotificationEventSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_MEMORYSTATUS, 0, DISPATCH_MEMORYSTATUS_PRESSURE_WARN, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0));
+    static dispatch_source_t memoryNotificationEventSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_MEMORYPRESSURE, 0, DISPATCH_MEMORYPRESSURE_WARN, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0));
     dispatch_source_set_event_handler(memoryNotificationEventSource, ^{
         // Set memory pressure flag and schedule releasing memory in web thread runloop exit.
         MemoryPressureHandler::singleton().setReceivedMemoryPressure(WebCore::MemoryPressureReasonVMPressure);
@@ -1292,15 +1298,15 @@ static void WebKitInitializeGamepadProviderIfNecessary()
 
     if (!shouldAutoClearPressureOnMemoryRelease) {
         // Listen to memory status notification to reset the memory pressure flag.
-        static dispatch_source_t memoryStatusEventSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_MEMORYSTATUS,
+        static dispatch_source_t memoryStatusEventSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_MEMORYPRESSURE,
                                                                                     0,
-                                                                                    DISPATCH_MEMORYSTATUS_PRESSURE_WARN | DISPATCH_MEMORYSTATUS_PRESSURE_NORMAL,
+                                                                                    DISPATCH_MEMORYPRESSURE_WARN | DISPATCH_MEMORYPRESSURE_NORMAL,
                                                                                     dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0));
         dispatch_source_set_event_handler(memoryStatusEventSource, ^{
             unsigned long currentStatus = dispatch_source_get_data(memoryStatusEventSource);
-            if (currentStatus == DISPATCH_MEMORYSTATUS_PRESSURE_NORMAL)
+            if (currentStatus == DISPATCH_MEMORYPRESSURE_NORMAL)
                 MemoryPressureHandler::singleton().clearMemoryPressure();
-            else if (currentStatus == DISPATCH_MEMORYSTATUS_PRESSURE_WARN)
+            else if (currentStatus == DISPATCH_MEMORYPRESSURE_WARN)
                 MemoryPressureHandler::singleton().setReceivedMemoryPressure(WebCore::MemoryPressureReasonVMStatus);
         });
 
@@ -1322,11 +1328,6 @@ static void WebKitInitializeGamepadProviderIfNecessary()
         // Clear the main thread's TCMalloc thread cache.
         [WebView releaseFastMallocMemoryOnCurrentThread];
     });
-}
-
-+ (void)_clearPrivateBrowsingSessionCookieStorage
-{
-    WebFrameNetworkingContext::clearPrivateBrowsingSessionCookieStorage();
 }
 
 - (void)_replaceCurrentHistoryItem:(WebHistoryItem *)item
@@ -1354,7 +1355,7 @@ static void WebKitInitializeGamepadProviderIfNecessary()
 {
     ASSERT(WebThreadIsCurrent());
     WebKit::MemoryMeasure measurer("Memory warning: Calling JavaScript GC.");
-    gcController().garbageCollectNow();
+    GCController::singleton().garbageCollectNow();
 }
 
 + (void)purgeInactiveFontData
@@ -1375,7 +1376,7 @@ static void WebKitInitializeGamepadProviderIfNecessary()
 {
     ASSERT(WebThreadIsCurrent());
     WebKit::MemoryMeasure measurer("Memory warning: Discarding JIT'ed code.");
-    gcController().discardAllCompiledCode();
+    GCController::singleton().discardAllCompiledCode();
 }
 
 + (BOOL)isCharacterSmartReplaceExempt:(unichar)character isPreviousCharacter:(BOOL)b
@@ -1561,6 +1562,14 @@ static NSMutableSet *knownPluginMIMETypes()
     if (!_private->page)
         return 0;
     return _private->page->renderTreeSize();
+}
+
+- (NSSize)_contentsSizeRespectingOverflow
+{
+    if (FrameView* view = [self _mainCoreFrame]->view())
+        return view->contentsSizeRespectingOverflow();
+    
+    return [[[[self mainFrame] frameView] documentView] bounds].size;
 }
 
 - (void)_dispatchTileDidDraw:(CALayer*)tile
@@ -1751,7 +1760,6 @@ static bool fastDocumentTeardownEnabled()
     [_private->inspector webViewClosed];
 #endif
 #if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
-    [_private->actionMenuController webViewClosed];
     [_private->immediateActionController webViewClosed];
 #endif
 
@@ -1807,7 +1815,7 @@ static bool fastDocumentTeardownEnabled()
 #ifndef NDEBUG
     // Need this to make leak messages accurate.
     if (applicationIsTerminating) {
-        gcController().garbageCollectNow();
+        GCController::singleton().garbageCollectNow();
         [WebCache setDisabled:YES];
     }
 #endif
@@ -2007,29 +2015,29 @@ static bool fastDocumentTeardownEnabled()
     // type.  (See behavior matrix at the top of WebFramePrivate.)  So we copy all the items
     // in the back forward list, and go to the current one.
 
-    BackForwardClient* backForwardClient = _private->page->backForward().client();
-    ASSERT(!backForwardClient->currentItem()); // destination list should be empty
+    BackForwardController& backForward = _private->page->backForward();
+    ASSERT(!backForward.currentItem()); // destination list should be empty
 
-    BackForwardClient* otherBackForwardClient = otherView->_private->page->backForward().client();
-    if (!otherBackForwardClient->currentItem())
+    BackForwardController& otherBackForward = otherView->_private->page->backForward();
+    if (!otherBackForward.currentItem())
         return; // empty back forward list, bail
     
     HistoryItem* newItemToGoTo = nullptr;
 
-    int lastItemIndex = otherBackForwardClient->forwardListCount();
-    for (int i = -otherBackForwardClient->backListCount(); i <= lastItemIndex; ++i) {
+    int lastItemIndex = otherBackForward.forwardCount();
+    for (int i = -otherBackForward.backCount(); i <= lastItemIndex; ++i) {
         if (i == 0) {
             // If this item is showing , save away its current scroll and form state,
             // since that might have changed since loading and it is normally not saved
             // until we leave that page.
             otherView->_private->page->mainFrame().loader().history().saveDocumentAndScrollState();
         }
-        Ref<HistoryItem> newItem = otherBackForwardClient->itemAtIndex(i)->copy();
+        Ref<HistoryItem> newItem = otherBackForward.itemAtIndex(i)->copy();
         if (i == 0) 
             newItemToGoTo = newItem.ptr();
-        backForwardClient->addItem(WTF::move(newItem));
+        backForward.client()->addItem(WTF::move(newItem));
     }
-    
+
     ASSERT(newItemToGoTo);
     _private->page->goToItem(*newItemToGoTo, FrameLoadType::IndexedBackForward);
 }
@@ -2295,9 +2303,10 @@ static bool needsSelfRetainWhileLoadingQuirk()
     settings.setInteractiveFormValidationEnabled([self interactiveFormValidationEnabled]);
     settings.setValidationMessageTimerMagnification([self validationMessageTimerMagnification]);
 
-    settings.setMediaPlaybackRequiresUserGesture([preferences mediaPlaybackRequiresUserGesture]);
-    settings.setMediaPlaybackAllowsInline([preferences mediaPlaybackAllowsInline]);
-    settings.setAllowsAlternateFullscreen([preferences allowsAlternateFullscreen]);
+    settings.setRequiresUserGestureForMediaPlayback([preferences mediaPlaybackRequiresUserGesture]);
+    settings.setAllowsInlineMediaPlayback([preferences mediaPlaybackAllowsInline]);
+    settings.setAllowsPictureInPictureMediaPlayback([preferences allowsPictureInPictureMediaPlayback] && shouldAllowPictureInPictureMediaPlayback());
+    settings.setMediaControlsScaleWithPageZoom([preferences mediaControlsScaleWithPageZoom]);
     settings.setSuppressesIncrementalRendering([preferences suppressesIncrementalRendering]);
     settings.setBackspaceKeyNavigationEnabled([preferences backspaceKeyNavigationEnabled]);
     settings.setWantsBalancedSetDefersLoadingBehavior([preferences wantsBalancedSetDefersLoadingBehavior]);
@@ -2330,6 +2339,7 @@ static bool needsSelfRetainWhileLoadingQuirk()
     }
 
     settings.setPlugInSnapshottingEnabled([preferences plugInSnapshottingEnabled]);
+    settings.setHttpEquivEnabled([preferences httpEquivEnabled]);
 
     settings.setFixedPositionCreatesStackingContext(true);
 #if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
@@ -2341,6 +2351,9 @@ static bool needsSelfRetainWhileLoadingQuirk()
     settings.setRubberBandingForSubScrollableRegionsEnabled(false);
 #endif
 
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
+    settings.setAllowsAirPlayForMediaPlayback([preferences allowsAirPlayForMediaPlayback]);
+#endif
 #if PLATFORM(IOS)
     settings.setStandalone([preferences _standalone]);
     settings.setTelephoneNumberParsingEnabled([preferences _telephoneNumberParsingEnabled]);
@@ -2348,7 +2361,6 @@ static bool needsSelfRetainWhileLoadingQuirk()
     settings.setLayoutInterval(std::chrono::milliseconds([preferences _layoutInterval]));
     settings.setMaxParseDuration([preferences _maxParseDuration]);
     settings.setAlwaysUseAcceleratedOverflowScroll([preferences _alwaysUseAcceleratedOverflowScroll]);
-    settings.setMediaPlaybackAllowsAirPlay([preferences mediaPlaybackAllowsAirPlay]);
     settings.setAudioSessionCategoryOverride([preferences audioSessionCategoryOverride]);
     settings.setNetworkDataUsageTrackingEnabled([preferences networkDataUsageTrackingEnabled]);
     settings.setNetworkInterfaceName([preferences networkInterfaceName]);
@@ -3783,14 +3795,6 @@ static inline IMP getMethod(id o, SEL s)
     return [[[WebTextIterator alloc] initWithRange:kit(selectionInsideRect.toNormalizedRange().get())] autorelease];
 }
 
-#if ENABLE(DASHBOARD_SUPPORT)
-- (void)handleAuthenticationForResource:(id)identifier challenge:(NSURLAuthenticationChallenge *)challenge fromDataSource:(WebDataSource *)dataSource 
-{
-    NSWindow *window = [self hostWindow] ? [self hostWindow] : [self window]; 
-    [[WebPanelAuthenticationHandler sharedHandler] startAuthentication:challenge window:window]; 
-} 
-#endif
-
 #if !PLATFORM(IOS)
 - (void)_clearUndoRedoOperations
 {
@@ -3835,13 +3839,6 @@ static inline IMP getMethod(id o, SEL s)
 {
     return _private->page->areMemoryCacheClientCallsEnabled();
 }
-
-#if !PLATFORM(IOS)
-+ (NSCursor *)_pointingHandCursor
-{
-    return handCursor().platformCursor();
-}
-#endif
 
 - (BOOL)_postsAcceleratedCompositingNotifications
 {
@@ -7730,7 +7727,10 @@ static WebFrameView *containingFrameView(NSView *view)
         nsurlCacheDirectory = NSHomeDirectory();
 
     static uint64_t memSize = ramSize() / 1024 / 1024;
-    unsigned long long diskFreeSize = WebVolumeFreeSize(nsurlCacheDirectory) / 1024 / 1000;
+
+    NSDictionary *fileSystemAttributesDictionary = [[NSFileManager defaultManager] attributesOfFileSystemForPath:nsurlCacheDirectory error:nullptr];
+    unsigned long long diskFreeSize = [[fileSystemAttributesDictionary objectForKey:NSFileSystemFreeSize] unsignedLongLongValue] / 1024 / 1000;
+
     NSURLCache *nsurlCache = [NSURLCache sharedURLCache];
 
     unsigned cacheTotalCapacity = 0;
@@ -8287,6 +8287,19 @@ static WebFrameView *containingFrameView(NSView *view)
     return result;
 }
 
+- (void)_clearCredentials
+{
+    Frame* frame = [self _mainCoreFrame];
+    if (!frame)
+        return;
+
+    NetworkingContext* networkingContext = frame->loader().networkingContext();
+    if (!networkingContext)
+        return;
+
+    networkingContext->storageSession().credentialStorage().clearCredentials();
+}
+
 - (BOOL)_needsOneShotDrawingSynchronization
 {
     return _private->needsOneShotDrawingSynchronization;
@@ -8407,7 +8420,7 @@ bool LayerFlushController::flushLayers()
 #endif
 
 #if ENABLE(VIDEO)
-- (void)_enterVideoFullscreenForVideoElement:(WebCore::HTMLVideoElement*)videoElement mode:(WebCore::HTMLMediaElement::VideoFullscreenMode)mode
+- (void)_enterVideoFullscreenForVideoElement:(WebCore::HTMLVideoElement*)videoElement mode:(WebCore::HTMLMediaElementEnums::VideoFullscreenMode)mode
 {
     if (_private->fullscreenController) {
         if ([_private->fullscreenController videoElement] == videoElement) {
@@ -8538,35 +8551,6 @@ bool LayerFlushController::flushLayers()
 
 #if PLATFORM(MAC)
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
-- (void)prepareForMenu:(NSMenu *)menu withEvent:(NSEvent *)event
-{
-    if (menu != self._actionMenu)
-        return;
-
-    [_private->actionMenuController prepareForMenu:menu withEvent:event];
-}
-
-- (void)willOpenMenu:(NSMenu *)menu withEvent:(NSEvent *)event
-{
-    if (menu != self._actionMenu)
-        return;
-
-    [_private->actionMenuController willOpenMenu:menu withEvent:event];
-}
-
-- (void)didCloseMenu:(NSMenu *)menu withEvent:(NSEvent *)event
-{
-    if (menu != self._actionMenu)
-        return;
-
-    [_private->actionMenuController didCloseMenu:menu withEvent:event];
-}
-
-- (WebActionMenuController *)_actionMenuController
-{
-    return _private->actionMenuController;
-}
-
 - (WebImmediateActionController *)_immediateActionController
 {
     return _private->immediateActionController;
@@ -8599,6 +8583,16 @@ bool LayerFlushController::flushLayers()
     return [getLULookupDefinitionModuleClass() lookupAnimationControllerForTerm:dictionaryPopupInfo.attributedString.get() atLocation:textBaselineOrigin options:dictionaryPopupInfo.options.get()];
 }
 #endif // __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
+
+- (NSEvent *)_pressureEvent
+{
+    return _private->pressureEvent.get();
+}
+
+- (void)_setPressureEvent:(NSEvent *)event
+{
+    _private->pressureEvent = event;
+}
 
 - (void)_setTextIndicator:(TextIndicator&)textIndicator
 {

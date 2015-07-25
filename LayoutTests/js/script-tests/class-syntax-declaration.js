@@ -2,9 +2,9 @@
 description('Tests for ES6 class syntax declarations');
 
 var constructorCallCount = 0;
-const staticMethodValue = [1];
-const instanceMethodValue = [2];
-const getterValue = [3];
+var staticMethodValue = [1];
+var instanceMethodValue = [2];
+var getterValue = [3];
 var setterValue = undefined;
 class A {
     constructor() { constructorCallCount++; }
@@ -33,7 +33,7 @@ shouldThrow("class", "'SyntaxError: Unexpected end of script'");
 shouldThrow("class [", "'SyntaxError: Unexpected token \\'[\\''");
 shouldThrow("class {", "'SyntaxError: Class statements must have a name.'");
 shouldThrow("class X {", "'SyntaxError: Unexpected end of script'");
-shouldThrow("class X { ( }", "'SyntaxError: Unexpected token \\'(\\'. Expected an identifier.'");
+shouldThrow("class X { ( }", "'SyntaxError: Unexpected token \\'(\\''");
 shouldNotThrow("class X {}");
 
 shouldThrow("class X { constructor() {} constructor() {} }", "'SyntaxError: Cannot declare multiple constructors in a single class.'");

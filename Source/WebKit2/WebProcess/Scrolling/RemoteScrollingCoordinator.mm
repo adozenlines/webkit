@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2014-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -79,6 +79,12 @@ bool RemoteScrollingCoordinator::isRubberBandInProgress() const
     return false;
 }
 
+bool RemoteScrollingCoordinator::isScrollSnapInProgress() const
+{
+    // FIXME: need to maintain state in the web process?
+    return false;
+}
+
 void RemoteScrollingCoordinator::setScrollPinningBehavior(ScrollPinningBehavior)
 {
     // FIXME: send to the UI process.
@@ -94,6 +100,11 @@ void RemoteScrollingCoordinator::buildTransaction(RemoteScrollingCoordinatorTran
 void RemoteScrollingCoordinator::scrollPositionChangedForNode(ScrollingNodeID nodeID, const FloatPoint& scrollPosition, bool syncLayerPosition)
 {
     scheduleUpdateScrollPositionAfterAsyncScroll(nodeID, scrollPosition, false /* FIXME */, syncLayerPosition ? SyncScrollingLayerPosition : SetScrollingLayerPosition);
+}
+
+void RemoteScrollingCoordinator::currentSnapPointIndicesChangedForNode(ScrollingNodeID nodeID, unsigned horizontal, unsigned vertical)
+{
+    setActiveScrollSnapIndices(nodeID, horizontal, vertical);
 }
 
 } // namespace WebKit

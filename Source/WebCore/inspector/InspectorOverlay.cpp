@@ -111,8 +111,8 @@ static void buildRendererHighlight(RenderObject* renderer, RenderRegion* region,
             if (!renderBox.isOutOfFlowPositioned() && region) {
                 RenderBox::LogicalExtentComputedValues computedValues;
                 renderBox.computeLogicalWidthInRegion(computedValues, region);
-                margins.mutableLogicalLeft(renderBox.style().writingMode()) = computedValues.m_margins.m_start;
-                margins.mutableLogicalRight(renderBox.style().writingMode()) = computedValues.m_margins.m_end;
+                margins.start(renderBox.style().writingMode()) = computedValues.m_margins.m_start;
+                margins.end(renderBox.style().writingMode()) = computedValues.m_margins.m_end;
             }
 
             paddingBox = renderBox.clientBoxRectInRegion(region);
@@ -243,8 +243,17 @@ void InspectorOverlay::setPausedInDebuggerMessage(const String* message)
 
 void InspectorOverlay::hideHighlight()
 {
-    m_highlightNode.clear();
-    m_highlightQuad.reset();
+    m_highlightNode = nullptr;
+    m_highlightNodeList = nullptr;
+    m_highlightQuad = nullptr;
+    update();
+}
+
+void InspectorOverlay::highlightNodeList(PassRefPtr<NodeList> nodes, const HighlightConfig& highlightConfig)
+{
+    m_nodeHighlightConfig = highlightConfig;
+    m_highlightNodeList = nodes;
+    m_highlightNode = nullptr;
     update();
 }
 
@@ -252,6 +261,7 @@ void InspectorOverlay::highlightNode(Node* node, const HighlightConfig& highligh
 {
     m_nodeHighlightConfig = highlightConfig;
     m_highlightNode = node;
+    m_highlightNodeList = nullptr;
     update();
 }
 
@@ -289,7 +299,7 @@ void InspectorOverlay::setIndicating(bool indicating)
 
 bool InspectorOverlay::shouldShowOverlay() const
 {
-    return m_highlightNode || m_highlightQuad || m_indicating || m_showingPaintRects || !m_pausedInDebuggerMessage.isNull();
+    return m_highlightNode || m_highlightNodeList || m_highlightQuad || m_indicating || m_showingPaintRects || !m_pausedInDebuggerMessage.isNull();
 }
 
 void InspectorOverlay::update()
@@ -306,8 +316,6 @@ void InspectorOverlay::update()
     FrameView* overlayView = overlayPage()->mainFrame().view();
     IntSize viewportSize = view->unscaledVisibleContentSizeIncludingObscuredArea();
     IntSize frameViewFullSize = view->unscaledVisibleContentSizeIncludingObscuredArea(ScrollableArea::IncludeScrollbars);
-    overlayPage()->setPageScaleFactor(m_page.pageScaleFactor(), IntPoint());
-    frameViewFullSize.scale(m_page.pageScaleFactor());
     overlayView->resize(frameViewFullSize);
 
     // Clear canvas and paint things.
@@ -665,7 +673,7 @@ static RefPtr<Inspector::Protocol::OverlayTypes::ShapeOutsideData> buildObjectFo
 
             paths.marginShape.apply(&info, &appendPathSegment);
 
-            shapeObject->setMarginShape(shapePath.copyRef());
+            shapeObject->setMarginShape(marginShapePath.copyRef());
         }
     }
 
@@ -673,7 +681,7 @@ static RefPtr<Inspector::Protocol::OverlayTypes::ShapeOutsideData> buildObjectFo
 }
 #endif
 
-static RefPtr<Inspector::Protocol::OverlayTypes::ElementData> buildObjectForElementData(Node* node)
+static RefPtr<Inspector::Protocol::OverlayTypes::ElementData> buildObjectForElementData(Node* node, HighlightType type)
 {
     if (!is<Element>(node) || !node->document().frame())
         return nullptr;
@@ -716,7 +724,7 @@ static RefPtr<Inspector::Protocol::OverlayTypes::ElementData> buildObjectForElem
         .release();
     elementData->setSize(WTF::move(sizeObject));
 
-    if (renderer->isRenderNamedFlowFragmentContainer()) {
+    if (type != HighlightType::NodeList && renderer->isRenderNamedFlowFragmentContainer()) {
         RenderNamedFlowFragment& region = *downcast<RenderBlockFlow>(*renderer).renderNamedFlowFragment();
         if (region.isValid()) {
             RenderFlowThread* flowThread = region.flowThread();
@@ -757,12 +765,11 @@ static RefPtr<Inspector::Protocol::OverlayTypes::ElementData> buildObjectForElem
     return WTF::move(elementData);
 }
 
-RefPtr<Inspector::Protocol::OverlayTypes::NodeHighlightData> InspectorOverlay::buildObjectForHighlightedNode() const
+RefPtr<Inspector::Protocol::OverlayTypes::NodeHighlightData> InspectorOverlay::buildHighlightObjectForNode(Node* node, HighlightType type) const
 {
-    if (!m_highlightNode)
+    if (!node)
         return nullptr;
 
-    Node* node = m_highlightNode.get();
     RenderObject* renderer = node->renderer();
     if (!renderer)
         return nullptr;
@@ -780,17 +787,34 @@ RefPtr<Inspector::Protocol::OverlayTypes::NodeHighlightData> InspectorOverlay::b
         .release();
 
     if (m_nodeHighlightConfig.showInfo) {
-        if (RefPtr<Inspector::Protocol::OverlayTypes::ElementData> elementData = buildObjectForElementData(node))
+        if (RefPtr<Inspector::Protocol::OverlayTypes::ElementData> elementData = buildObjectForElementData(node, type))
             nodeHighlightObject->setElementData(WTF::move(elementData));
     }
 
     return WTF::move(nodeHighlightObject);
 }
 
+Ref<Inspector::Protocol::Array<Inspector::Protocol::OverlayTypes::NodeHighlightData>> InspectorOverlay::buildObjectForHighlightedNodes() const
+{
+    auto highlights = Inspector::Protocol::Array<Inspector::Protocol::OverlayTypes::NodeHighlightData>::create();
+
+    if (m_highlightNode) {
+        if (RefPtr<Inspector::Protocol::OverlayTypes::NodeHighlightData> nodeHighlightData = buildHighlightObjectForNode(m_highlightNode.get(), HighlightType::Node))
+            highlights->addItem(WTF::move(nodeHighlightData));
+    } else if (m_highlightNodeList) {
+        for (unsigned i = 0; i < m_highlightNodeList->length(); ++i) {
+            if (RefPtr<Inspector::Protocol::OverlayTypes::NodeHighlightData> nodeHighlightData = buildHighlightObjectForNode(m_highlightNodeList->item(i), HighlightType::NodeList))
+                highlights->addItem(WTF::move(nodeHighlightData));
+        }
+    }
+
+    return WTF::move(highlights);
+}
+
 void InspectorOverlay::drawNodeHighlight()
 {
-    if (RefPtr<Inspector::Protocol::OverlayTypes::NodeHighlightData> highlightObject = buildObjectForHighlightedNode())
-        evaluateInOverlay("drawNodeHighlight", WTF::move(highlightObject));
+    if (m_highlightNode || m_highlightNodeList)
+        evaluateInOverlay("drawNodeHighlight", buildObjectForHighlightedNodes());
 }
 
 void InspectorOverlay::drawQuadHighlight()

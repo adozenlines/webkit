@@ -35,7 +35,6 @@
 #import "WebIconDatabase.h"
 #import "WebKitLogging.h"
 #import "WebKitNSStringExtras.h"
-#import "WebNSArrayExtras.h"
 #import "WebNSDictionaryExtras.h"
 #import "WebNSObjectExtras.h"
 #import "WebNSURLExtras.h"
@@ -63,6 +62,7 @@ NSString *WebViewportInitialScaleKey = @"initial-scale";
 NSString *WebViewportMinimumScaleKey = @"minimum-scale";
 NSString *WebViewportMaximumScaleKey = @"maximum-scale";
 NSString *WebViewportUserScalableKey = @"user-scalable";
+NSString *WebViewportShrinkToFitKey  = @"shrink-to-fit";
 NSString *WebViewportWidthKey        = @"width";
 NSString *WebViewportHeightKey       = @"height";
 
@@ -181,7 +181,6 @@ void WKNotifyHistoryItemChanged(HistoryItem*)
 // FIXME: Need to decide if this class ever returns URLs and decide on the name of this method
 - (NSString *)URLString
 {
-    ASSERT_MAIN_THREAD();
     return nsStringNilIfEmpty(core(_private)->urlString());
 }
 
@@ -189,13 +188,11 @@ void WKNotifyHistoryItemChanged(HistoryItem*)
 // and server redirects.
 - (NSString *)originalURLString
 {
-    ASSERT_MAIN_THREAD();
     return nsStringNilIfEmpty(core(_private)->originalURLString());
 }
 
 - (NSString *)title
 {
-    ASSERT_MAIN_THREAD();
     return nsStringNilIfEmpty(core(_private)->title());
 }
 
@@ -218,7 +215,6 @@ void WKNotifyHistoryItemChanged(HistoryItem*)
 
 - (NSTimeInterval)lastVisitedTimeInterval
 {
-    ASSERT_MAIN_THREAD();
     return _private->_lastVisitedTime;
 }
 
@@ -229,17 +225,14 @@ void WKNotifyHistoryItemChanged(HistoryItem*)
 
 - (BOOL)isEqual:(id)anObject
 {
-    ASSERT_MAIN_THREAD();
-    if (![anObject isMemberOfClass:[WebHistoryItem class]]) {
+    if (![anObject isMemberOfClass:[WebHistoryItem class]])
         return NO;
-    }
-    
+
     return core(_private)->urlString() == core(((WebHistoryItem*)anObject)->_private)->urlString();
 }
 
 - (NSString *)description
 {
-    ASSERT_MAIN_THREAD();
     HistoryItem* coreItem = core(_private);
     NSMutableString *result = [NSMutableString stringWithFormat:@"%@ %@", [super description], (NSString*)coreItem->urlString()];
     if (!coreItem->target().isEmpty()) {
@@ -344,7 +337,6 @@ WebHistoryItem *kit(HistoryItem* item)
 
 - (id)initFromDictionaryRepresentation:(NSDictionary *)dict
 {
-    ASSERT_MAIN_THREAD();
     NSString *URLString = [dict _webkit_stringForKey:@""];
     NSString *title = [dict _webkit_stringForKey:titleKey];
 
@@ -369,10 +361,16 @@ WebHistoryItem *kit(HistoryItem* item)
         core(_private)->setLastVisitWasFailure(true);
     
     if (NSArray *redirectURLs = [dict _webkit_arrayForKey:redirectURLsKey]) {
-        NSUInteger size = [redirectURLs count];
-        auto redirectURLsVector = std::make_unique<Vector<String>>(size);
-        for (NSUInteger i = 0; i < size; ++i)
-            (*redirectURLsVector)[i] = String([redirectURLs _webkit_stringAtIndex:i]);
+        auto redirectURLsVector = std::make_unique<Vector<String>>();
+        redirectURLsVector->reserveInitialCapacity([redirectURLs count]);
+
+        for (id redirectURL in redirectURLs) {
+            if (![redirectURL isKindOfClass:[NSString class]])
+                continue;
+
+            redirectURLsVector->uncheckedAppend((NSString *)redirectURL);
+        }
+
         core(_private)->setRedirectURLs(WTF::move(redirectURLsVector));
     }
 
@@ -413,7 +411,6 @@ WebHistoryItem *kit(HistoryItem* item)
 
 - (NSPoint)scrollPoint
 {
-    ASSERT_MAIN_THREAD();
     return core(_private)->scrollPoint();
 }
 
@@ -444,7 +441,6 @@ WebHistoryItem *kit(HistoryItem* item)
 - (NSDictionary *)dictionaryRepresentation
 #endif
 {
-    ASSERT_MAIN_THREAD();
     NSMutableDictionary *dict = [NSMutableDictionary dictionaryWithCapacity:8];
 
     HistoryItem* coreItem = core(_private);
@@ -511,7 +507,6 @@ WebHistoryItem *kit(HistoryItem* item)
 
 - (NSString *)target
 {
-    ASSERT_MAIN_THREAD();
     return nsStringNilIfEmpty(core(_private)->target());
 }
 
@@ -532,7 +527,6 @@ WebHistoryItem *kit(HistoryItem* item)
 
 - (NSArray *)children
 {
-    ASSERT_MAIN_THREAD();
     const HistoryItemVector& children = core(_private)->children();
     if (!children.size())
         return nil;
@@ -548,7 +542,6 @@ WebHistoryItem *kit(HistoryItem* item)
 
 - (NSURL *)URL
 {
-    ASSERT_MAIN_THREAD();
     const URL& url = core(_private)->url();
     if (url.isEmpty())
         return nil;
@@ -557,7 +550,6 @@ WebHistoryItem *kit(HistoryItem* item)
 
 - (WebHistoryItem *)targetItem
 {    
-    ASSERT_MAIN_THREAD();
     return kit(core(_private)->targetItem());
 }
 
@@ -622,6 +614,7 @@ WebHistoryItem *kit(HistoryItem* item)
     [argumentsDictionary setObject:[NSNumber numberWithFloat:viewportArguments.width] forKey:WebViewportWidthKey];
     [argumentsDictionary setObject:[NSNumber numberWithFloat:viewportArguments.height] forKey:WebViewportHeightKey];
     [argumentsDictionary setObject:[NSNumber numberWithFloat:viewportArguments.userZoom] forKey:WebViewportUserScalableKey];
+    [argumentsDictionary setObject:[NSNumber numberWithFloat:viewportArguments.shrinkToFit] forKey:WebViewportShrinkToFitKey];
     return argumentsDictionary;
 }
 
@@ -634,6 +627,7 @@ WebHistoryItem *kit(HistoryItem* item)
     viewportArguments.width = [[arguments objectForKey:WebViewportWidthKey] floatValue];
     viewportArguments.height = [[arguments objectForKey:WebViewportHeightKey] floatValue];
     viewportArguments.userZoom = [[arguments objectForKey:WebViewportUserScalableKey] floatValue];
+    viewportArguments.shrinkToFit = [[arguments objectForKey:WebViewportShrinkToFitKey] floatValue];
     core(_private)->setViewportArguments(viewportArguments);
 }
 

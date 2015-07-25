@@ -56,6 +56,7 @@ JS_EXPORT_PRIVATE JSObject* createEvalError(ExecState*, const String&);
 JS_EXPORT_PRIVATE JSObject* createRangeError(ExecState*, const String&);
 JS_EXPORT_PRIVATE JSObject* createReferenceError(ExecState*, const String&);
 JS_EXPORT_PRIVATE JSObject* createSyntaxError(ExecState*, const String&);
+JS_EXPORT_PRIVATE JSObject* createTypeError(ExecState*);
 JS_EXPORT_PRIVATE JSObject* createTypeError(ExecState*, const String&);
 JS_EXPORT_PRIVATE JSObject* createNotEnoughArgumentsError(ExecState*);
 JS_EXPORT_PRIVATE JSObject* createURIError(ExecState*, const String&);
@@ -73,11 +74,14 @@ JSObject* addErrorInfo(ExecState*, JSObject* error, int line, const SourceCode&)
 // Convenience wrappers, create an throw an exception with a default message.
 JS_EXPORT_PRIVATE JSObject* throwTypeError(ExecState*);
 JS_EXPORT_PRIVATE JSObject* throwSyntaxError(ExecState*);
+inline JSObject* throwRangeError(ExecState* state, const String& errorMessage) { return state->vm().throwException(state, createRangeError(state, errorMessage)); }
 
 // Convenience wrappers, wrap result as an EncodedJSValue.
+inline void throwVMError(ExecState* exec, Exception* exception) { exec->vm().throwException(exec, exception); }
 inline EncodedJSValue throwVMError(ExecState* exec, JSValue error) { return JSValue::encode(exec->vm().throwException(exec, error)); }
 inline EncodedJSValue throwVMTypeError(ExecState* exec) { return JSValue::encode(throwTypeError(exec)); }
 inline EncodedJSValue throwVMTypeError(ExecState* exec, const String& errorMessage) { return JSValue::encode(throwTypeError(exec, errorMessage)); }
+inline EncodedJSValue throwVMRangeError(ExecState* state, const String& errorMessage) { return JSValue::encode(throwRangeError(state, errorMessage)); }
 
 class StrictModeTypeErrorFunction : public InternalFunction {
 private:

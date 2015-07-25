@@ -60,11 +60,6 @@ public:
         return m_propertyNames[index].get();
     }
 
-    RefCountedIdentifierSet* identifierSet() const
-    {
-        return m_identifierSet.get();
-    }
-
     StructureChain* cachedPrototypeChain() const { return m_prototypeChain.get(); }
     void setCachedPrototypeChain(VM& vm, StructureChain* prototypeChain) { return m_prototypeChain.set(vm, this, prototypeChain); }
 
@@ -92,11 +87,10 @@ public:
     static void visitChildren(JSCell*, SlotVisitor&);
 
 private:
-    JSPropertyNameEnumerator(VM&, StructureID, uint32_t, RefCountedIdentifierSet*);
+    JSPropertyNameEnumerator(VM&, StructureID, uint32_t);
     void finishCreation(VM&, uint32_t, uint32_t, PassRefPtr<PropertyNameArrayData>);
 
     Vector<WriteBarrier<JSString>> m_propertyNames;
-    RefPtr<RefCountedIdentifierSet> m_identifierSet;
     StructureID m_cachedStructureID;
     WriteBarrier<StructureChain> m_prototypeChain;
     uint32_t m_indexedLength;
@@ -121,7 +115,7 @@ inline JSPropertyNameEnumerator* propertyNameEnumerator(ExecState* exec, JSObjec
 
     uint32_t numberStructureProperties = 0;
 
-    PropertyNameArray propertyNames(exec);
+    PropertyNameArray propertyNames(exec, PropertyNameMode::Strings);
 
     if (structure->canAccessPropertiesQuickly() && indexedLength == base->getArrayLength()) {
         base->methodTable(vm)->getStructurePropertyNames(base, exec, propertyNames, EnumerationMode());

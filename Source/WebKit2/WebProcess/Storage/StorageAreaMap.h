@@ -46,7 +46,7 @@ class StorageNamespaceImpl;
 
 class StorageAreaMap : public RefCounted<StorageAreaMap>, private IPC::MessageReceiver {
 public:
-    static PassRefPtr<StorageAreaMap> create(StorageNamespaceImpl*, Ref<WebCore::SecurityOrigin>&&);
+    static Ref<StorageAreaMap> create(StorageNamespaceImpl*, Ref<WebCore::SecurityOrigin>&&);
     ~StorageAreaMap();
 
     WebCore::StorageType storageType() const { return m_storageType; }
@@ -58,6 +58,8 @@ public:
     void removeItem(WebCore::Frame* sourceFrame, StorageAreaImpl* sourceArea, const String& key);
     void clear(WebCore::Frame* sourceFrame, StorageAreaImpl* sourceArea);
     bool contains(const String& key);
+
+    WebCore::SecurityOrigin& securityOrigin() { return m_securityOrigin.get(); }
 
 private:
     StorageAreaMap(StorageNamespaceImpl*, Ref<WebCore::SecurityOrigin>&&);
@@ -81,6 +83,8 @@ private:
 
     void dispatchSessionStorageEvent(uint64_t sourceStorageAreaID, const String& key, const String& oldValue, const String& newValue, const String& urlString);
     void dispatchLocalStorageEvent(uint64_t sourceStorageAreaID, const String& key, const String& oldValue, const String& newValue, const String& urlString);
+
+    Ref<StorageNamespaceImpl> m_storageNamespace;
 
     uint64_t m_storageMapID;
 

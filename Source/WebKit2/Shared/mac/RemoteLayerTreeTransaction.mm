@@ -516,6 +516,7 @@ void RemoteLayerTreeTransaction::encode(IPC::ArgumentEncoder& encoder) const
     encoder << m_layerIDsWithNewlyUnreachableBackingStore;
 
     encoder << m_contentsSize;
+    encoder << m_scrollOrigin;
 #if PLATFORM(MAC)
     encoder << m_scrollPosition;
 #endif
@@ -579,6 +580,9 @@ bool RemoteLayerTreeTransaction::decode(IPC::ArgumentDecoder& decoder, RemoteLay
     }
 
     if (!decoder.decode(result.m_contentsSize))
+        return false;
+
+    if (!decoder.decode(result.m_scrollOrigin))
         return false;
 
 #if PLATFORM(MAC)
@@ -666,6 +670,7 @@ public:
     RemoteLayerTreeTextStream& operator<<(const FilterOperations&);
     RemoteLayerTreeTextStream& operator<<(const PlatformCAAnimationRemote::Properties&);
     RemoteLayerTreeTextStream& operator<<(const RemoteLayerBackingStore&);
+    RemoteLayerTreeTextStream& operator<<(const WebCore::GraphicsLayer::CustomAppearance&);
     RemoteLayerTreeTextStream& operator<<(BlendMode);
     RemoteLayerTreeTextStream& operator<<(PlatformCAAnimation::AnimationType);
     RemoteLayerTreeTextStream& operator<<(PlatformCAAnimation::FillModeType);
@@ -833,6 +838,19 @@ RemoteLayerTreeTextStream& RemoteLayerTreeTextStream::operator<<(const FilterOpe
     case FilterOperation::NONE:
         ts << "none";
         break;
+    }
+    return ts;
+}
+
+RemoteLayerTreeTextStream& RemoteLayerTreeTextStream::operator<<(const WebCore::GraphicsLayer::CustomAppearance& customAppearance)
+{
+    RemoteLayerTreeTextStream& ts = *this;
+    switch (customAppearance) {
+    case WebCore::GraphicsLayer::CustomAppearance::NoCustomAppearance: ts << "none"; break;
+    case WebCore::GraphicsLayer::CustomAppearance::ScrollingOverhang: ts << "scrolling-overhang"; break;
+    case WebCore::GraphicsLayer::CustomAppearance::ScrollingShadow: ts << "scrolling-shadow"; break;
+    case WebCore::GraphicsLayer::CustomAppearance::LightBackdropAppearance: ts << "light-backdrop"; break;
+    case WebCore::GraphicsLayer::CustomAppearance::DarkBackdropAppearance: ts << "dark-backdrop"; break;
     }
     return ts;
 }
@@ -1227,6 +1245,15 @@ void RemoteLayerTreeTransaction::dump() const
 CString RemoteLayerTreeTransaction::description() const
 {
     RemoteLayerTreeTextStream ts;
+
+    ts << "(";
+    dumpProperty(ts, "transactionID", m_transactionID);
+    dumpProperty(ts, "contentsSize", m_contentsSize);
+    if (m_scrollOrigin != IntPoint::zero())
+        dumpProperty(ts, "scrollOrigin", m_scrollOrigin);
+
+    if (m_pageScaleFactor != 1)
+        dumpProperty(ts, "pageScaleFactor", m_pageScaleFactor);
 
     ts << "(\n";
     ts.increaseIndent();

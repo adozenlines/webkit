@@ -64,7 +64,7 @@ var CommitLogs = {
     _cachedCommitsByRepository: {}
 };
 
-CommitLogs.fetchForTimeRange = function (repository, from, to, keyword)
+CommitLogs.fetchCommits = function (repository, from, to, keyword)
 {
     var params = [];
     if (from && to) {
@@ -406,16 +406,18 @@ RunsData.unitFromMetricName = function (metricName)
         'FrameRate': 'fps',
         'Runs': '/s',
         'Time': 'ms',
-        'Malloc': 'bytes',
-        'Heap': 'bytes',
-        'Allocations': 'bytes'
+        'Duration': 'ms',
+        'Malloc': 'B',
+        'Heap': 'B',
+        'Allocations': 'B',
+        'Score': 'pt',
     }[suffix];
     return unit;
 }
 
 RunsData.isSmallerBetter = function (unit)
 {
-    return unit != 'fps' && unit != '/s';
+    return unit != 'fps' && unit != '/s' && unit != 'pt';
 }
 
 function TimeSeries(series)

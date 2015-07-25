@@ -33,44 +33,16 @@
 #if ENABLE(STREAMS_API)
 
 #include "JSDOMBinding.h"
-#include "NotImplemented.h"
-#include "ReadableStreamJSSource.h"
+#include "ReadableJSStream.h"
 #include <runtime/Error.h>
 
 using namespace JSC;
 
 namespace WebCore {
 
-JSValue JSReadableStreamController::close(ExecState* exec)
+EncodedJSValue JSC_HOST_CALL constructJSReadableStreamController(ExecState* exec)
 {
-    ReadableJSStream* stream = impl().stream();
-    if (!stream)
-        return exec->vm().throwException(exec, createTypeError(exec, ASCIILiteral("Controller has no readablestream")));
-    // FIXME: Handle the case of draining.
-    if (stream->internalState() != ReadableStream::State::Readable)
-        return exec->vm().throwException(exec, createTypeError(exec, ASCIILiteral("Calling close on a stream which is not readable")));
-    stream->changeStateToClosed();
-    return jsUndefined();
-}
-
-JSValue JSReadableStreamController::enqueue(ExecState* exec)
-{
-    ReadableJSStream* stream = impl().stream();
-    if (!stream)
-        return exec->vm().throwException(exec, createTypeError(exec, ASCIILiteral("Controller has no readablestream")));
-    notImplemented();
-    return jsBoolean(false);
-}
-
-JSValue JSReadableStreamController::error(ExecState* exec)
-{
-    ReadableJSStream* stream = impl().stream();
-    if (!stream)
-        return exec->vm().throwException(exec, createTypeError(exec, ASCIILiteral("Controller has no readablestream")));
-    if (stream->internalState() != ReadableStream::State::Readable)
-        return exec->vm().throwException(exec, createTypeError(exec, ASCIILiteral("Calling error on a stream which is not readable")));
-    notImplemented();
-    return jsUndefined();
+    return throwVMError(exec, createTypeError(exec, ASCIILiteral("ReadableStreamController constructor should not be called directly")));
 }
 
 } // namespace WebCore

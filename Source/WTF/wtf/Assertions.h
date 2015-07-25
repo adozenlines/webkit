@@ -26,6 +26,8 @@
 #ifndef WTF_Assertions_h
 #define WTF_Assertions_h
 
+#include <wtf/Platform.h>
+
 /*
    no namespaces because this file has to be includable from C and Objective-C
 
@@ -40,6 +42,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <wtf/ExportMacros.h>
 
 #ifdef NDEBUG
 /* Disable ASSERT* macros in release mode. */

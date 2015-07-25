@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -106,7 +106,7 @@ struct ScrollableAreaParameters {
 
 class ScrollingCoordinator : public ThreadSafeRefCounted<ScrollingCoordinator> {
 public:
-    static PassRefPtr<ScrollingCoordinator> create(Page*);
+    static Ref<ScrollingCoordinator> create(Page*);
     virtual ~ScrollingCoordinator();
 
     WEBCORE_EXPORT virtual void pageDestroyed();
@@ -168,6 +168,8 @@ public:
 #if ENABLE(CSS_SCROLL_SNAP)
         Vector<LayoutUnit> horizontalSnapOffsets;
         Vector<LayoutUnit> verticalSnapOffsets;
+        unsigned currentHorizontalSnapPointIndex;
+        unsigned currentVerticalSnapPointIndex;
 #endif
     };
 
@@ -176,6 +178,7 @@ public:
     virtual void syncChildPositions(const LayoutRect&) { }
     virtual String scrollingStateTreeAsText() const;
     virtual bool isRubberBandInProgress() const { return false; }
+    virtual bool isScrollSnapInProgress() const { return false; }
     virtual void setScrollPinningBehavior(ScrollPinningBehavior) { }
 
     // Generated a unique id for scroll layers.
@@ -199,7 +202,7 @@ public:
     static String synchronousScrollingReasonsAsText(SynchronousScrollingReasons);
     String synchronousScrollingReasonsAsText() const;
 
-    Region computeNonFastScrollableRegion(const Frame&, const IntPoint& frameLocation) const;
+    Region absoluteNonFastScrollableRegion() const;
 
 protected:
     explicit ScrollingCoordinator(Page*);
@@ -223,6 +226,8 @@ private:
 
     virtual bool hasVisibleSlowRepaintViewportConstrainedObjects(const FrameView&) const;
     void updateSynchronousScrollingReasons(FrameView&);
+
+    Region absoluteNonFastScrollableRegionForFrame(const Frame&) const;
     
     bool m_forceSynchronousScrollLayerPositionUpdates { false };
 };

@@ -33,24 +33,29 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
         WebInspector.Frame.addEventListener(WebInspector.Frame.Event.MainResourceDidChange, this._mainResourceDidChange, this);
         WebInspector.Frame.addEventListener(WebInspector.Frame.Event.ResourceWasAdded, this._resourceWasAdded, this);
 
-        this._recordings = [];
-        this._activeRecording = null;
+        this._persistentNetworkTimeline = new WebInspector.NetworkTimeline;
+
         this._isCapturing = false;
-
-        this._nextRecordingIdentifier = 1;
-
+        this._isCapturingPageReload = false;
+        this._autoCapturingMainResource = null;
         this._boundStopCapturing = this.stopCapturing.bind(this);
 
-        function delayedWork()
-        {
-            this._loadNewRecording();
-        }
-
-        // Allow other code to set up listeners before firing the initial RecordingLoaded event.
-        setTimeout(delayedWork.bind(this), 0);
+        this.reset();
     }
 
     // Public
+
+    reset()
+    {
+        if (this._isCapturing)
+            this.stopCapturing();
+
+        this._recordings = [];
+        this._activeRecording = null;
+        this._nextRecordingIdentifier = 1;
+
+        this._loadNewRecording();
+    }
 
     // The current recording that new timeline records will be appended to, if any.
     get activeRecording()
@@ -59,14 +64,34 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
         return this._activeRecording;
     }
 
+    get persistentNetworkTimeline()
+    {
+        return this._persistentNetworkTimeline;
+    }
+
     get recordings()
     {
         return this._recordings.slice();
     }
 
+    get autoCaptureOnPageLoad()
+    {
+        return this._autoCaptureOnPageLoad;
+    }
+
+    set autoCaptureOnPageLoad(autoCapture)
+    {
+        this._autoCaptureOnPageLoad = autoCapture;
+    }
+
     isCapturing()
     {
         return this._isCapturing;
+    }
+
+    isCapturingPageReload()
+    {
+        return this._isCapturingPageReload;
     }
 
     startCapturing(shouldCreateRecording)
@@ -119,17 +144,17 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
 
     // Protected
 
-    capturingStarted()
+    capturingStarted(startTime)
     {
         if (this._isCapturing)
             return;
 
         this._isCapturing = true;
 
-        this.dispatchEventToListeners(WebInspector.TimelineManager.Event.CapturingStarted);
+        this.dispatchEventToListeners(WebInspector.TimelineManager.Event.CapturingStarted, {startTime});
     }
 
-    capturingStopped()
+    capturingStopped(endTime)
     {
         if (!this._isCapturing)
             return;
@@ -145,9 +170,10 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
         }
 
         this._isCapturing = false;
+        this._isCapturingPageReload = false;
         this._autoCapturingMainResource = null;
 
-        this.dispatchEventToListeners(WebInspector.TimelineManager.Event.CapturingStopped);
+        this.dispatchEventToListeners(WebInspector.TimelineManager.Event.CapturingStopped, {endTime});
     }
 
     eventRecorded(recordPayload)
@@ -163,8 +189,12 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
         }.bind(this));
     }
 
+    // Protected
+
     pageDidLoad(timestamp)
     {
+        // Called from WebInspector.PageObserver.
+
         if (isNaN(WebInspector.frameResourceManager.mainFrame.loadEventTimestamp))
             WebInspector.frameResourceManager.mainFrame.markLoadEvent(this.activeRecording.computeElapsedTime(timestamp));
     }
@@ -249,10 +279,18 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
         case TimelineAgent.EventType.Paint:
             // COMPATIBILITY (iOS 6): Paint records data contained x, y, width, height properties. This became a quad "clip".
             var quad = recordPayload.data.clip ? new WebInspector.Quad(recordPayload.data.clip) : null;
+            var duringComposite = recordPayload.__duringComposite || false;
             if (quad)
-                return new WebInspector.LayoutTimelineRecord(WebInspector.LayoutTimelineRecord.EventType.Paint, startTime, endTime, callFrames, sourceCodeLocation, null, null, quad.width, quad.height, quad);
+                return new WebInspector.LayoutTimelineRecord(WebInspector.LayoutTimelineRecord.EventType.Paint, startTime, endTime, callFrames, sourceCodeLocation, null, null, quad.width, quad.height, quad, duringComposite);
             else
-                return new WebInspector.LayoutTimelineRecord(WebInspector.LayoutTimelineRecord.EventType.Paint, startTime, endTime, callFrames, sourceCodeLocation, recordPayload.data.x, recordPayload.data.y, recordPayload.data.width, recordPayload.data.height);
+                return new WebInspector.LayoutTimelineRecord(WebInspector.LayoutTimelineRecord.EventType.Paint, startTime, endTime, callFrames, sourceCodeLocation, recordPayload.data.x, recordPayload.data.y, recordPayload.data.width, recordPayload.data.height, null, duringComposite);
+
+        case TimelineAgent.EventType.Composite:
+            recordPayload.children.forEach(function(childRecordPayload) {
+                console.assert(childRecordPayload.type === TimelineAgent.EventType.Paint, childRecordPayload.type);
+                childRecordPayload.__duringComposite = true;
+            });
+            return new WebInspector.LayoutTimelineRecord(WebInspector.LayoutTimelineRecord.EventType.Composite, startTime, endTime, callFrames, sourceCodeLocation);
 
         case TimelineAgent.EventType.RenderingFrame:
             if (!recordPayload.children)
@@ -422,13 +460,12 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
         var identifier = this._nextRecordingIdentifier++;
         var newRecording = new WebInspector.TimelineRecording(identifier, WebInspector.UIString("Timeline Recording %d").format(identifier));
         newRecording.addTimeline(WebInspector.Timeline.create(WebInspector.TimelineRecord.Type.Network, newRecording));
+        newRecording.addTimeline(WebInspector.Timeline.create(WebInspector.TimelineRecord.Type.Layout, newRecording));
+        newRecording.addTimeline(WebInspector.Timeline.create(WebInspector.TimelineRecord.Type.Script, newRecording));
 
         // COMPATIBILITY (iOS 8): TimelineAgent.EventType.RenderingFrame did not exist.
         if (window.TimelineAgent && TimelineAgent.EventType.RenderingFrame)
             newRecording.addTimeline(WebInspector.Timeline.create(WebInspector.TimelineRecord.Type.RenderingFrame, newRecording));
-
-        newRecording.addTimeline(WebInspector.Timeline.create(WebInspector.TimelineRecord.Type.Layout, newRecording));
-        newRecording.addTimeline(WebInspector.Timeline.create(WebInspector.TimelineRecord.Type.Script, newRecording));
 
         this._recordings.push(newRecording);
         this.dispatchEventToListeners(WebInspector.TimelineManager.Event.RecordingCreated, {recording: newRecording});
@@ -442,8 +479,19 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
         if (oldRecording)
             oldRecording.unloaded();
 
-        this._legacyFirstRecordedTimestamp = NaN;
         this._activeRecording = newRecording;
+
+        // COMPATIBILITY (iOS 8): When using Legacy timestamps, a navigation will have computed
+        // the main resource's will send request timestamp in terms of the last page's base timestamp.
+        // Now that we have navigated, we should reset the legacy base timestamp and the
+        // will send request timestamp for the new main resource. This way, all new timeline
+        // records will be computed relative to the new navigation.
+        if (this._autoCapturingMainResource && WebInspector.TimelineRecording.isLegacy) {
+            console.assert(this._autoCapturingMainResource.originalRequestWillBeSentTimestamp);
+            this._activeRecording.setLegacyBaseTimestamp(this._autoCapturingMainResource.originalRequestWillBeSentTimestamp);
+            this._autoCapturingMainResource._requestSentTimestamp = 0;
+        }
+
         this.dispatchEventToListeners(WebInspector.TimelineManager.Event.RecordingLoaded, {oldRecording});
     }
 
@@ -452,30 +500,7 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
         if (!payload)
             return null;
 
-        function createCallFrame(payload)
-        {
-            var url = payload.url;
-            var nativeCode = false;
-
-            if (url === "[native code]") {
-                nativeCode = true;
-                url = null;
-            }
-
-            var sourceCode = WebInspector.frameResourceManager.resourceForURL(url);
-            if (!sourceCode)
-                sourceCode = WebInspector.debuggerManager.scriptsForURL(url)[0];
-
-            // The lineNumber is 1-based, but we expect 0-based.
-            var lineNumber = payload.lineNumber - 1;
-
-            var sourceCodeLocation = sourceCode ? sourceCode.createLazySourceCodeLocation(lineNumber, payload.columnNumber) : null;
-            var functionName = payload.functionName !== "global code" ? payload.functionName : null;
-
-            return new WebInspector.CallFrame(null, sourceCodeLocation, functionName, null, null, nativeCode);
-        }
-
-        return payload.map(createCallFrame);
+        return payload.map(WebInspector.CallFrame.fromPayload);
     }
 
     _addRecord(record)
@@ -489,12 +514,18 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
 
     _startAutoCapturing(event)
     {
+        if (!this._autoCaptureOnPageLoad)
+            return false;
+
         if (!event.target.isMainFrame() || (this._isCapturing && !this._autoCapturingMainResource))
             return false;
 
         var mainResource = event.target.provisionalMainResource || event.target.mainResource;
         if (mainResource === this._autoCapturingMainResource)
             return false;
+
+        var oldMainResource = event.target.mainResource || null;
+        this._isCapturingPageReload = oldMainResource !== null && oldMainResource.url === mainResource.url;
 
         if (this._isCapturing)
             this.stopCapturing();
@@ -538,6 +569,14 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
 
     _mainResourceDidChange(event)
     {
+        if (event.target.isMainFrame())
+            this._persistentNetworkTimeline.reset();
+
+        var mainResource = event.target.mainResource;
+        var record = new WebInspector.ResourceTimelineRecord(mainResource);
+        if (!isNaN(record.startTime))
+            this._persistentNetworkTimeline.addRecord(record);
+
         // Ignore resource events when there isn't a main frame yet. Those events are triggered by
         // loading the cached resources when the inspector opens, and they do not have timing information.
         if (!WebInspector.frameResourceManager.mainFrame)
@@ -549,15 +588,18 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
         if (!this._isCapturing)
             return;
 
-        var mainResource = event.target.mainResource;
         if (mainResource === this._autoCapturingMainResource)
             return;
 
-        this._addRecord(new WebInspector.ResourceTimelineRecord(mainResource));
+        this._addRecord(record);
     }
 
     _resourceWasAdded(event)
     {
+        var record = new WebInspector.ResourceTimelineRecord(event.data.resource);
+        if (!isNaN(record.startTime))
+            this._persistentNetworkTimeline.addRecord(record);
+
         // Ignore resource events when there isn't a main frame yet. Those events are triggered by
         // loading the cached resources when the inspector opens, and they do not have timing information.
         if (!WebInspector.frameResourceManager.mainFrame)
@@ -566,7 +608,7 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
         if (!this._isCapturing)
             return;
 
-        this._addRecord(new WebInspector.ResourceTimelineRecord(event.data.resource));
+        this._addRecord(record);
     }
 };
 

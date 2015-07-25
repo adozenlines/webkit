@@ -124,10 +124,10 @@ void JSEventListener::handleEvent(ScriptExecutionContext* scriptExecutionContext
         InspectorInstrumentationCookie cookie = JSMainThreadExecState::instrumentFunctionCall(scriptExecutionContext, callType, callData);
 
         JSValue thisValue = handleEventFunction == jsFunction ? toJS(exec, globalObject, event->currentTarget()) : jsFunction;
-        JSValue exception;
+        NakedPtr<Exception> exception;
         JSValue retval = scriptExecutionContext->isDocument()
-            ? JSMainThreadExecState::call(exec, handleEventFunction, callType, callData, thisValue, args, &exception)
-            : JSC::call(exec, handleEventFunction, callType, callData, thisValue, args, &exception);
+            ? JSMainThreadExecState::call(exec, handleEventFunction, callType, callData, thisValue, args, exception)
+            : JSC::call(exec, handleEventFunction, callType, callData, thisValue, args, exception);
 
         InspectorInstrumentation::didCallFunction(cookie, scriptExecutionContext);
 
@@ -217,6 +217,16 @@ void setWindowEventHandlerAttribute(JSC::ExecState& state, JSC::JSObject& wrappe
     element.document().setWindowAttributeEventListener(eventType, createEventListenerForEventHandlerAttribute(state, value, *wrapper.globalObject()));
 }
 
+JSC::JSValue windowEventHandlerAttribute(DOMWindow& window, const AtomicString& eventType)
+{
+    return eventHandlerAttribute(window, eventType);
+}
+
+void setWindowEventHandlerAttribute(JSC::ExecState& state, JSC::JSObject& wrapper, DOMWindow& window, const AtomicString& eventType, JSC::JSValue value)
+{
+    setEventHandlerAttribute(state, wrapper, window, eventType, value);
+}
+
 JSC::JSValue documentEventHandlerAttribute(HTMLElement& element, const AtomicString& eventType)
 {
     auto& document = element.document();
@@ -230,6 +240,16 @@ void setDocumentEventHandlerAttribute(JSC::ExecState& state, JSC::JSObject& wrap
     auto* documentWrapper = jsDocumentCast(toJS(&state, JSC::jsCast<JSDOMGlobalObject*>(wrapper.globalObject()), document));
     ASSERT(documentWrapper);
     document.setAttributeEventListener(eventType, createEventListenerForEventHandlerAttribute(state, value, *documentWrapper));
+}
+
+JSC::JSValue documentEventHandlerAttribute(Document& document, const AtomicString& eventType)
+{
+    return eventHandlerAttribute(document, eventType);
+}
+
+void setDocumentEventHandlerAttribute(JSC::ExecState& state, JSC::JSObject& wrapper, Document& document, const AtomicString& eventType, JSC::JSValue value)
+{
+    setEventHandlerAttribute(state, wrapper, document, eventType, value);
 }
 
 } // namespace WebCore

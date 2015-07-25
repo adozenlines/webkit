@@ -248,10 +248,11 @@ enum EBoxDirection { BNORMAL, BREVERSE };
 enum EAlignContent { AlignContentFlexStart, AlignContentFlexEnd, AlignContentCenter, AlignContentSpaceBetween, AlignContentSpaceAround, AlignContentStretch };
 enum EFlexDirection { FlowRow, FlowRowReverse, FlowColumn, FlowColumnReverse };
 enum EFlexWrap { FlexNoWrap, FlexWrap, FlexWrapReverse };
-enum EJustifyContent { JustifyFlexStart, JustifyFlexEnd, JustifyCenter, JustifySpaceBetween, JustifySpaceAround };
 enum ItemPosition {ItemPositionAuto, ItemPositionStretch, ItemPositionBaseline, ItemPositionLastBaseline, ItemPositionCenter, ItemPositionStart, ItemPositionEnd, ItemPositionSelfStart, ItemPositionSelfEnd, ItemPositionFlexStart, ItemPositionFlexEnd, ItemPositionLeft, ItemPositionRight};
 enum OverflowAlignment {OverflowAlignmentDefault, OverflowAlignmentTrue, OverflowAlignmentSafe};
 enum ItemPositionType {NonLegacyPosition, LegacyPosition};
+enum ContentPosition {ContentPositionAuto, ContentPositionBaseline, ContentPositionLastBaseline, ContentPositionCenter, ContentPositionStart, ContentPositionEnd, ContentPositionFlexStart, ContentPositionFlexEnd, ContentPositionLeft, ContentPositionRight};
+enum ContentDistributionType {ContentDistributionDefault, ContentDistributionSpaceBetween, ContentDistributionSpaceAround, ContentDistributionSpaceEvenly, ContentDistributionStretch};
 
 enum ETextSecurity {
     TSNONE, TSDISC, TSCIRCLE, TSSQUARE
@@ -284,10 +285,8 @@ enum AspectRatioType {
     AspectRatioAuto, AspectRatioFromIntrinsic, AspectRatioFromDimensions, AspectRatioSpecified
 };
 
-// Word Break Values. Matches WinIE, rather than CSS3
-
 enum EWordBreak {
-    NormalWordBreak, BreakAllWordBreak, BreakWordBreak
+    NormalWordBreak, BreakAllWordBreak, KeepAllWordBreak, BreakWordBreak
 };
 
 enum EOverflowWrap {
@@ -464,6 +463,10 @@ typedef unsigned TextDecorationSkip;
 enum TextUnderlinePosition {
     // FIXME: Implement support for 'under left' and 'under right' values.
     TextUnderlinePositionAuto = 0x1, TextUnderlinePositionAlphabetic = 0x2, TextUnderlinePositionUnder = 0x4
+};
+
+enum TextZoom {
+    TextZoomNormal, TextZoomReset
 };
 
 enum EPageBreak {

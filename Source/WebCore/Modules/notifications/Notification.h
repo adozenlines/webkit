@@ -35,10 +35,10 @@
 #include "ActiveDOMObject.h"
 #include "EventNames.h"
 #include "EventTarget.h"
-#include "URL.h"
 #include "NotificationClient.h"
-#include "TextFlags.h"
 #include "ThreadableLoaderClient.h"
+#include "URL.h"
+#include "WritingMode.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
@@ -124,7 +124,7 @@ public:
 #if ENABLE(NOTIFICATIONS)
     static const String permission(ScriptExecutionContext*);
     WEBCORE_EXPORT static const String permissionString(NotificationClient::Permission);
-    static void requestPermission(ScriptExecutionContext*, PassRefPtr<NotificationPermissionCallback> = 0);
+    static void requestPermission(ScriptExecutionContext*, PassRefPtr<NotificationPermissionCallback> = nullptr);
 #endif
 
 private:

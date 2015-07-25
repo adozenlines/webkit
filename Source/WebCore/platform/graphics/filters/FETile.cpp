@@ -63,15 +63,19 @@ void FETile::platformApplySoftware()
         tileRect.scale(filter.filterResolution().width(), filter.filterResolution().height());
     }
 
-    std::unique_ptr<ImageBuffer> tileImage;
-    if (!SVGRenderingContext::createImageBufferForPattern(tileRect, tileRect, tileImage, ColorSpaceDeviceRGB, filter().renderingMode()))
+    auto tileImage = SVGRenderingContext::createImageBuffer(tileRect, tileRect, ColorSpaceDeviceRGB, filter().renderingMode());
+    if (!tileImage)
         return;
 
     GraphicsContext* tileImageContext = tileImage->context();
     tileImageContext->translate(-inMaxEffectLocation.x(), -inMaxEffectLocation.y());
     tileImageContext->drawImageBuffer(in->asImageBuffer(), ColorSpaceDeviceRGB, in->absolutePaintRect().location());
 
-    auto pattern = Pattern::create(tileImage->copyImage(CopyBackingStore), true, true);
+    auto tileImageCopy = tileImage->copyImage(CopyBackingStore);
+    if (!tileImageCopy)
+        return;
+
+    auto pattern = Pattern::create(WTF::move(tileImageCopy), true, true);
 
     AffineTransform patternTransform;
     patternTransform.translate(inMaxEffectLocation.x() - maxEffectLocation.x(), inMaxEffectLocation.y() - maxEffectLocation.y());

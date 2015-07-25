@@ -48,6 +48,7 @@
 #import <UIKit/UIPickerContentView_Private.h>
 #import <UIKit/UIPickerView_Private.h>
 #import <UIKit/UIPresentationController_Private.h>
+#import <UIKit/UIResponder_Private.h>
 #import <UIKit/UIScrollView_Private.h>
 #import <UIKit/UIStringDrawing_Private.h>
 #import <UIKit/UITableViewCell_Private.h>
@@ -56,6 +57,7 @@
 #import <UIKit/UITextInteractionAssistant_Private.h>
 #import <UIKit/UIViewControllerTransitioning_Private.h>
 #import <UIKit/UIViewController_Private.h>
+#import <UIKit/UIViewController_ViewService.h>
 #import <UIKit/UIView_Private.h>
 #import <UIKit/UIWKSelectionAssistant.h>
 #import <UIKit/UIWKTextInteractionAssistant.h>
@@ -71,6 +73,12 @@
 #import <UIKit/_UIHighlightView.h>
 #import <UIKit/_UINavigationInteractiveTransition.h>
 #import <UIKit/_UINavigationParallaxTransition.h>
+
+#import <WebKitAdditions/LinkPreviewDefines.h>
+
+#if HAVE(LINK_PREVIEW)
+#import <UIKit/UIPreviewItemController.h>
+#endif
 
 // FIXME: Unconditionally include this file when a new SDK is available. <rdar://problem/20150072>
 #if defined(__has_include) && __has_include(<UIKit/UIDocumentMenuViewController_Private.h>)
@@ -110,6 +118,26 @@ typedef NS_ENUM(NSInteger, UIDatePickerPrivateMode)  {
 @end
 
 typedef enum {
+    kUIKeyboardInputRepeat                 = 1 << 0,
+    kUIKeyboardInputPopupVariant           = 1 << 1,
+    kUIKeyboardInputMultitap               = 1 << 2,
+    kUIKeyboardInputSkipCandidateSelection = 1 << 3,
+    kUIKeyboardInputDeadKey                = 1 << 4,
+    kUIKeyboardInputModifierFlagsChanged   = 1 << 5,
+    kUIKeyboardInputFlick                  = 1 << 6,
+    kUIKeyboardInputPreProcessed           = 1 << 7,
+} UIKeyboardInputFlags;
+
+@interface UIEvent (Details)
+@property (nonatomic, readonly) UIKeyboardInputFlags _inputFlags;
+- (void *)_hidEvent;
+- (NSString *)_unmodifiedInput;
+- (NSString *)_modifiedInput;
+- (NSInteger)_modifierFlags;
+- (BOOL)_isKeyDown;
+@end
+
+typedef enum {
     UIFontTraitPlain = 0x00000000,
 } UIFontTrait;
 
@@ -127,6 +155,10 @@ typedef enum {
 
 @interface UIImage (Details)
 - (id)initWithCGImage:(CGImageRef)CGImage imageOrientation:(UIImageOrientation)imageOrientation;
+@end
+
+@interface UIKeyCommand (Details)
+@property (nonatomic, readonly) UIEvent *_triggeringEvent;
 @end
 
 @protocol UIKeyboardImplGeometryDelegate
@@ -216,12 +248,22 @@ typedef enum {
 @property (nonatomic, setter=_setMagnifierEnabled:) BOOL _magnifierEnabled;
 @end
 
+@interface UIResponder (Details)
+- (void)_handleKeyUIEvent:(UIEvent *)event;
+@end
+
+@class CADisplay;
+@interface UIScreen (Details)
+- (CADisplay *)_display;
+@end
+
 @interface UIScrollView (Details)
 - (void)_stopScrollingAndZoomingAnimations;
 - (void)_zoomToCenter:(CGPoint)center scale:(CGFloat)scale duration:(CFTimeInterval)duration force:(BOOL)force;
 - (void)_zoomToCenter:(CGPoint)center scale:(CGFloat)scale duration:(CFTimeInterval)duration;
 @property (nonatomic, getter=isZoomEnabled) BOOL zoomEnabled;
 @property (nonatomic, readonly, getter=_isAnimatingZoom) BOOL isAnimatingZoom;
+@property (nonatomic, readonly, getter=_isAnimatingScroll) BOOL isAnimatingScroll;
 @property (nonatomic) CGFloat horizontalScrollDecelerationFactor;
 @property (nonatomic) CGFloat verticalScrollDecelerationFactor;
 @end
@@ -287,6 +329,10 @@ typedef enum {
 @interface UIViewController (Details)
 + (UIViewController *)_viewControllerForFullScreenPresentationFromView:(UIView *)view;
 + (UIViewController *)viewControllerForView:(UIView *)view;
+@end
+
+@interface UIViewController (ViewService)
+- (pid_t)_hostProcessIdentifier;
 @end
 
 @protocol UIViewControllerContextTransitioningEx <UIViewControllerContextTransitioning>
@@ -556,6 +602,10 @@ struct _UIWebTouchEvent {
 
     struct _UIWebTouchPoint* touchPoints;
     unsigned touchPointCount;
+
+#if __IPHONE_OS_VERSION_MIN_REQUIRED >= 90000
+    bool isPotentialTap;
+#endif
 };
 
 @protocol UIWebTouchEventsGestureRecognizerDelegate
@@ -730,6 +780,7 @@ extern NSString * const UIWindowWillRotateNotification;
 extern NSString * const UIKeyboardIsLocalUserInfoKey;
 
 extern UIApplication *UIApp;
+BOOL _UIApplicationIsExtension(void);
 void _UIApplicationLoadWebKit(void);
 BOOL _UIApplicationUsesLegacyUI(void);
 
@@ -741,5 +792,8 @@ UIImage* _UIImageGetWebKitTakePhotoOrVideoIcon(void);
 extern const float UIWebViewGrowsAndShrinksToFitHeight;
 extern const float UIWebViewScalesToFitScale;
 extern const float UIWebViewStandardViewportWidth;
+
+extern NSString *const UIKeyInputPageUp;
+extern NSString *const UIKeyInputPageDown;
 
 WTF_EXTERN_C_END

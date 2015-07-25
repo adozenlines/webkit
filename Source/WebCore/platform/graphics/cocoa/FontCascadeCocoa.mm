@@ -131,6 +131,33 @@ static void showLetterpressedGlyphsWithAdvances(const FloatPoint& point, const F
 #endif
 }
 
+class RenderingStyleSaver {
+public:
+#if !PLATFORM(MAC) || __MAC_OS_X_VERSION_MIN_REQUIRED <= 101000
+    RenderingStyleSaver(CTFontRef, CGContextRef) { }
+#else
+    RenderingStyleSaver(CTFontRef font, CGContextRef context)
+        : m_context(context)
+    {
+        m_changed = CTFontSetRenderingStyle(font, context, &m_originalStyle, &m_originalDilation);
+    }
+
+    ~RenderingStyleSaver()
+    {
+        if (!m_changed)
+            return;
+        CGContextSetFontRenderingStyle(m_context, m_originalStyle);
+        CGContextSetFontDilation(m_context, m_originalDilation);
+    }
+
+private:
+    bool m_changed;
+    CGContextRef m_context;
+    CGFontRenderingStyle m_originalStyle;
+    CGSize m_originalDilation;
+#endif
+};
+
 static void showGlyphsWithAdvances(const FloatPoint& point, const Font* font, CGContextRef context, const CGGlyph* glyphs, const CGSize* advances, size_t count)
 {
     if (!count)
@@ -162,18 +189,14 @@ static void showGlyphsWithAdvances(const FloatPoint& point, const Font* font, CG
             position.y += advances[i].height;
         }
         if (!platformData.isColorBitmapFont()) {
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED > 101000
-            CTFontSetRenderingParameters(platformData.ctFont(), context);
-#endif
+            RenderingStyleSaver saver(platformData.ctFont(), context);
             CGContextShowGlyphsAtPositions(context, glyphs, positions.data(), count);
         } else
             CTFontDrawGlyphs(platformData.ctFont(), glyphs, positions.data(), count, context);
         CGContextSetTextMatrix(context, savedMatrix);
     } else {
         if (!platformData.isColorBitmapFont()) {
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED > 101000
-            CTFontSetRenderingParameters(platformData.ctFont(), context);
-#endif
+            RenderingStyleSaver saver(platformData.ctFont(), context);
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
             CGContextShowGlyphsWithAdvances(context, glyphs, advances, count);
@@ -223,10 +246,19 @@ static CGSize dilationSizeForTextColor(const Color& color)
 }
 #endif
 
-static FloatPoint pointAdjustedForEmoji(const FontPlatformData& platformData, FloatPoint point)
+static inline bool isOnOrAfterIOS6()
 {
 #if PLATFORM(IOS)
-    if (!platformData.m_isEmoji)
+    return iosExecutableWasLinkedOnOrAfterVersion(wkIOSSystemVersion_6_0);
+#else
+    ASSERT_NOT_REACHED();
+    return false;
+#endif
+}
+
+static FloatPoint pointAdjustedForEmoji(const FontPlatformData& platformData, FloatPoint point)
+{
+    if (!platformData.isEmoji())
         return point;
 
     // Mimic the positioining of non-bitmap glyphs, which are not subpixel-positioned.
@@ -243,19 +275,16 @@ static FloatPoint pointAdjustedForEmoji(const FontPlatformData& platformData, Fl
     float y = point.y();
     if (fontSize <= 15) {
         // Undo Core Text's y adjustment.
-        static float yAdjustmentFactor = iosExecutableWasLinkedOnOrAfterVersion(wkIOSSystemVersion_6_0) ? .19 : .1;
+        static float yAdjustmentFactor = isOnOrAfterIOS6() ? .19 : .1;
         point.setY(floorf(y - yAdjustmentFactor * (fontSize + 2) + 2));
     } else {
         if (fontSize < 26)
             y -= .35f * fontSize - 10;
 
         // Undo Core Text's y adjustment.
-        static float yAdjustment = iosExecutableWasLinkedOnOrAfterVersion(wkIOSSystemVersion_6_0) ? 3.8 : 2;
+        static float yAdjustment = isOnOrAfterIOS6() ? 3.8 : 2;
         point.setY(floorf(y - yAdjustment));
     }
-#else
-    UNUSED_PARAM(platformData);
-#endif
     return point;
 }
 
@@ -393,11 +422,7 @@ void FontCascade::drawGlyphs(GraphicsContext* context, const Font* font, const G
         // If shadows are ignoring transforms, then we haven't applied the Y coordinate flip yet, so down is negative.
         float shadowTextY = point.y() + shadowOffset.height() * (context->shadowsIgnoreTransforms() ? -1 : 1);
         showGlyphsWithAdvances(FloatPoint(shadowTextX, shadowTextY), font, cgContext, glyphBuffer.glyphs(from), static_cast<const CGSize*>(glyphBuffer.advances(from)), numGlyphs);
-#if !PLATFORM(IOS)
-        if (syntheticBoldOffset)
-#else
-        if (syntheticBoldOffset && !platformData.m_isEmoji)
-#endif
+        if (syntheticBoldOffset && !platformData.isEmoji())
             showGlyphsWithAdvances(FloatPoint(shadowTextX + syntheticBoldOffset, shadowTextY), font, cgContext, glyphBuffer.glyphs(from), static_cast<const CGSize*>(glyphBuffer.advances(from)), numGlyphs);
         context->setFillColor(fillColor, fillColorSpace);
     }
@@ -406,11 +431,7 @@ void FontCascade::drawGlyphs(GraphicsContext* context, const Font* font, const G
         showLetterpressedGlyphsWithAdvances(point, font, cgContext, glyphBuffer.glyphs(from), static_cast<const CGSize*>(glyphBuffer.advances(from)), numGlyphs);
     else
         showGlyphsWithAdvances(point, font, cgContext, glyphBuffer.glyphs(from), static_cast<const CGSize*>(glyphBuffer.advances(from)), numGlyphs);
-#if !PLATFORM(IOS)
-    if (syntheticBoldOffset)
-#else
-    if (syntheticBoldOffset && !platformData.m_isEmoji)
-#endif
+    if (syntheticBoldOffset && !platformData.isEmoji())
         showGlyphsWithAdvances(FloatPoint(point.x() + syntheticBoldOffset, point.y()), font, cgContext, glyphBuffer.glyphs(from), static_cast<const CGSize*>(glyphBuffer.advances(from)), numGlyphs);
 
     if (hasSimpleShadow)
@@ -641,9 +662,12 @@ bool FontCascade::primaryFontIsSystemFont() const
     const auto& fontData = primaryFont();
     return !fontData.isSVGFont() && CTFontDescriptorIsSystemUIFont(adoptCF(CTFontCopyFontDescriptor(fontData.platformData().ctFont())).get());
 #else
-    // System fonts are hidden by having a name that begins with a period, so simply search
-    // for that here rather than try to keep the list up to date.
-    return firstFamily().startsWith('.');
+    const String& firstFamily = this->firstFamily();
+    return equalIgnoringASCIICase(firstFamily, "-webkit-system-font")
+        || equalIgnoringASCIICase(firstFamily, "-apple-system-font")
+        || equalIgnoringASCIICase(firstFamily, "-apple-system")
+        || equalIgnoringASCIICase(firstFamily, "-apple-menu")
+        || equalIgnoringASCIICase(firstFamily, "-apple-status-bar");
 #endif
 }
 
@@ -659,7 +683,7 @@ void FontCascade::adjustSelectionRectForComplexText(const TextRun& run, LayoutRe
         selectionRect.move(controller.totalWidth() - afterWidth + controller.leadingExpansion(), 0);
     else
         selectionRect.move(beforeWidth, 0);
-    selectionRect.setWidth(afterWidth - beforeWidth);
+    selectionRect.setWidth(LayoutUnit::fromFloatCeil(afterWidth - beforeWidth));
 }
 
 float FontCascade::getGlyphsAndAdvancesForComplexText(const TextRun& run, int from, int to, GlyphBuffer& glyphBuffer, ForTextEmphasisOrNot forTextEmphasis) const

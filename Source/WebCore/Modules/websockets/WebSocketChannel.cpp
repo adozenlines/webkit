@@ -81,6 +81,8 @@ WebSocketChannel::WebSocketChannel(Document* document, WebSocketChannelClient* c
     , m_outgoingFrameQueueStatus(OutgoingFrameQueueOpen)
     , m_blobLoaderStatus(BlobLoaderNotStarted)
 {
+    ASSERT(m_document);
+
     if (Page* page = m_document->page())
         m_identifier = page->progress().createUniqueIdentifier();
 
@@ -103,8 +105,13 @@ void WebSocketChannel::connect(const URL& url, const String& protocol)
         m_handshake->addExtensionProcessor(m_deflateFramer.createExtensionProcessor());
     if (m_identifier)
         InspectorInstrumentation::didCreateWebSocket(m_document, m_identifier, url, m_document->url(), protocol);
-    ref();
-    m_handle = SocketStreamHandle::create(m_handshake->url(), this);
+
+    if (Frame* frame = m_document->frame()) {
+        if (NetworkingContext* networkingContext = frame->loader().networkingContext()) {
+            ref();
+            m_handle = SocketStreamHandle::create(m_handshake->url(), this, *networkingContext);
+        }
+    }
 }
 
 String WebSocketChannel::subprotocol()
@@ -221,8 +228,8 @@ void WebSocketChannel::disconnect()
         InspectorInstrumentation::didCloseWebSocket(m_document, m_identifier);
     if (m_handshake)
         m_handshake->clearScriptExecutionContext();
-    m_client = 0;
-    m_document = 0;
+    m_client = nullptr;
+    m_document = nullptr;
     if (m_handle)
         m_handle->disconnect();
 }
@@ -273,9 +280,9 @@ void WebSocketChannel::didCloseSocketStream(SocketStreamHandle* handle)
         if (m_suspended)
             return;
         WebSocketChannelClient* client = m_client;
-        m_client = 0;
-        m_document = 0;
-        m_handle = 0;
+        m_client = nullptr;
+        m_document = nullptr;
+        m_handle = nullptr;
         if (client)
             client->didClose(m_unhandledBufferedAmount, m_receivedClosingHandshake ? WebSocketChannelClient::ClosingHandshakeComplete : WebSocketChannelClient::ClosingHandshakeIncomplete, m_closeEventCode, m_closeEventReason);
     }
@@ -649,7 +656,8 @@ bool WebSocketChannel::processFrame()
         m_receivedClosingHandshake = true;
         startClosingHandshake(m_closeEventCode, m_closeEventReason);
         if (m_closing) {
-            m_outgoingFrameQueueStatus = OutgoingFrameQueueClosing;
+            if (m_outgoingFrameQueueStatus == OutgoingFrameQueueOpen)
+                m_outgoingFrameQueueStatus = OutgoingFrameQueueClosing;
             processOutgoingFrameQueue();
         }
         break;

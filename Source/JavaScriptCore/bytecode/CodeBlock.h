@@ -185,7 +185,11 @@ public:
         return index >= m_numVars;
     }
 
-    HandlerInfo* handlerForBytecodeOffset(unsigned bytecodeOffset);
+    enum class RequiredHandler {
+        CatchHandler,
+        AnyHandler
+    };
+    HandlerInfo* handlerForBytecodeOffset(unsigned bytecodeOffset, RequiredHandler = RequiredHandler::AnyHandler);
     unsigned lineNumberForBytecodeOffset(unsigned bytecodeOffset);
     unsigned columnNumberForBytecodeOffset(unsigned bytecodeOffset);
     void expressionRangeForBytecodeOffset(unsigned bytecodeOffset, int& divot,
@@ -248,8 +252,6 @@ public:
         RELEASE_ASSERT(returnAddress >= instructions().begin() && returnAddress < instructions().end());
         return static_cast<Instruction*>(returnAddress) - instructions().begin();
     }
-
-    bool isNumericCompareFunction() { return m_unlinkedCode->isNumericCompareFunction(); }
 
     unsigned numberOfInstructions() const { return m_instructions.size(); }
     RefCountedArray<Instruction>& instructions() { return m_instructions; }
@@ -570,7 +572,6 @@ public:
 
     Vector<WriteBarrier<Unknown>>& constants() { return m_constantRegisters; }
     Vector<SourceCodeRepresentation>& constantsSourceCodeRepresentation() { return m_constantsSourceCodeRepresentation; }
-    size_t numberOfConstantRegisters() const { return m_constantRegisters.size(); }
     unsigned addConstant(JSValue v)
     {
         unsigned result = m_constantRegisters.size();
@@ -588,8 +589,6 @@ public:
         return result;
     }
 
-    bool findConstant(JSValue, unsigned& result);
-    unsigned addOrFindConstant(JSValue);
     WriteBarrier<Unknown>& constantRegister(int index) { return m_constantRegisters[index - FirstConstantRegisterIndex]; }
     ALWAYS_INLINE bool isConstantRegisterIndex(int index) const { return index >= FirstConstantRegisterIndex; }
     ALWAYS_INLINE JSValue getConstant(int index) const { return m_constantRegisters[index - FirstConstantRegisterIndex].get(); }
@@ -664,9 +663,6 @@ public:
     size_t numberOfStringSwitchJumpTables() const { return m_rareData ? m_rareData->m_stringSwitchJumpTables.size() : 0; }
     StringJumpTable& addStringSwitchJumpTable() { createRareDataIfNecessary(); m_rareData->m_stringSwitchJumpTables.append(StringJumpTable()); return m_rareData->m_stringSwitchJumpTables.last(); }
     StringJumpTable& stringSwitchJumpTable(int tableIndex) { RELEASE_ASSERT(m_rareData); return m_rareData->m_stringSwitchJumpTables[tableIndex]; }
-
-
-    SymbolTable* symbolTable() const { return m_symbolTable.get(); }
 
     EvalCodeCache& evalCodeCache() { createRareDataIfNecessary(); return m_rareData->m_evalCodeCache; }
 
@@ -920,6 +916,15 @@ protected:
 private:
     friend class CodeBlockSet;
     
+    SymbolTable* symbolTable() const 
+    { 
+        // FIXME: Get rid of this function once the type profiler has a notion of what
+        // symbol table it's reading from.
+        // https://bugs.webkit.org/show_bug.cgi?id=145438
+        RELEASE_ASSERT(m_symbolTableConstantIndex); 
+        return jsCast<SymbolTable*>(getConstant(m_symbolTableConstantIndex));
+    }
+
     CodeBlock* specialOSREntryBlockOrNull();
     
     void noticeIncomingCall(ExecState* callerFrame);
@@ -932,10 +937,16 @@ private:
     {
         ASSERT(constants.size() == constantsSourceCodeRepresentation.size());
         size_t count = constants.size();
-        m_constantRegisters.resize(count);
+        m_constantRegisters.resizeToFit(count);
         for (size_t i = 0; i < count; i++)
             m_constantRegisters[i].set(*m_vm, ownerExecutable(), constants[i].get());
         m_constantsSourceCodeRepresentation = constantsSourceCodeRepresentation;
+    }
+
+    void replaceConstant(int index, JSValue value)
+    {
+        ASSERT(isConstantRegisterIndex(index) && static_cast<size_t>(index - FirstConstantRegisterIndex) < m_constantRegisters.size());
+        m_constantRegisters[index - FirstConstantRegisterIndex].set(m_globalObject->vm(), m_ownerExecutable.get(), value);
     }
 
     void dumpBytecode(
@@ -995,7 +1006,7 @@ private:
     VM* m_vm;
 
     RefCountedArray<Instruction> m_instructions;
-    WriteBarrier<SymbolTable> m_symbolTable;
+    int m_symbolTableConstantIndex;
     VirtualRegister m_thisRegister;
     VirtualRegister m_scopeRegister;
     VirtualRegister m_lexicalEnvironmentRegister;

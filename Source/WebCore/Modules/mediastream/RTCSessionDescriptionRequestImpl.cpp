@@ -43,11 +43,11 @@
 
 namespace WebCore {
 
-PassRefPtr<RTCSessionDescriptionRequestImpl> RTCSessionDescriptionRequestImpl::create(ScriptExecutionContext* context, PassRefPtr<RTCSessionDescriptionCallback> successCallback, PassRefPtr<RTCPeerConnectionErrorCallback> errorCallback)
+Ref<RTCSessionDescriptionRequestImpl> RTCSessionDescriptionRequestImpl::create(ScriptExecutionContext* context, PassRefPtr<RTCSessionDescriptionCallback> successCallback, PassRefPtr<RTCPeerConnectionErrorCallback> errorCallback)
 {
-    RefPtr<RTCSessionDescriptionRequestImpl> request = adoptRef(new RTCSessionDescriptionRequestImpl(context, successCallback, errorCallback));
+    Ref<RTCSessionDescriptionRequestImpl> request = adoptRef(*new RTCSessionDescriptionRequestImpl(context, successCallback, errorCallback));
     request->suspendIfNeeded();
-    return request.release();
+    return request;
 }
 
 RTCSessionDescriptionRequestImpl::RTCSessionDescriptionRequestImpl(ScriptExecutionContext* context, PassRefPtr<RTCSessionDescriptionCallback> successCallback, PassRefPtr<RTCPeerConnectionErrorCallback> errorCallback)
@@ -97,8 +97,8 @@ bool RTCSessionDescriptionRequestImpl::canSuspendForPageCache() const
 
 void RTCSessionDescriptionRequestImpl::clear()
 {
-    m_successCallback.clear();
-    m_errorCallback.clear();
+    m_successCallback = nullptr;
+    m_errorCallback = nullptr;
 }
 
 } // namespace WebCore

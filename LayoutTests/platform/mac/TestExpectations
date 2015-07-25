@@ -297,9 +297,6 @@ webkit.org/b/78290 fast/dom/MutationObserver/end-of-task-delivery.html [ Failure
 # Needs PageClients::vibrationClient() implementation.
 webkit.org/b/72010 vibration
 
-# Touch adjustment not enabled
-webkit.org/b/78801 touchadjustment
-
 # <rdar://problem/11059777>
 webkit.org/b/81289 canvas/philip/tests/2d.line.cap.round.html [ Failure ]
 
@@ -408,17 +405,12 @@ svg/stroke/zero-length-arc-linecaps-rendering.svg [ Failure ]
 svg/stroke/zero-length-path-linecap-rendering.svg [ Failure ]
 svg/stroke/zero-length-subpaths-linecap-rendering.svg [ Failure ]
 
-# https://bugs.webkit.org/show_bug.cgi?id=110871
-compositing/overlap-blending/reflection-opacity-huge.html [ ImageOnlyFailure ]
+webkit.org/b/110871 compositing/overlap-blending/reflection-opacity-huge.html [ ImageOnlyFailure ]
+webkit.org/b/114340 compositing/overlap-blending/nested-overlap.html [ ImageOnlyFailure ]
+webkit.org/b/114338 compositing/overlap-blending/nested-overlap-overflow.html [ ImageOnlyFailure ]
+webkit.org/b/146523 compositing/masks/compositing-clip-path-origin.html [ Pass ImageOnlyFailure ]
 
-# https://bugs.webkit.org/show_bug.cgi?id=114340
-compositing/overlap-blending/nested-overlap.html [ ImageOnlyFailure ]
-
-# https://bugs.webkit.org/show_bug.cgi?id=114338
-compositing/overlap-blending/nested-overlap-overflow.html [ ImageOnlyFailure ]
-
-# https://bugs.webkit.org/show_bug.cgi?id=95027
-fast/block/float/016.html [ Failure ]
+webkit.org/b/95027 fast/block/float/016.html [ Failure ]
 
 # https://bugs.webkit.org/show_bug.cgi?id=93878
 # Due to JSC::Bindings::Instance::createRuntimeObject(JSC::ExecState*) crashes:
@@ -526,7 +518,9 @@ webkit.org/b/89052 fast/css/image-orientation
 # CSS3 Text support is not yet enabled (needs ENABLE_CSS3_TEXT).
 webkit.org/b/76173 fast/css3-text/css3-text-align-last
 webkit.org/b/99945 fast/css3-text/css3-text-justify [ Skip ]
-webkit.org/b/112755 fast/css3-text/css3-text-indent [ Failure ImageOnlyFailure ]
+webkit.org/b/112755 fast/css3-text/css3-text-indent/text-indent-each-line-hanging.html [ ImageOnlyFailure ]
+webkit.org/b/112755 fast/css3-text/css3-text-indent/getComputedStyle/getComputedStyle-text-indent.html [ Failure ]
+webkit.org/b/112755 fast/css3-text/css3-text-indent/getComputedStyle/getComputedStyle-text-indent-inherited.html [ Failure ]
 webkit.org/b/58491 editing/pasteboard/insert-text-decoration.html [ Skip ]
 
 # MHTML is not yet enabled
@@ -560,8 +554,6 @@ webkit.org/b/112532 fast/frames/flattening/frameset-flattening-advanced.html [ F
 webkit.org/b/112532 fast/frames/flattening/frameset-flattening-subframesets.html [ Failure Pass ]
 webkit.org/b/106185 fast/frames/flattening/iframe-flattening-fixed-height.html [ Failure Pass ]
 webkit.org/b/106185 fast/frames/flattening/frameset-flattening-grid.html [ Failure Pass ]
-
-webkit.org/b/69999 [ Release ] http/tests/security/contentSecurityPolicy/media-src-allowed.html [ Failure Pass ]
 
 webkit.org/b/73766 css3/unicode-bidi-isolate-aharon-failing.html [ ImageOnlyFailure ]
 
@@ -608,7 +600,7 @@ webkit.org/b/85308 ietestcenter/css3/valuesandunits/units-000.htm [ Skip ]
 webkit.org/b/86142 ietestcenter/css3/namespaces/syntax-021.xml [ ImageOnlyFailure ]
 
 webaudio/mediastreamaudiodestinationnode.html [ Failure ]
-webaudio/mediastreamaudiosourcenode.html [ Failure ]
+webaudio/mediastreamaudiosourcenode.html [ Skip ]
 webaudio/codec-tests/vorbis/ [ WontFix ]
 webkit.org/b/119467 webaudio/audiobuffersource-loop-points.html [ Skip ]
 
@@ -739,6 +731,9 @@ webkit.org/b/122038 animations/transform-non-accelerated.html [ Pass Failure ]
 
 webkit.org/b/122490 [ Debug ] mathml/very-large-stretchy-operators.html [ Skip ]
 
+# rdar://problem/21443002
+[ Release ElCapitan+ ] mathml/very-large-stretchy-operators.html [ Slow ]
+
 webkit.org/b/123220 compositing/regions/floated-region-with-transformed-child.html [ Pass ImageOnlyFailure ]
 webkit.org/b/138179 compositing/regions/propagate-region-box-shadow-border-padding-for-video.html [ Skip ]
 
@@ -753,6 +748,7 @@ inspector-protocol/debugger
 webkit.org/b/124311 compositing/regions/transform-transparent-positioned-video-inside-region.html [ ImageOnlyFailure ]
 
 webkit.org/b/124321 [ Mavericks ] animations/resume-after-page-cache.html [ Pass Failure ]
+[ Debug Mavericks ] media/restore-from-page-cache.html [ Pass Failure ]
 
 # These fast/forms/select tests open a pop-up menu (visible on screen even when using run-webkit-tests), and get stuck in its nested event loop.
 webkit.org/b/87748 fast/forms/select/optgroup-clicking.html [ Skip ]
@@ -853,6 +849,7 @@ webkit.org/b/132385 compositing/repaint/repaint-on-layer-grouping-change.html [ 
 [ Mavericks ] http/tests/misc/webtiming-cross-origin-redirect.php [ WontFix ]
 [ Mavericks ] http/tests/misc/webtiming-no-origin.html [ WontFix ]
 [ Mavericks ] http/tests/misc/webtiming-one-redirect.php [ WontFix ]
+[ Mavericks ] http/tests/misc/webtiming-resolution.html [ WontFix ]
 [ Mavericks ] http/tests/misc/webtiming-slow-load.php [ WontFix ]
 [ Mavericks ] http/tests/misc/webtiming-ssl.php [ WontFix ]
 [ Mavericks ] http/tests/misc/webtiming-two-redirects.php [ WontFix ]
@@ -988,13 +985,18 @@ webkit.org/b/142152 media/track/track-in-band-cues-added-once.html [ Pass Failur
 webkit.org/b/28221 media/audio-delete-while-step-button-clicked.html [ Failure ]
 
 # These tests always time out.
-webkit.org/b/112492 media/track/track-language-preference.html [ Skip ]
 webkit.org/b/112492 media/track/track-prefer-captions.html [ Skip ]
 
 webkit.org/b/136708 http/tests/media/video-play-stall-seek.html
 webkit.org/b/136708 media/media-fullscreen-not-in-document.html
 
 webkit.org/b/140639 http/tests/media/video-play-waiting.html [ Pass Timeout ]
+
+# ENABLE(MEDIA_SESSION) is disabled
+media/session/content-interruptions.html
+media/session/controls-existence.html
+media/session/default-session.html
+media/session/transient-interruptions.html
 
 # This test requires generation of progress events during loading
 webkit.org/b/100984 media/progress-events-generated-correctly.html [ Failure ]
@@ -1103,9 +1105,6 @@ webkit.org/b/137505 media/track/track-forced-subtitles-in-band.html [ Failure Pa
 # FIXME: Needs bugzilla (<rdar://problem/16802068>)
 [ Yosemite+ ] fast/css/input-search-padding.html [ Failure ]
 
-# FIXME: Needs bugzilla (<rdar://problem/17458024>)
-[ Yosemite ] http/tests/misc/webtiming-ssl.php [ Skip ]
-
 # FIXME: Needs bugzilla (<rdar://problem/17458211>)
 [ Yosemite+ ] platform/mac/fast/text/systemFont.html [ Pass Failure ]
 [ Mavericks ] platform/mac/fast/text/systemFont.html [ Failure ]
@@ -1115,12 +1114,17 @@ webkit.org/b/137505 media/track/track-forced-subtitles-in-band.html [ Failure Pa
 
 # Passing Media Source tests
 [ Yosemite+ ] http/tests/media/media-source/ [ Skip ]
+[ Yosemite+ ] http/tests/media/media-source/SourceBuffer-abort-readyState.html [ Pass ]
+[ Yosemite+ ] http/tests/media/media-source/SourceBuffer-abort-removed.html [ Pass ]
+[ Yosemite+ ] http/tests/media/media-source/SourceBuffer-abort-updating.html [ Pass ]
+[ Yosemite+ ] http/tests/media/media-source/SourceBuffer-abort.html [ Pass ]
 [ Yosemite+ ] http/tests/media/media-source/mediasource-addsourcebuffer.html [ Pass ]
 [ Yosemite+ ] http/tests/media/media-source/mediasource-append-buffer.html [ Pass ]
 [ Yosemite+ ] http/tests/media/media-source/mediasource-closed.html [ Pass ]
 [ Yosemite+ ] http/tests/media/media-source/mediasource-config-change-mp4-v-bitrate.html [ Pass ]
 [ Yosemite+ ] http/tests/media/media-source/mediasource-config-change-mp4-v-framerate.html [ Pass ]
 [ Yosemite+ ] http/tests/media/media-source/mediasource-endofstream-invaliderror.html [ Pass ]
+[ Yosemite+ ] http/tests/media/media-source/mediasource-is-type-supported.html [ Pass ]
 [ Yosemite+ ] http/tests/media/media-source/mediasource-multiple-attach.html [ Pass ]
 [ Yosemite+ ] http/tests/media/media-source/mediasource-play.html [ Pass ]
 [ Yosemite+ ] http/tests/media/media-source/mediasource-remove.html [ Pass ]
@@ -1262,4 +1266,35 @@ webkit.org/b/17022 [ MountainLion Mavericks ] fast/images/animated-png.html [ Sk
 
 # OS X 10.10.3+ has the necessary glyphs.
 webkit.org/b/142548 [ Yosemite+ ] editing/selection/extend-by-character-007.html [ Pass ]
-webkit.org/b/141661 [ Yosemite+ ] fast/text/emoji.html [ Pass ]
+
+media/accessiblity-describes-video.html [ Pass Failure ]
+
+webkit.org/b/145432 media/video-transformed-by-javascript.html [ Failure ]
+
+# <rdar://problem/19588632>
+[ ElCapitan+ ] http/tests/media/track-in-band-hls-metadata.html [ Timeout ]
+
+# <rdar://problem/19893462>
+[ ElCapitan+ ] sputnik/Unicode/Unicode_510/S7.6_A3.1.html [ Failure ]
+[ ElCapitan+ ] sputnik/Unicode/Unicode_510/S7.6_A3.2.html [ Failure ]
+[ ElCapitan+ ] sputnik/Unicode/Unicode_510/S7.6_A5.3_T1.html [ Failure ]
+[ ElCapitan+ ] sputnik/Unicode/Unicode_510/S7.6_A5.3_T2.html [ Failure ]
+
+# <rdar://problem/20417352>
+[ ElCapitan+ ] accessibility/deleting-iframe-destroys-axcache.html [ Pass Failure ]
+
+# <rdar://problem/20622665> WebKit media doesn't get a canplay event when load stalls
+[ ElCapitan+ ] http/tests/media/video-play-stall.html [ Failure ]
+
+# <rdar://problem/21263363>
+http/tests/media/remove-while-loading.html [ Skip ]
+http/tests/media/video-accept-encoding.html [ Failure ]
+http/tests/media/video-cancel-load.html [ Skip ]
+http/tests/media/video-served-as-text.html [ Failure ]
+http/tests/media/video-throttled-load-metadata.html [ Failure ]
+http/tests/security/contentSecurityPolicy/media-src-allowed.html [ Skip ]
+
+[ Yosemite ] fast/canvas/webgl/oes-texture-half-float-linear.html [ Pass Failure ]
+
+# <rdar://problem/21857102>
+[ ElCapitan+ ] fast/canvas/canvas-too-large-to-draw.html [ Crash ]

@@ -109,7 +109,7 @@ CachedImage::~CachedImage()
 
 void CachedImage::load(CachedResourceLoader& cachedResourceLoader, const ResourceLoaderOptions& options)
 {
-    if (cachedResourceLoader.shouldPerformImageLoad(resourceRequest().url()))
+    if (cachedResourceLoader.shouldPerformImageLoad(url()))
         CachedResource::load(cachedResourceLoader, options);
     else
         setLoading(false);
@@ -320,7 +320,7 @@ void CachedImage::checkShouldPaintBrokenImage()
     if (!m_loader || m_loader->reachedTerminalState())
         return;
 
-    m_shouldPaintBrokenImage = m_loader->frameLoader()->client().shouldPaintBrokenImage(m_resourceRequest.url());
+    m_shouldPaintBrokenImage = m_loader->frameLoader()->client().shouldPaintBrokenImage(url());
 }
 
 void CachedImage::clear()
@@ -342,7 +342,7 @@ inline void CachedImage::createImage()
         m_image = PDFDocumentImage::create(this);
 #endif
     else if (m_response.mimeType() == "image/svg+xml") {
-        RefPtr<SVGImage> svgImage = SVGImage::create(this);
+        RefPtr<SVGImage> svgImage = SVGImage::create(*this, url());
         m_svgImageCache = std::make_unique<SVGImageCache>(svgImage.get());
         m_image = svgImage.release();
     } else {
@@ -365,8 +365,8 @@ inline void CachedImage::clearImage()
     // If our Image has an observer, it's always us so we need to clear the back pointer
     // before dropping our reference.
     if (m_image)
-        m_image->setImageObserver(0);
-    m_image.clear();
+        m_image->setImageObserver(nullptr);
+    m_image = nullptr;
 }
 
 void CachedImage::addIncrementalDataBuffer(SharedBuffer& data)
@@ -458,7 +458,7 @@ void CachedImage::destroyDecodedData()
 {
     bool canDeleteImage = !m_image || (m_image->hasOneRef() && m_image->isBitmapImage());
     if (canDeleteImage && !isLoading() && !hasClients()) {
-        m_image = 0;
+        m_image = nullptr;
         setDecodedSize(0);
     } else if (m_image && !errorOccurred())
         m_image->destroyDecodedData();
@@ -510,12 +510,12 @@ bool CachedImage::isOriginClean(SecurityOrigin* securityOrigin)
 {
     if (!image()->hasSingleSecurityOrigin())
         return false;
-    if (passesAccessControlCheck(securityOrigin))
+    if (passesAccessControlCheck(*securityOrigin))
         return true;
-    return !securityOrigin->taintsCanvas(response().url());
+    return !securityOrigin->taintsCanvas(responseForSameOriginPolicyChecks().url());
 }
 
-bool CachedImage::mustRevalidateDueToCacheHeaders(const CachedResourceLoader& cachedResourceLoader, CachePolicy policy) const
+CachedResource::RevalidationDecision CachedImage::makeRevalidationDecision(CachePolicy cachePolicy) const
 {
     if (UNLIKELY(isManuallyCached())) {
         // Do not revalidate manually cached images. This mechanism is used as a
@@ -523,9 +523,9 @@ bool CachedImage::mustRevalidateDueToCacheHeaders(const CachedResourceLoader& ca
         // the URL for that image may not represent a resource that can be
         // retrieved by standard means. If the manual caching SPI is used, it is
         // incumbent on the client to only use valid resources.
-        return false;
+        return RevalidationDecision::No;
     }
-    return CachedResource::mustRevalidateDueToCacheHeaders(cachedResourceLoader, policy);
+    return CachedResource::makeRevalidationDecision(cachePolicy);
 }
 
 } // namespace WebCore

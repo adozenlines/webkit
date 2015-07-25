@@ -36,28 +36,16 @@
 #include "JSDOMBinding.h"
 #include "JSDOMPromise.h"
 #include "JSReadableStreamReader.h"
+#include "ReadableJSStream.h"
 #include "ReadableStream.h"
-#include "ReadableStreamJSSource.h"
 #include "ReadableStreamReader.h"
 #include <runtime/Error.h>
+#include <runtime/Exception.h>
 #include <wtf/NeverDestroyed.h>
 
 using namespace JSC;
 
 namespace WebCore {
-
-JSValue JSReadableStream::cancel(ExecState* exec)
-{
-    JSValue error = createError(exec, ASCIILiteral("cancel is not implemented"));
-    return exec->vm().throwException(exec, error);
-}
-
-JSValue JSReadableStream::getReader(ExecState* exec)
-{
-    if (impl().isLocked())
-        return exec->vm().throwException(exec, createTypeError(exec, ASCIILiteral("ReadableStream is locked")));
-    return toJS(exec, globalObject(), impl().createReader());
-}
 
 JSValue JSReadableStream::pipeTo(ExecState* exec)
 {
@@ -69,27 +57,6 @@ JSValue JSReadableStream::pipeThrough(ExecState* exec)
 {
     JSValue error = createError(exec, ASCIILiteral("pipeThrough is not implemented"));
     return exec->vm().throwException(exec, error);
-}
-
-EncodedJSValue JSC_HOST_CALL constructJSReadableStream(ExecState* exec)
-{
-    if (exec->argumentCount() && !exec->argument(0).isObject())
-        return throwVMError(exec, createTypeError(exec, ASCIILiteral("ReadableStream constructor should get an object as argument.")));
-
-    DOMConstructorObject* jsConstructor = jsCast<DOMConstructorObject*>(exec->callee());
-    ASSERT(jsConstructor);
-    ScriptExecutionContext* scriptExecutionContext = jsConstructor->scriptExecutionContext();
-
-    Ref<ReadableStreamJSSource> source = ReadableStreamJSSource::create(exec);
-    RefPtr<ReadableStream> readableStream = ReadableJSStream::create(*scriptExecutionContext, Ref<ReadableStreamJSSource>(source.get()));
-
-    VM& vm = exec->vm();
-    JSGlobalObject* globalObject = exec->callee()->globalObject();
-    JSReadableStream* jsReadableStream = JSReadableStream::create(JSReadableStream::createStructure(vm, globalObject, JSReadableStream::createPrototype(vm, globalObject)), jsCast<JSDOMGlobalObject*>(globalObject), readableStream.releaseNonNull());
-
-    source->start(exec, jsReadableStream);
-
-    return JSValue::encode(jsReadableStream);
 }
 
 } // namespace WebCore

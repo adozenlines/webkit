@@ -37,7 +37,6 @@
 #include "TextCheckerState.h"
 #include "ViewUpdateDispatcher.h"
 #include "VisitedLinkTable.h"
-#include "WebOriginDataManagerSupplement.h"
 #include <WebCore/SessionID.h>
 #include <WebCore/Timer.h>
 #include <wtf/Forward.h>
@@ -72,14 +71,15 @@ namespace WebKit {
 class DownloadManager;
 class EventDispatcher;
 class InjectedBundle;
+class ObjCObjectGraph;
 class UserData;
 class WebConnectionToUIProcess;
 class WebFrame;
 class WebIconDatabaseProxy;
-class WebOriginDataManager;
 class WebPage;
 class WebPageGroupProxy;
 class WebProcessSupplement;
+struct SecurityOriginData;
 struct WebPageCreationParameters;
 struct WebPageGroupData;
 struct WebPreferencesStore;
@@ -94,7 +94,7 @@ class WebResourceLoadScheduler;
 class WebToDatabaseProcessConnection;
 #endif
 
-class WebProcess : public ChildProcess, public WebOriginDataManagerSupplement, private DownloadManager::Client {
+class WebProcess : public ChildProcess, private DownloadManager::Client {
     friend class NeverDestroyed<DownloadManager>;
 public:
     static WebProcess& singleton();
@@ -178,14 +178,19 @@ public:
 
     void nonVisibleProcessCleanupTimerFired();
 
+#if PLATFORM(COCOA)
+    void destroyRenderingResources();
+#endif
+
     void updateActivePages();
 
 #if USE(SOUP)
     void allowSpecificHTTPSCertificateForHost(const WebCore::CertificateInfo&, const String& host);
 #endif
 
-    void processWillSuspend();
-    void cancelProcessWillSuspend();
+    void processWillSuspendImminently(bool& handled);
+    void prepareToSuspend();
+    void cancelPrepareToSuspend();
     bool markAllLayersVolatileIfPossible();
     void setAllLayerTreeStatesFrozen(bool);
     void processSuspensionCleanupTimerFired();
@@ -211,6 +216,7 @@ public:
 
 private:
     WebProcess();
+    ~WebProcess();
 
     // DownloadManager::Client.
     virtual void didCreateDownload() override;
@@ -282,6 +288,9 @@ private:
     void handleInjectedBundleMessage(const String& messageName, const UserData& messageBody);
     void setInjectedBundleParameter(const String& key, const IPC::DataReference&);
 
+    enum class ShouldAcknowledgeWhenReadyToSuspend { No, Yes };
+    void actualPrepareToSuspend(ShouldAcknowledgeWhenReadyToSuspend);
+
     // ChildProcess
     virtual void initializeProcess(const ChildProcessInitializationParameters&) override;
     virtual void initializeProcessName(const ChildProcessInitializationParameters&) override;
@@ -307,12 +316,7 @@ private:
 
     // Implemented in generated WebProcessMessageReceiver.cpp
     void didReceiveWebProcessMessage(IPC::Connection&, IPC::MessageDecoder&);
-
-    // WebOriginDataManagerSupplement
-    virtual void getOrigins(WKOriginDataTypes, std::function<void (const Vector<SecurityOriginData>&)> completion) override;
-    virtual void deleteEntriesForOrigin(WKOriginDataTypes, const SecurityOriginData&, std::function<void ()> completion) override;
-    virtual void deleteEntriesModifiedBetweenDates(WKOriginDataTypes, double startDate, double endDate, std::function<void ()> completion) override;
-    virtual void deleteAllEntries(WKOriginDataTypes, std::function<void ()> completion) override;
+    void didReceiveSyncWebProcessMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&);
 
     RefPtr<WebConnectionToUIProcess> m_webConnection;
 
@@ -333,12 +337,10 @@ private:
 
     bool m_hasSetCacheModel;
     CacheModel m_cacheModel;
-    bool m_diskCacheIsDisabledForTesting;
 
 #if PLATFORM(COCOA)
     WebCore::MachSendRight m_compositingRenderServerPort;
     pid_t m_presenterApplicationPid;
-    dispatch_group_t m_clearResourceCachesDispatchGroup;
 #endif
 
     bool m_fullKeyboardAccessEnabled;
@@ -377,10 +379,11 @@ private:
     HashSet<uint64_t> m_pagesInWindows;
     WebCore::Timer m_nonVisibleProcessCleanupTimer;
 
-    std::unique_ptr<WebOriginDataManager> m_webOriginDataManager;
 #if PLATFORM(IOS)
     WebSQLiteDatabaseTracker m_webSQLiteDatabaseTracker;
 #endif
+
+    ShouldAcknowledgeWhenReadyToSuspend m_shouldAcknowledgeWhenReadyToSuspend;
 };
 
 } // namespace WebKit

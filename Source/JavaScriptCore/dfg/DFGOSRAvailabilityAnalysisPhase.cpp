@@ -32,7 +32,6 @@
 #include "DFGGraph.h"
 #include "DFGInsertionSet.h"
 #include "DFGPhase.h"
-#include "DFGPromoteHeapAccess.h"
 #include "JSCInlines.h"
 
 namespace JSC { namespace DFG {
@@ -82,10 +81,6 @@ public:
                 for (unsigned nodeIndex = 0; nodeIndex < block->size(); ++nodeIndex)
                     calculator.executeNode(block->at(nodeIndex));
                 
-                // FIXME: we should probably prune by liveness here.
-                // https://bugs.webkit.org/show_bug.cgi?id=143078
-                calculator.m_availability.prune();
-
                 if (calculator.m_availability == block->ssa->availabilityAtTail)
                     continue;
                 
@@ -95,6 +90,8 @@ public:
                 for (unsigned successorIndex = block->numSuccessors(); successorIndex--;) {
                     BasicBlock* successor = block->successor(successorIndex);
                     successor->ssa->availabilityAtHead.merge(calculator.m_availability);
+                    successor->ssa->availabilityAtHead.pruneByLiveness(
+                        m_graph, successor->firstOrigin().forExit);
                 }
             }
         } while (changed);

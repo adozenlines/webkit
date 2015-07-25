@@ -101,12 +101,9 @@ private:
     virtual bool runJavaScriptConfirm(WebCore::Frame*, const String&) override;
     virtual bool runJavaScriptPrompt(WebCore::Frame*, const String& message, const String& defaultValue, String& result) override;
     virtual void setStatusbarText(const String&) override;
-    virtual bool shouldInterruptJavaScript() override;
 
     virtual WebCore::KeyboardUIMode keyboardUIMode() override;
 
-    virtual WebCore::IntRect windowResizerRect() const override;
-    
     // HostWindow member function overrides.
     virtual void invalidateRootView(const WebCore::IntRect&) override;
     virtual void invalidateContentsAndRootView(const WebCore::IntRect&) override;
@@ -206,8 +203,8 @@ private:
     virtual bool selectItemWritingDirectionIsNatural() override;
     virtual bool selectItemAlignmentFollowsMenuWritingDirection() override;
     virtual bool hasOpenedPopup() const override;
-    virtual PassRefPtr<WebCore::PopupMenu> createPopupMenu(WebCore::PopupMenuClient*) const override;
-    virtual PassRefPtr<WebCore::SearchPopupMenu> createSearchPopupMenu(WebCore::PopupMenuClient*) const override;
+    virtual RefPtr<WebCore::PopupMenu> createPopupMenu(WebCore::PopupMenuClient*) const override;
+    virtual RefPtr<WebCore::SearchPopupMenu> createSearchPopupMenu(WebCore::PopupMenuClient*) const override;
 
     virtual WebCore::GraphicsLayerFactory* graphicsLayerFactory() const override;
     virtual void attachRootGraphicsLayer(WebCore::Frame*, WebCore::GraphicsLayer*) override;
@@ -250,7 +247,7 @@ private:
 
 #if PLATFORM(IOS)
     virtual bool supportsVideoFullscreen() override;
-    virtual void enterVideoFullscreenForVideoElement(WebCore::HTMLVideoElement&, WebCore::HTMLMediaElement::VideoFullscreenMode) override;
+    virtual void enterVideoFullscreenForVideoElement(WebCore::HTMLVideoElement&, WebCore::HTMLMediaElementEnums::VideoFullscreenMode) override;
     virtual void exitVideoFullscreenForVideoElement(WebCore::HTMLVideoElement&) override;
 #endif
 
@@ -276,6 +273,8 @@ private:
     virtual void notifyScrollerThumbIsVisibleInRect(const WebCore::IntRect&) override;
     virtual void recommendedScrollbarStyleDidChange(WebCore::ScrollbarStyle newStyle) override;
 
+    virtual WTF::Optional<WebCore::ScrollbarOverlayStyle> preferredScrollbarOverlayStyle() override;
+
     virtual WebCore::Color underlayColor() const override;
 
     virtual void pageExtendedBackgroundColorDidChange(WebCore::Color) const override;
@@ -294,6 +293,11 @@ private:
 
     virtual void isPlayingMediaDidChange(WebCore::MediaProducer::MediaStateFlags) override;
     virtual void setPageActivityState(WebCore::PageActivityState::Flags) override;
+
+#if ENABLE(MEDIA_SESSION)
+    virtual void hasMediaSessionWithActiveMediaElementsDidChange(bool) override;
+    virtual void mediaSessionMetadataDidChange(const WebCore::MediaSessionMetadata&) override;
+#endif
 
 #if ENABLE(SUBTLE_CRYPTO)
     virtual bool wrapCryptoKey(const Vector<uint8_t>&, Vector<uint8_t>&) const override;
@@ -317,6 +321,13 @@ private:
     virtual void removePlaybackTargetPickerClient(uint64_t /*contextId*/) override;
     virtual void showPlaybackTargetPicker(uint64_t contextId, const WebCore::IntPoint&, bool) override;
     virtual void playbackTargetPickerClientStateDidChange(uint64_t, WebCore::MediaProducer::MediaStateFlags) override;
+#endif
+
+#if ENABLE(VIDEO)
+    virtual void mediaDocumentNaturalSizeChanged(const WebCore::IntSize&) override;
+#if USE(GSTREAMER)
+    virtual void requestInstallMissingMediaPlugins(const String&, WebCore::MediaPlayerRequestInstallMissingPluginsCallback&) override;
+#endif
 #endif
 
     String m_cachedToolTip;

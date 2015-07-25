@@ -1,3 +1,0 @@
-main frame - didStartProvisionalLoadForFrame
-main frame - didFailProvisionalLoadWithError
-main frame - (kWKErrorCodeCannotShowURL)

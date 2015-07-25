@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2014-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,6 +30,8 @@
 #include <wtf/Forward.h>
 #include <wtf/RetainPtr.h>
 #include <wtf/Vector.h>
+#include <wtf/text/CString.h>
+#include <wtf/text/ConversionMode.h>
 #include <wtf/text/LChar.h>
 #include <wtf/text/StringCommon.h>
 
@@ -58,6 +60,7 @@ public:
 
     StringView(const String&);
     StringView(const StringImpl&);
+    StringView(const StringImpl*);
     StringView(const LChar*, unsigned length);
     StringView(const UChar*, unsigned length);
 
@@ -95,6 +98,8 @@ public:
     WTF_EXPORT_STRING_API RetainPtr<NSString> createNSStringWithoutCopying() const;
 #endif
 
+    WTF_EXPORT_STRING_API CString utf8(ConversionMode = LenientConversion) const;
+
     class UpconvertedCharacters;
     UpconvertedCharacters upconvertedCharacters() const;
 
@@ -104,6 +109,9 @@ public:
     StringView substring(unsigned start, unsigned length = std::numeric_limits<unsigned>::max()) const;
 
     size_t find(UChar, unsigned start = 0) const;
+
+    WTF_EXPORT_STRING_API size_t find(StringView, unsigned start) const;
+
     WTF_EXPORT_STRING_API size_t findIgnoringASCIICase(const StringView&) const;
     WTF_EXPORT_STRING_API size_t findIgnoringASCIICase(const StringView&, unsigned startOffset) const;
 
@@ -155,6 +163,12 @@ bool equal(StringView, StringView);
 bool equal(StringView, const LChar*);
 bool equal(StringView, const char*);
 bool equalIgnoringASCIICase(StringView, StringView);
+WTF_EXPORT_STRING_API bool equalIgnoringASCIICase(StringView a, const char* b, unsigned bLength);
+template<unsigned charactersCount>
+bool equalIgnoringASCIICase(StringView a, const char (&b)[charactersCount])
+{
+    return equalIgnoringASCIICase(a, b, charactersCount - 1);
+}
 
 inline bool operator==(StringView a, StringView b) { return equal(a, b); }
 inline bool operator==(StringView a, const LChar* b) { return equal(a, b); }
@@ -271,6 +285,18 @@ inline StringView::StringView(const StringImpl& string)
         initialize(string.characters16(), string.length());
 }
 
+inline StringView::StringView(const StringImpl* string)
+{
+    if (!string)
+        return;
+
+    setUnderlyingString(string);
+    if (string->is8Bit())
+        initialize(string->characters8(), string->length());
+    else
+        initialize(string->characters16(), string->length());
+}
+
 inline StringView::StringView(const String& string)
 {
     setUnderlyingString(string.impl());
@@ -383,19 +409,23 @@ inline bool StringView::contains(UChar character) const
 inline void StringView::getCharactersWithUpconvert(LChar* destination) const
 {
     ASSERT(is8Bit());
-    memcpy(destination, characters8(), length());
+    auto characters8 = this->characters8();
+    for (unsigned i = 0; i < m_length; ++i)
+        destination[i] = characters8[i];
 }
 
 inline void StringView::getCharactersWithUpconvert(UChar* destination) const
 {
     if (is8Bit()) {
-        const LChar* characters8 = this->characters8();
-        unsigned length = this->length();
-        for (unsigned i = 0; i < length; ++i)
+        auto characters8 = this->characters8();
+        for (unsigned i = 0; i < m_length; ++i)
             destination[i] = characters8[i];
         return;
     }
-    memcpy(destination, characters16(), length() * sizeof(UChar));
+    auto characters16 = this->characters16();
+    unsigned length = this->length();
+    for (unsigned i = 0; i < length; ++i)
+        destination[i] = characters16[i];
 }
 
 inline StringView::UpconvertedCharacters::UpconvertedCharacters(const StringView& string)
@@ -405,7 +435,7 @@ inline StringView::UpconvertedCharacters::UpconvertedCharacters(const StringView
         return;
     }
     const LChar* characters8 = string.characters8();
-    unsigned length = string.length();
+    unsigned length = string.m_length;
     m_upconvertedCharacters.reserveInitialCapacity(length);
     for (unsigned i = 0; i < length; ++i)
         m_upconvertedCharacters.uncheckedAppend(characters8[i]);
@@ -415,35 +445,35 @@ inline StringView::UpconvertedCharacters::UpconvertedCharacters(const StringView
 inline String StringView::toString() const
 {
     if (is8Bit())
-        return String(characters8(), length());
+        return String(characters8(), m_length);
     return String(characters16(), length());
 }
 
 inline float StringView::toFloat(bool& isValid) const
 {
     if (is8Bit())
-        return charactersToFloat(characters8(), length(), &isValid);
+        return charactersToFloat(characters8(), m_length, &isValid);
     return charactersToFloat(characters16(), length(), &isValid);
 }
 
 inline int StringView::toInt(bool& isValid) const
 {
     if (is8Bit())
-        return charactersToInt(characters8(), length(), &isValid);
+        return charactersToInt(characters8(), m_length, &isValid);
     return charactersToInt(characters16(), length(), &isValid);
 }
 
 inline String StringView::toStringWithoutCopying() const
 {
     if (is8Bit())
-        return StringImpl::createWithoutCopying(characters8(), length());
+        return StringImpl::createWithoutCopying(characters8(), m_length);
     return StringImpl::createWithoutCopying(characters16(), length());
 }
 
 inline size_t StringView::find(UChar character, unsigned start) const
 {
     if (is8Bit())
-        return WTF::find(characters8(), length(), character, start);
+        return WTF::find(characters8(), m_length, character, start);
     return WTF::find(characters16(), length(), character, start);
 }
 

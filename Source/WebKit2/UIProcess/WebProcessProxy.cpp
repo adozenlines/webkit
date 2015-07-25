@@ -45,7 +45,6 @@
 #include "WebPageGroup.h"
 #include "WebPageProxy.h"
 #include "WebPasteboardProxy.h"
-#include "WebPluginSiteDataManager.h"
 #include "WebProcessMessages.h"
 #include "WebProcessPool.h"
 #include "WebProcessProxyMessages.h"
@@ -106,7 +105,7 @@ WebProcessProxy::WebProcessProxy(WebProcessPool& processPool)
     , m_mayHaveUniversalFileReadSandboxExtension(false)
     , m_customProtocolManagerProxy(this, processPool)
     , m_numberOfTimesSuddenTerminationWasDisabled(0)
-    , m_throttler(std::make_unique<ProcessThrottler>(this))
+    , m_throttler(*this)
 {
     WebPasteboardProxy::singleton().addWebProcessProxy(*this);
 
@@ -147,9 +146,9 @@ void WebProcessProxy::connectionWillOpen(IPC::Connection& connection)
         page->connectionWillOpen(connection);
 }
 
-void WebProcessProxy::connectionDidClose(IPC::Connection& connection)
+void WebProcessProxy::processWillShutDown(IPC::Connection& connection)
 {
-    ASSERT(this->connection() == &connection);
+    ASSERT_UNUSED(connection, this->connection() == &connection);
 
     for (const auto& callback : m_pendingFetchWebsiteDataCallbacks.values())
         callback(WebsiteData());
@@ -164,14 +163,14 @@ void WebProcessProxy::connectionDidClose(IPC::Connection& connection)
     m_pendingDeleteWebsiteDataForOriginsCallbacks.clear();
 
     for (auto& page : m_pageMap.values())
-        page->connectionDidClose(connection);
+        page->webProcessWillShutDown();
 
     releaseRemainingIconsForPageURLs();
 }
 
-void WebProcessProxy::disconnect()
+void WebProcessProxy::shutDown()
 {
-    clearConnection();
+    shutDownProcess();
 
     if (m_webConnection) {
         m_webConnection->invalidate();
@@ -185,7 +184,7 @@ void WebProcessProxy::disconnect()
     copyValuesToVector(m_frameMap, frames);
 
     for (size_t i = 0, size = frames.size(); i < size; ++i)
-        frames[i]->disconnect();
+        frames[i]->webProcessWillShutDown();
     m_frameMap.clear();
 
     if (m_downloadProxyMap)
@@ -245,17 +244,7 @@ void WebProcessProxy::removeWebPage(uint64_t pageID)
     if (!m_processPool->usesNetworkProcess() || state() == State::Terminated || !canTerminateChildProcess())
         return;
 
-    abortProcessLaunchIfNeeded();
-
-#if PLATFORM(IOS)
-    if (state() == State::Running) {
-        // On iOS deploy a watchdog in the UI process, since the content may be suspended.
-        // 30s should be sufficient for any outstanding activity to complete cleanly.
-        connection()->terminateSoon(30);
-    }
-#endif
-
-    disconnect();
+    shutDown();
 }
 
 void WebProcessProxy::addVisitedLinkProvider(VisitedLinkProvider& provider)
@@ -527,7 +516,7 @@ void WebProcessProxy::didClose(IPC::Connection&)
     Vector<RefPtr<WebPageProxy>> pages;
     copyValuesToVector(m_pageMap, pages);
 
-    disconnect();
+    shutDown();
 
     for (size_t i = 0, size = pages.size(); i < size; ++i)
         pages[i]->processDidCrash();
@@ -588,10 +577,8 @@ void WebProcessProxy::didFinishLaunching(ProcessLauncher* launcher, IPC::Connect
 #if PLATFORM(IOS)
     xpc_connection_t xpcConnection = connection()->xpcConnection();
     ASSERT(xpcConnection);
-    m_throttler->didConnectToProcess(xpc_connection_get_pid(xpcConnection));
+    m_throttler.didConnectToProcess(xpc_connection_get_pid(xpcConnection));
 #endif
-
-    initializeNetworkProcessActivityToken();
 }
 
 WebFrameProxy* WebProcessProxy::webFrame(uint64_t frameID) const
@@ -628,7 +615,7 @@ void WebProcessProxy::disconnectFramesFromPage(WebPageProxy* page)
     copyValuesToVector(m_frameMap, frames);
     for (size_t i = 0, size = frames.size(); i < size; ++i) {
         if (frames[i]->page() == page)
-            frames[i]->disconnect();
+            frames[i]->webProcessWillShutDown();
     }
 }
 
@@ -663,8 +650,8 @@ void WebProcessProxy::shouldTerminate(bool& shouldTerminate)
 {
     shouldTerminate = canTerminateChildProcess();
     if (shouldTerminate) {
-        // We know that the web process is going to terminate so disconnect it from the process pool.
-        disconnect();
+        // We know that the web process is going to terminate so start shutting it down in the UI process.
+        shutDown();
     }
 }
 
@@ -726,7 +713,11 @@ void WebProcessProxy::fetchWebsiteData(SessionID sessionID, WebsiteDataTypes dat
     ASSERT(canSendMessage());
 
     uint64_t callbackID = generateCallbackID();
-    m_pendingFetchWebsiteDataCallbacks.add(callbackID, WTF::move(completionHandler));
+    auto token = throttler().backgroundActivityToken();
+
+    m_pendingFetchWebsiteDataCallbacks.add(callbackID, [token, completionHandler](WebsiteData websiteData) {
+        completionHandler(WTF::move(websiteData));
+    });
 
     send(Messages::WebProcess::FetchWebsiteData(sessionID, dataTypes, callbackID), 0);
 }
@@ -736,8 +727,11 @@ void WebProcessProxy::deleteWebsiteData(SessionID sessionID, WebsiteDataTypes da
     ASSERT(canSendMessage());
 
     uint64_t callbackID = generateCallbackID();
+    auto token = throttler().backgroundActivityToken();
 
-    m_pendingDeleteWebsiteDataCallbacks.add(callbackID, WTF::move(completionHandler));
+    m_pendingDeleteWebsiteDataCallbacks.add(callbackID, [token, completionHandler] {
+        completionHandler();
+    });
     send(Messages::WebProcess::DeleteWebsiteData(sessionID, dataTypes, modifiedSince, callbackID), 0);
 }
 
@@ -746,7 +740,11 @@ void WebProcessProxy::deleteWebsiteDataForOrigins(SessionID sessionID, WebsiteDa
     ASSERT(canSendMessage());
 
     uint64_t callbackID = generateCallbackID();
-    m_pendingDeleteWebsiteDataForOriginsCallbacks.add(callbackID, WTF::move(completionHandler));
+    auto token = throttler().backgroundActivityToken();
+
+    m_pendingDeleteWebsiteDataForOriginsCallbacks.add(callbackID, [token, completionHandler] {
+        completionHandler();
+    });
 
     Vector<SecurityOriginData> originData;
     for (auto& origin : origins)
@@ -765,7 +763,7 @@ void WebProcessProxy::requestTermination()
     if (webConnection())
         webConnection()->didClose();
 
-    disconnect();
+    shutDown();
 }
 
 void WebProcessProxy::enableSuddenTermination()
@@ -831,7 +829,7 @@ RefPtr<API::Object> WebProcessProxy::transformHandlesToObjects(API::Object* obje
 
 #if PLATFORM(COCOA)
             case API::Object::Type::ObjCObjectGraph:
-                return m_webProcessProxy.transformHandlesToObjects(static_cast<ObjCObjectGraph&>(object));;
+                return m_webProcessProxy.transformHandlesToObjects(static_cast<ObjCObjectGraph&>(object));
 #endif
             default:
                 return &object;
@@ -889,47 +887,95 @@ RefPtr<API::Object> WebProcessProxy::transformObjectsToHandles(API::Object* obje
     return UserData::transform(object, Transformer());
 }
 
-void WebProcessProxy::sendProcessWillSuspend()
+void WebProcessProxy::sendProcessWillSuspendImminently()
 {
-    if (canSendMessage())
-        send(Messages::WebProcess::ProcessWillSuspend(), 0);
+    if (!canSendMessage())
+        return;
+
+    bool handled = false;
+    sendSync(Messages::WebProcess::ProcessWillSuspendImminently(), Messages::WebProcess::ProcessWillSuspendImminently::Reply(handled),
+        0, std::chrono::seconds(1), IPC::InterruptWaitingIfSyncMessageArrives);
 }
 
-void WebProcessProxy::sendCancelProcessWillSuspend()
+void WebProcessProxy::sendPrepareToSuspend()
 {
     if (canSendMessage())
-        send(Messages::WebProcess::CancelProcessWillSuspend(), 0);
+        send(Messages::WebProcess::PrepareToSuspend(), 0);
 }
 
-void WebProcessProxy::initializeNetworkProcessActivityToken()
+void WebProcessProxy::sendCancelPrepareToSuspend()
 {
-#if PLATFORM(IOS) && ENABLE(NETWORK_PROCESS)
-    if (processPool().usesNetworkProcess())
-        m_tokenForNetworkProcess = processPool().ensureNetworkProcess().throttler().foregroundActivityToken();
-#endif
+    if (canSendMessage())
+        send(Messages::WebProcess::CancelPrepareToSuspend(), 0);
 }
 
 void WebProcessProxy::sendProcessDidResume()
 {
-    initializeNetworkProcessActivityToken();
-
     if (canSendMessage())
         send(Messages::WebProcess::ProcessDidResume(), 0);
 }
-    
+
 void WebProcessProxy::processReadyToSuspend()
 {
-    m_throttler->processReadyToSuspend();
-#if PLATFORM(IOS) && ENABLE(NETWORK_PROCESS)
-    m_tokenForNetworkProcess = nullptr;
-#endif
+    m_throttler.processReadyToSuspend();
 }
 
 void WebProcessProxy::didCancelProcessSuspension()
 {
-    m_throttler->didCancelProcessSuspension();
+    m_throttler.didCancelProcessSuspension();
 }
 
+#if ENABLE(NETWORK_PROCESS)
+void WebProcessProxy::reinstateNetworkProcessAssertionState(NetworkProcessProxy& newNetworkProcessProxy)
+{
+#if PLATFORM(IOS)
+    ASSERT(!m_backgroundTokenForNetworkProcess || !m_foregroundTokenForNetworkProcess);
+
+    // The network process crashed; take new tokens for the new network process.
+    if (m_backgroundTokenForNetworkProcess)
+        m_backgroundTokenForNetworkProcess = newNetworkProcessProxy.throttler().backgroundActivityToken();
+    else if (m_foregroundTokenForNetworkProcess)
+        m_foregroundTokenForNetworkProcess = newNetworkProcessProxy.throttler().foregroundActivityToken();
+#else
+    UNUSED_PARAM(newNetworkProcessProxy);
+#endif
+}
+#endif
+
+void WebProcessProxy::didSetAssertionState(AssertionState state)
+{
+#if PLATFORM(IOS) && ENABLE(NETWORK_PROCESS)
+    ASSERT(!m_backgroundTokenForNetworkProcess || !m_foregroundTokenForNetworkProcess);
+
+    switch (state) {
+    case AssertionState::Suspended:
+        m_foregroundTokenForNetworkProcess = nullptr;
+        m_backgroundTokenForNetworkProcess = nullptr;
+        for (auto& page : m_pageMap.values())
+            page->processWillBecomeSuspended();
+        break;
+
+    case AssertionState::Background:
+        if (processPool().usesNetworkProcess())
+            m_backgroundTokenForNetworkProcess = processPool().ensureNetworkProcess().throttler().backgroundActivityToken();
+        m_foregroundTokenForNetworkProcess = nullptr;
+        break;
+    
+    case AssertionState::Foreground:
+        if (processPool().usesNetworkProcess())
+            m_foregroundTokenForNetworkProcess = processPool().ensureNetworkProcess().throttler().foregroundActivityToken();
+        m_backgroundTokenForNetworkProcess = nullptr;
+        for (auto& page : m_pageMap.values())
+            page->processWillBecomeForeground();
+        break;
+    }
+
+    ASSERT(!m_backgroundTokenForNetworkProcess || !m_foregroundTokenForNetworkProcess);
+#else
+    UNUSED_PARAM(state);
+#endif
+}
+    
 void WebProcessProxy::setIsHoldingLockedFiles(bool isHoldingLockedFiles)
 {
     if (!isHoldingLockedFiles) {
@@ -937,7 +983,7 @@ void WebProcessProxy::setIsHoldingLockedFiles(bool isHoldingLockedFiles)
         return;
     }
     if (!m_tokenForHoldingLockedFiles)
-        m_tokenForHoldingLockedFiles = m_throttler->backgroundActivityToken();
+        m_tokenForHoldingLockedFiles = m_throttler.backgroundActivityToken();
 }
 
 } // namespace WebKit

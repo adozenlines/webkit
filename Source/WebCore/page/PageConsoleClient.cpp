@@ -93,6 +93,8 @@ static void getParserLocationForConsoleMessage(Document* document, String& url, 
         return;
 
     ScriptableDocumentParser* parser = document->scriptableDocumentParser();
+    if (!parser)
+        return;
 
     // When the parser waits for scripts, any messages must be coming from some other source, and are not related to the location of the script element that made the parser wait.
     if (!parser->shouldAssociateConsoleMessagesWithTextPosition())
@@ -169,7 +171,7 @@ void PageConsoleClient::messageWithTypeAndLevel(MessageType type, MessageLevel l
         return;
 
     if (gotMessage)
-        m_page.chrome().client().addMessageToConsole(MessageSource::ConsoleAPI, type, level, messageText, lineNumber, columnNumber, url);
+        m_page.chrome().client().addMessageToConsole(MessageSource::ConsoleAPI, level, messageText, lineNumber, columnNumber, url);
 
     if (m_page.settings().logsPageMessagesToSystemConsoleEnabled() || PageConsoleClient::shouldPrintExceptions())
         ConsoleClient::printConsoleMessageWithArguments(MessageSource::ConsoleAPI, type, level, exec, WTF::move(arguments));

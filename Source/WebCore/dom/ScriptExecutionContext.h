@@ -173,7 +173,7 @@ public:
     virtual double minimumTimerInterval() const;
 
     void didChangeTimerAlignmentInterval();
-    virtual double timerAlignmentInterval() const;
+    virtual double timerAlignmentInterval(bool hasReachedMaxNestingLevel) const;
 
     virtual EventQueue& eventQueue() const = 0;
 
@@ -237,6 +237,8 @@ private:
 
 #if !ASSERT_DISABLED
     bool m_inScriptExecutionContextDestructor;
+#endif
+#if !ASSERT_DISABLED || ENABLE(SECURITY_ASSERTIONS)
     bool m_activeDOMObjectRemovalForbidden;
 #endif
 };

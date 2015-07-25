@@ -35,10 +35,11 @@
 #include "IntRect.h"
 #include "URL.h"
 #include "LayoutRect.h"
-#include "MediaSession.h"
+#include "MediaPlayerEnums.h"
 #include "NativeImagePtr.h"
 #include "PlatformLayer.h"
 #include "PlatformMediaResourceLoader.h"
+#include "PlatformMediaSession.h"
 #include "Timer.h"
 #include "VideoTrackPrivate.h"
 #include <runtime/Uint8Array.h>
@@ -147,6 +148,10 @@ struct MediaPlayerFactory;
 struct GraphicsDeviceAdapter;
 #endif
 
+#if USE(GSTREAMER)
+class MediaPlayerRequestInstallMissingPluginsCallback;
+#endif
+
 class MediaPlayerClient {
 public:
     virtual ~MediaPlayerClient() { }
@@ -244,7 +249,7 @@ public:
     virtual bool mediaPlayerIsPaused() const { return true; }
     virtual bool mediaPlayerIsLooping() const { return false; }
     virtual CachedResourceLoader* mediaPlayerCachedResourceLoader() { return 0; }
-    virtual PassRefPtr<PlatformMediaResourceLoader> mediaPlayerCreateResourceLoader(std::unique_ptr<PlatformMediaResourceLoaderClient>) { return nullptr; }
+    virtual RefPtr<PlatformMediaResourceLoader> mediaPlayerCreateResourceLoader(std::unique_ptr<PlatformMediaResourceLoaderClient>) { return nullptr; }
     virtual bool doesHaveAttribute(const AtomicString&, AtomicString* = 0) const { return false; }
 
 #if ENABLE(VIDEO_TRACK)
@@ -267,7 +272,7 @@ public:
 #endif
     
     virtual bool mediaPlayerShouldWaitForResponseToAuthenticationChallenge(const AuthenticationChallenge&) { return false; }
-    virtual void mediaPlayerHandlePlaybackCommand(MediaSession::RemoteControlCommandType) { }
+    virtual void mediaPlayerHandlePlaybackCommand(PlatformMediaSession::RemoteControlCommandType) { }
 
     virtual String mediaPlayerSourceApplicationIdentifier() const { return emptyString(); }
 
@@ -275,6 +280,12 @@ public:
     virtual void mediaPlayerEngineFailedToLoad() const { }
 
     virtual double mediaPlayerRequestedPlaybackRate() const { return 0; }
+    virtual MediaPlayerEnums::VideoFullscreenMode mediaPlayerFullscreenMode() const { return MediaPlayerEnums::VideoFullscreenModeNone; }
+    virtual Vector<String> mediaPlayerPreferredAudioCharacteristics() const { return Vector<String>(); }
+
+#if USE(GSTREAMER)
+    virtual void requestInstallMissingPlugins(const String&, MediaPlayerRequestInstallMissingPluginsCallback&) { };
+#endif
 };
 
 class MediaPlayerSupportsTypeClient {
@@ -285,7 +296,7 @@ public:
     virtual String mediaPlayerDocumentHost() const { return String(); }
 };
 
-class MediaPlayer {
+class MediaPlayer : public MediaPlayerEnums {
     WTF_MAKE_NONCOPYABLE(MediaPlayer); WTF_MAKE_FAST_ALLOCATED;
 public:
     explicit MediaPlayer(MediaPlayerClient&);
@@ -311,8 +322,10 @@ public:
 #if PLATFORM(IOS)
     void setVideoFullscreenLayer(PlatformLayer*);
     void setVideoFullscreenFrame(FloatRect);
-    enum VideoGravity { VideoGravityResize, VideoGravityResizeAspect, VideoGravityResizeAspectFill };
+    using MediaPlayerEnums::VideoGravity;
     void setVideoFullscreenGravity(VideoGravity);
+    void setVideoFullscreenMode(VideoFullscreenMode);
+    VideoFullscreenMode fullscreenMode() const;
 
     NSArray *timedMetadata() const;
     String accessLog() const;
@@ -375,6 +388,8 @@ public:
     MediaTime startTime() const;
     MediaTime initialTime() const;
 
+    MediaTime getStartDate() const;
+
     double rate() const;
     void setRate(double);
     double requestedRate() const;
@@ -422,16 +437,16 @@ public:
 
     PassNativeImagePtr nativeImageForCurrentTime();
 
-    enum NetworkState { Empty, Idle, Loading, Loaded, FormatError, NetworkError, DecodeError };
+    using MediaPlayerEnums::NetworkState;
     NetworkState networkState();
 
-    enum ReadyState  { HaveNothing, HaveMetadata, HaveCurrentData, HaveFutureData, HaveEnoughData };
+    using MediaPlayerEnums::ReadyState;
     ReadyState readyState();
 
-    enum MovieLoadType { Unknown, Download, StoredStream, LiveStream };
+    using MediaPlayerEnums::MovieLoadType;
     MovieLoadType movieLoadType() const;
 
-    enum Preload { None, MetaData, Auto };
+    using MediaPlayerEnums::Preload;
     Preload preload() const;
     void setPreload(Preload);
 
@@ -463,8 +478,6 @@ public:
 #endif
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
-    bool isCurrentPlaybackTargetWireless() const;
-
     enum WirelessPlaybackTargetType { TargetTypeNone, TargetTypeAirPlay, TargetTypeTVOut };
     WirelessPlaybackTargetType wirelessPlaybackTargetType() const;
 
@@ -476,8 +489,8 @@ public:
     void currentPlaybackTargetIsWirelessChanged();
     void playbackTargetAvailabilityChanged();
 
+    bool isCurrentPlaybackTargetWireless() const;
     bool canPlayToWirelessPlaybackTarget() const;
-    bool isPlayingToWirelessPlaybackTarget() const;
     void setWirelessPlaybackTarget(Ref<MediaPlaybackTarget>&&);
 
     void setShouldPlayToPlaybackTarget(bool);
@@ -554,6 +567,7 @@ public:
     bool requiresTextTrackRepresentation() const;
     void setTextTrackRepresentation(TextTrackRepresentation*);
     void syncTextTrackBounds();
+    void tracksChanged();
 #if ENABLE(AVF_CAPTIONS)
     void notifyTrackModeChanged();
     Vector<RefPtr<PlatformTextTrack>> outOfBandTrackSources();
@@ -590,8 +604,9 @@ public:
 #endif
 
     bool shouldWaitForResponseToAuthenticationChallenge(const AuthenticationChallenge&);
-    void handlePlaybackCommand(MediaSession::RemoteControlCommandType);
+    void handlePlaybackCommand(PlatformMediaSession::RemoteControlCommandType);
     String sourceApplicationIdentifier() const;
+    Vector<String> preferredAudioCharacteristics() const;
 
 private:
     const MediaPlayerFactory* nextBestMediaEngine(const MediaPlayerFactory*) const;

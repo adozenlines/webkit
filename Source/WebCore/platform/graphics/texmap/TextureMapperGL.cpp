@@ -241,8 +241,7 @@ void TextureMapperGLData::initializeStencil()
 }
 
 TextureMapperGL::TextureMapperGL()
-    : TextureMapper(OpenGLMode)
-    , m_enableEdgeDistanceAntialiasing(false)
+    : m_enableEdgeDistanceAntialiasing(false)
 {
     m_context3D = GraphicsContext3D::createForCurrentGLContext();
     m_data = new TextureMapperGLData(m_context3D.get());
@@ -692,7 +691,7 @@ void TextureMapperGL::bindDefaultSurface()
     data().projectionMatrix = createProjectionMatrix(viewportSize, data().PaintFlags & PaintingMirrored);
     m_context3D->viewport(data().viewport[0], data().viewport[1], viewportSize.width(), viewportSize.height());
     m_clipStack.apply(m_context3D.get());
-    data().currentSurface.clear();
+    data().currentSurface = nullptr;
 }
 
 void TextureMapperGL::bindSurface(BitmapTexture *surface)

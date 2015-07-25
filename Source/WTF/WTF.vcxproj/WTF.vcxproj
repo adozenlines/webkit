@@ -73,7 +73,7 @@
     <ClCompile Include="..\wtf\FastMalloc.cpp" />
     <ClCompile Include="..\wtf\FilePrintStream.cpp" />
     <ClCompile Include="..\wtf\FunctionDispatcher.cpp" />
-    <ClCompile Include="..\wtf\gobject\GlibUtilities.cpp">
+    <ClCompile Include="..\wtf\glib\GLibUtilities.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugSuffix|Win32'">true</ExcludedFromBuild>
@@ -83,7 +83,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Production|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Production|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\wtf\gobject\GMainLoopSource.cpp">
+    <ClCompile Include="..\wtf\glib\GMainLoopSource.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugSuffix|Win32'">true</ExcludedFromBuild>
@@ -93,7 +93,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Production|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Production|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\wtf\gobject\GRefPtr.cpp">
+    <ClCompile Include="..\wtf\glib\GRefPtr.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugSuffix|Win32'">true</ExcludedFromBuild>
@@ -103,7 +103,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Production|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Production|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\wtf\gobject\GThreadSafeMainLoopSource.cpp" />
+    <ClCompile Include="..\wtf\glib\GThreadSafeMainLoopSource.cpp" />
     <ClCompile Include="..\wtf\GregorianDateTime.cpp" />
     <ClCompile Include="..\wtf\HashTable.cpp" />
     <ClCompile Include="..\wtf\MainThread.cpp" />
@@ -127,6 +127,7 @@
     <ClCompile Include="..\wtf\StackBounds.cpp" />
     <ClCompile Include="..\wtf\StringPrintStream.cpp" />
     <ClCompile Include="..\wtf\text\AtomicString.cpp" />
+    <ClCompile Include="..\wtf\text\AtomicStringImpl.cpp" />
     <ClCompile Include="..\wtf\text\AtomicStringTable.cpp" />
     <ClCompile Include="..\wtf\text\Base64.cpp" />
     <ClCompile Include="..\wtf\text\CString.cpp" />
@@ -136,7 +137,7 @@
     <ClCompile Include="..\wtf\text\StringView.cpp" />
     <ClCompile Include="..\wtf\text\SymbolRegistry.cpp" />
     <ClCompile Include="..\wtf\text\WTFString.cpp" />
-    <ClCompile Include="..\wtf\text\cf\AtomicStringCF.cpp" />
+    <ClCompile Include="..\wtf\text\cf\AtomicStringImplCF.cpp" />
     <ClCompile Include="..\wtf\text\cf\StringCF.cpp" />
     <ClCompile Include="..\wtf\text\cf\StringImplCF.cpp" />
     <ClCompile Include="..\wtf\text\cf\StringViewCF.cpp" />
@@ -144,7 +145,6 @@
     <ClCompile Include="..\wtf\ThreadingWin.cpp" />
     <ClCompile Include="..\wtf\threadspecificWin.cpp" />
     <ClCompile Include="..\wtf\threads\BinarySemaphore.cpp" />
-    <ClCompile Include="..\wtf\threads\win\BinarySemaphoreWin.cpp" />
     <ClCompile Include="..\wtf\unicode\icu\CollatorICU.cpp" />
     <ClCompile Include="..\wtf\unicode\UTF8.cpp" />
     <ClCompile Include="..\wtf\win\MainThreadWin.cpp" />
@@ -163,7 +163,6 @@
     <ClInclude Include="..\wtf\Assertions.h" />
     <ClInclude Include="..\wtf\Atomics.h" />
     <ClInclude Include="..\wtf\AutodrainedPool.h" />
-    <ClInclude Include="..\wtf\AVLTree.h" />
     <ClInclude Include="..\wtf\Bag.h" />
     <ClInclude Include="..\wtf\BagToHashMap.h" />
     <ClInclude Include="..\wtf\Bitmap.h" />
@@ -204,13 +203,13 @@
     <ClInclude Include="..\wtf\FunctionDispatcher.h" />
     <ClInclude Include="..\wtf\Functional.h" />
     <ClInclude Include="..\wtf\GetPtr.h" />
-    <ClInclude Include="..\wtf\gobject\GlibUtilities.h" />
-    <ClInclude Include="..\wtf\gobject\GMainLoopSource.h" />
-    <ClInclude Include="..\wtf\gobject\GMutexLocker.h" />
-    <ClInclude Include="..\wtf\gobject\GRefPtr.h" />
-    <ClInclude Include="..\wtf\gobject\GThreadSafeMainLoopSource.h" />
-    <ClInclude Include="..\wtf\gobject\GTypedefs.h" />
-    <ClInclude Include="..\wtf\gobject\GUniquePtr.h" />
+    <ClInclude Include="..\wtf\glib\GLibUtilities.h" />
+    <ClInclude Include="..\wtf\glib\GMainLoopSource.h" />
+    <ClInclude Include="..\wtf\glib\GMutexLocker.h" />
+    <ClInclude Include="..\wtf\glib\GTypedefs.h" />
+    <ClInclude Include="..\wtf\glib\GRefPtr.h" />
+    <ClInclude Include="..\wtf\glib\GThreadSafeMainLoopSource.h" />
+    <ClInclude Include="..\wtf\glib\GUniquePtr.h" />
     <ClInclude Include="..\wtf\GregorianDateTime.h" />
     <ClInclude Include="..\wtf\HashCountedSet.h" />
     <ClInclude Include="..\wtf\HashFunctions.h" />
@@ -291,13 +290,16 @@
     <ClInclude Include="..\wtf\text\StringImpl.h" />
     <ClInclude Include="..\wtf\text\StringOperators.h" />
     <ClInclude Include="..\wtf\text\StringView.h" />
+    <ClInclude Include="..\wtf\text\SymbolImpl.h" />
     <ClInclude Include="..\wtf\text\SymbolRegistry.h" />
+    <ClInclude Include="..\wtf\text\UniquedStringImpl.h" />
     <ClInclude Include="..\wtf\text\WTFString.h" />
     <ClInclude Include="..\wtf\Threading.h" />
     <ClInclude Include="..\wtf\ThreadingPrimitives.h" />
     <ClInclude Include="..\wtf\threadsafeRefCounted.h" />
     <ClInclude Include="..\wtf\threadspecific.h" />
     <ClInclude Include="..\wtf\threads\BinarySemaphore.h" />
+    <ClInclude Include="..\wtf\TinyPtrSet.h" />
     <ClInclude Include="..\wtf\unicode\CharacterNames.h" />
     <ClInclude Include="..\wtf\unicode\Collator.h" />
     <ClInclude Include="..\wtf\unicode\UTF8.h" />
@@ -329,7 +331,7 @@
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v120_xp</PlatformToolset>
+    <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
@@ -353,7 +355,7 @@
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v120_xp</PlatformToolset>
+    <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugSuffix|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
@@ -365,7 +367,7 @@
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v120_xp</PlatformToolset>
+    <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
@@ -389,7 +391,7 @@
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v120_xp</PlatformToolset>
+    <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Production|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>

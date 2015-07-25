@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2014-2015 Apple Inc. All rights reserved.
  * Copyright (C) 2011 Nokia Corporation and/or its subsidiary(-ies).
  *
  * Redistribution and use in source and binary forms, with or without
@@ -309,8 +309,11 @@ void EventSenderProxy::mouseForceDown()
     [targetView pressureChangeWithEvent:secondEvent];
 
     [NSApp _setCurrentEvent:nil];
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnonnull"
     // WKView caches the most recent pressure event, so send it a nil event to clear the cache.
     [targetView pressureChangeWithEvent:nil];
+#pragma clang diagnostic pop
 
     [firstEvent release];
     [secondEvent release];
@@ -345,8 +348,12 @@ void EventSenderProxy::mouseForceUp()
     [targetView pressureChangeWithEvent:secondEvent];
 
     [NSApp _setCurrentEvent:nil];
-    // WKView caches the most recent pressure event, so send it a nil event to clear the cache.
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnonnull"
+// WKView caches the most recent pressure event, so send it a nil event to clear the cache.
     [targetView pressureChangeWithEvent:nil];
+#pragma clang diagnostic pop
 
     [firstEvent release];
     [secondEvent release];
@@ -369,8 +376,11 @@ void EventSenderProxy::mouseForceChanged(float force)
     [targetView pressureChangeWithEvent:event];
     [NSApp _setCurrentEvent:nil];
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnonnull"
     // WKView caches the most recent pressure event, so send it a nil event to clear the cache.
     [targetView pressureChangeWithEvent:nil];
+#pragma clang diagnostic pop
 
     [event release];
 }
@@ -553,6 +563,8 @@ void EventSenderProxy::keyDown(WKStringRef key, WKEventModifiers modifiers, unsi
         keyCode = 0x02;
     else if ([character isEqualToString:@"e"])
         keyCode = 0x0E;
+    else if ([character isEqualToString:@"\x1b"])
+        keyCode = 0x1B;
 
     KeyMappingEntry table[] = {
         {0x2F, 0x41, '.', nil},

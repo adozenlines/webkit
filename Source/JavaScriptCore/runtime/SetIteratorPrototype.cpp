@@ -36,9 +36,7 @@ namespace JSC {
 
 const ClassInfo SetIteratorPrototype::s_info = { "Set Iterator", &Base::s_info, 0, CREATE_METHOD_TABLE(SetIteratorPrototype) };
 
-static EncodedJSValue JSC_HOST_CALL SetIteratorPrototypeFuncIterator(ExecState*);
 static EncodedJSValue JSC_HOST_CALL SetIteratorPrototypeFuncNext(ExecState*);
-
 
 void SetIteratorPrototype::finishCreation(VM& vm, JSGlobalObject* globalObject)
 {
@@ -46,13 +44,7 @@ void SetIteratorPrototype::finishCreation(VM& vm, JSGlobalObject* globalObject)
     ASSERT(inherits(info()));
     vm.prototypeMap.addPrototype(this);
 
-    JSC_NATIVE_FUNCTION(vm.propertyNames->iteratorSymbol, SetIteratorPrototypeFuncIterator, DontEnum, 0);
     JSC_NATIVE_FUNCTION(vm.propertyNames->next, SetIteratorPrototypeFuncNext, DontEnum, 0);
-}
-
-EncodedJSValue JSC_HOST_CALL SetIteratorPrototypeFuncIterator(CallFrame* callFrame)
-{
-    return JSValue::encode(callFrame->thisValue());
 }
 
 EncodedJSValue JSC_HOST_CALL SetIteratorPrototypeFuncNext(CallFrame* callFrame)
@@ -63,9 +55,9 @@ EncodedJSValue JSC_HOST_CALL SetIteratorPrototypeFuncNext(CallFrame* callFrame)
         return JSValue::encode(throwTypeError(callFrame, ASCIILiteral("Cannot call SetIterator.next() on a non-SetIterator object")));
 
     if (iterator->next(callFrame, result))
-        return JSValue::encode(createIterResultObject(callFrame, result, false));
+        return JSValue::encode(createIteratorResultObject(callFrame, result, false));
     iterator->finish();
-    return JSValue::encode(createIterResultObject(callFrame, jsUndefined(), true));
+    return JSValue::encode(createIteratorResultObject(callFrame, jsUndefined(), true));
 }
 
 }

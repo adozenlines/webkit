@@ -26,10 +26,7 @@
 WebInspector.TimelineTabContentView = function(identifier)
 {
     var tabBarItem = new WebInspector.TabBarItem("Images/Timeline.svg", WebInspector.UIString("Timelines"));
-    var detailsSidebarPanels = [WebInspector.resourceDetailsSidebarPanel, WebInspector.probeDetailsSidebarPanel, WebInspector.renderingFrameDetailsSidebarPanel];
-
-    // FIME: Until TimelineSidebarPanel supports instantiating after inspector launch, disable closing.
-    tabBarItem.hideCloseButton = true;
+    var detailsSidebarPanels = [WebInspector.resourceDetailsSidebarPanel, WebInspector.probeDetailsSidebarPanel];
 
     WebInspector.ContentBrowserTabContentView.call(this, identifier || "timeline", "timeline", tabBarItem, WebInspector.TimelineSidebarPanel, detailsSidebarPanels);
 };
@@ -43,6 +40,20 @@ WebInspector.TimelineTabContentView.prototype = {
     get type()
     {
         return WebInspector.TimelineTabContentView.Type;
+    },
+
+    shown: function()
+    {
+        WebInspector.ContentBrowserTabContentView.prototype.shown.call(this);
+
+        WebInspector.timelineManager.autoCaptureOnPageLoad = true;
+    },
+
+    hidden: function()
+    {
+        WebInspector.ContentBrowserTabContentView.prototype.hidden.call(this);
+
+        WebInspector.timelineManager.autoCaptureOnPageLoad = false;
     },
 
     canShowRepresentedObject: function(representedObject)

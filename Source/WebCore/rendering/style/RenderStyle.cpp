@@ -39,6 +39,7 @@
 #include "StyleInheritedData.h"
 #include "StyleResolver.h"
 #include "StyleScrollSnapPoints.h"
+#include "StyleSelfAlignmentData.h"
 #include <wtf/MathExtras.h>
 #include <wtf/StdLibExtras.h>
 #include <algorithm>
@@ -171,19 +172,62 @@ ALWAYS_INLINE RenderStyle::RenderStyle(const RenderStyle& o)
 {
 }
 
-ItemPosition RenderStyle::resolveAlignment(const RenderStyle& parentStyle, const RenderStyle& childStyle, ItemPosition resolvedAutoPositionForRenderer)
+static inline StyleSelfAlignmentData resolveAlignmentData(const RenderStyle& parentStyle, const RenderStyle& childStyle, ItemPosition resolvedAutoPositionForRenderer)
 {
     // The auto keyword computes to the parent's align-items computed value, or to "stretch", if not set or "auto".
-    if (childStyle.alignSelf() == ItemPositionAuto)
-        return (parentStyle.alignItems() == ItemPositionAuto) ? resolvedAutoPositionForRenderer : parentStyle.alignItems();
+    if (childStyle.alignSelfPosition() == ItemPositionAuto)
+        return (parentStyle.alignItemsPosition() == ItemPositionAuto) ? StyleSelfAlignmentData(resolvedAutoPositionForRenderer, OverflowAlignmentDefault) : parentStyle.alignItems();
     return childStyle.alignSelf();
 }
 
-ItemPosition RenderStyle::resolveJustification(const RenderStyle& parentStyle, const RenderStyle& childStyle, ItemPosition resolvedAutoPositionForLayoutObject)
+static inline StyleSelfAlignmentData resolveJustificationData(const RenderStyle& parentStyle, const RenderStyle& childStyle, ItemPosition resolvedAutoPositionForRenderer)
 {
-    if (childStyle.justifySelf() == ItemPositionAuto)
-        return (parentStyle.justifyItems() == ItemPositionAuto) ? resolvedAutoPositionForLayoutObject : parentStyle.justifyItems();
+    // The auto keyword computes to the parent's justify-items computed value, or to "stretch", if not set or "auto".
+    if (childStyle.justifySelfPosition() == ItemPositionAuto)
+        return (parentStyle.justifyItemsPosition() == ItemPositionAuto) ? StyleSelfAlignmentData(resolvedAutoPositionForRenderer, OverflowAlignmentDefault) : parentStyle.justifyItems();
     return childStyle.justifySelf();
+}
+
+ItemPosition RenderStyle::resolveAlignment(const RenderStyle& parentStyle, const RenderStyle& childStyle, ItemPosition resolvedAutoPositionForRenderer)
+{
+    return resolveAlignmentData(parentStyle, childStyle, resolvedAutoPositionForRenderer).position();
+}
+
+OverflowAlignment RenderStyle::resolveAlignmentOverflow(const RenderStyle& parentStyle, const RenderStyle& childStyle)
+{
+    return resolveJustificationData(parentStyle, childStyle, ItemPositionStretch).overflow();
+}
+
+ItemPosition RenderStyle::resolveJustification(const RenderStyle& parentStyle, const RenderStyle& childStyle, ItemPosition resolvedAutoPositionForRenderer)
+{
+    return resolveJustificationData(parentStyle, childStyle, resolvedAutoPositionForRenderer).position();
+}
+
+OverflowAlignment RenderStyle::resolveJustificationOverflow(const RenderStyle& parentStyle, const RenderStyle& childStyle)
+{
+    return resolveJustificationData(parentStyle, childStyle, ItemPositionStretch).overflow();
+}
+
+void RenderStyle::resolveContentAlignment(const RenderStyle& style, ContentPosition& position, ContentDistributionType& distribution)
+{
+    if (position != ContentPositionAuto || distribution != ContentDistributionDefault)
+        return;
+
+    if (style.isDisplayFlexibleBox())
+        distribution = ContentDistributionStretch;
+    else
+        position = ContentPositionStart;
+}
+
+void RenderStyle::resolveContentJustification(const RenderStyle& style, ContentPosition& position)
+{
+    if (position != ContentPositionAuto || style.justifyContentDistribution() != ContentDistributionDefault)
+        return;
+
+    if (style.isDisplayFlexibleBox())
+        position = ContentPositionFlexStart;
+    else
+        position = ContentPositionStart;
 }
 
 void RenderStyle::inheritFrom(const RenderStyle* inheritParent, IsAtShadowBoundary isAtShadowBoundary)
@@ -519,6 +563,7 @@ bool RenderStyle::changeRequiresLayout(const RenderStyle& other, unsigned& chang
             || rareInheritedData->m_textIndentLine != other.rareInheritedData->m_textIndentLine
 #endif
             || rareInheritedData->m_effectiveZoom != other.rareInheritedData->m_effectiveZoom
+            || rareInheritedData->m_textZoom != other.rareInheritedData->m_textZoom
 #if ENABLE(IOS_TEXT_AUTOSIZING)
             || rareInheritedData->textSizeAdjust != other.rareInheritedData->textSizeAdjust
 #endif
@@ -851,36 +896,14 @@ bool RenderStyle::diffRequiresLayerRepaint(const RenderStyle& style, bool isComp
 
     return false;
 }
-    
-void RenderStyle::setMaskImage(const Vector<RefPtr<MaskImageOperation>>& ops)
-{
-    FillLayer* curLayer = &rareNonInheritedData.access()->m_mask;
-    while (curLayer) {
-        curLayer->setMaskImage(nullptr);
-        curLayer = curLayer->next();
-    }
-
-    curLayer = &rareNonInheritedData.access()->m_mask;
-    FillLayer* prevLayer = nullptr;
-    for (auto& maskImage : ops) {
-        if (!curLayer) {
-            prevLayer->setNext(std::make_unique<FillLayer>(MaskFillLayer));
-            curLayer = prevLayer->next();
-        }
-
-        curLayer->setMaskImage(maskImage);
-        prevLayer = curLayer;
-        curLayer = curLayer->next();
-    }
-}
 
 void RenderStyle::setClip(Length top, Length right, Length bottom, Length left)
 {
     StyleVisualData* data = visual.access();
-    data->clip.m_top = top;
-    data->clip.m_right = right;
-    data->clip.m_bottom = bottom;
-    data->clip.m_left = left;
+    data->clip.top() = top;
+    data->clip.right() = right;
+    data->clip.bottom() = bottom;
+    data->clip.left() = left;
 }
 
 void RenderStyle::addCursor(PassRefPtr<StyleImage> image, const IntPoint& hotSpot)
@@ -906,7 +929,7 @@ void RenderStyle::setQuotes(PassRefPtr<QuotesData> q)
 void RenderStyle::clearCursorList()
 {
     if (rareInheritedData->cursorData)
-        rareInheritedData.access()->cursorData = 0;
+        rareInheritedData.access()->cursorData = nullptr;
 }
 
 void RenderStyle::clearContent()
@@ -1033,8 +1056,8 @@ void RenderStyle::applyTransform(TransformationMatrix& transform, const FloatRec
     auto& operations = rareNonInheritedData->m_transform->m_operations.operations();
     bool applyTransformOrigin = requireTransformOrigin(operations, applyOrigin);
 
-    float offsetX = transformOriginX().isPercentNotCalculated() ? boundingBox.x() : 0;
-    float offsetY = transformOriginY().isPercentNotCalculated() ? boundingBox.y() : 0;
+    float offsetX = transformOriginX().isPercent() ? boundingBox.x() : 0;
+    float offsetY = transformOriginY().isPercent() ? boundingBox.y() : 0;
 
     if (applyTransformOrigin) {
         transform.translate3d(floatValueForLength(transformOriginX(), boundingBox.width()) + offsetX,
@@ -1265,10 +1288,10 @@ const Vector<StyleDashboardRegion>& RenderStyle::noneDashboardRegions()
     if (!noneListInitialized) {
         StyleDashboardRegion region;
         region.label = "";
-        region.offset.m_top  = Length();
-        region.offset.m_right = Length();
-        region.offset.m_bottom = Length();
-        region.offset.m_left = Length();
+        region.offset.top()  = Length();
+        region.offset.right() = Length();
+        region.offset.bottom() = Length();
+        region.offset.left() = Length();
         region.type = StyleDashboardRegion::None;
         noneList.append(region);
         noneListInitialized = true;
@@ -1412,7 +1435,7 @@ int RenderStyle::computedLineHeight() const
     if (lh.isNegative())
         return fontMetrics().lineSpacing();
 
-    if (lh.isPercent())
+    if (lh.isPercentOrCalculated())
         return minimumValueForLength(lh, fontSize());
 
     return clampTo<int>(lh.value());

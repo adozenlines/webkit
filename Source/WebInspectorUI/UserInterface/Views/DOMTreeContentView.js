@@ -29,16 +29,7 @@ WebInspector.DOMTreeContentView = function(representedObject)
 
     WebInspector.ContentView.call(this, representedObject);
 
-    var layerBordersImage, shadowDOMImage;
-    if (WebInspector.Platform.isLegacyMacOS) {
-        layerBordersImage = {src: "Images/Legacy/LayerBorders.svg", width: 16, height: 16};
-        shadowDOMImage = {src: "Images/Legacy/ShadowDOM.svg", width: 16, height: 16};
-    } else {
-        layerBordersImage = {src: "Images/LayerBorders.svg", width: 13, height: 13};
-        shadowDOMImage = {src: "Images/ShadowDOM.svg", width: 13, height: 13};
-    }
-
-    this._compositingBordersButtonNavigationItem = new WebInspector.ActivateButtonNavigationItem("layer-borders", WebInspector.UIString("Show compositing borders"), WebInspector.UIString("Hide compositing borders"), layerBordersImage.src, layerBordersImage.width, layerBordersImage.height);
+    this._compositingBordersButtonNavigationItem = new WebInspector.ActivateButtonNavigationItem("layer-borders", WebInspector.UIString("Show compositing borders"), WebInspector.UIString("Hide compositing borders"), "Images/LayerBorders.svg", 13, 13);
     this._compositingBordersButtonNavigationItem.addEventListener(WebInspector.ButtonNavigationItem.Event.Clicked, this._toggleCompositingBorders, this);
     this._compositingBordersButtonNavigationItem.enabled = !!PageAgent.getCompositingBordersVisible;
 
@@ -49,11 +40,11 @@ WebInspector.DOMTreeContentView = function(representedObject)
     this._paintFlashingButtonNavigationItem.activated = PageAgent.setShowPaintRects && WebInspector.showPaintRectsSetting.value;
 
     WebInspector.showShadowDOMSetting.addEventListener(WebInspector.Setting.Event.Changed, this._showShadowDOMSettingChanged, this);
-    this._showsShadowDOMButtonNavigationItem = new WebInspector.ActivateButtonNavigationItem("shows-shadow-DOM", WebInspector.UIString("Show shadow DOM nodes"), WebInspector.UIString("Hide shadow DOM nodes"), shadowDOMImage.src, shadowDOMImage.width, shadowDOMImage.height);
+    this._showsShadowDOMButtonNavigationItem = new WebInspector.ActivateButtonNavigationItem("shows-shadow-DOM", WebInspector.UIString("Show shadow DOM nodes"), WebInspector.UIString("Hide shadow DOM nodes"), "Images/ShadowDOM.svg", 13, 13);
     this._showsShadowDOMButtonNavigationItem.addEventListener(WebInspector.ButtonNavigationItem.Event.Clicked, this._toggleShowsShadowDOMSetting, this);
     this._showShadowDOMSettingChanged();
 
-    this.element.classList.add(WebInspector.DOMTreeContentView.StyleClassName);
+    this.element.classList.add("dom-tree");
     this.element.addEventListener("click", this._mouseWasClicked.bind(this), false);
 
     this._domTreeOutline = new WebInspector.DOMTreeOutline(true, true, true);
@@ -70,8 +61,6 @@ WebInspector.DOMTreeContentView = function(representedObject)
 
     this._numberOfSearchResults = null;
 };
-
-WebInspector.DOMTreeContentView.StyleClassName = "dom-tree";
 
 WebInspector.DOMTreeContentView.prototype = {
     constructor: WebInspector.DOMTreeContentView,
@@ -113,6 +102,8 @@ WebInspector.DOMTreeContentView.prototype = {
 
     closed: function()
     {
+        WebInspector.showPaintRectsSetting.removeEventListener(null, null, this);
+        WebInspector.showShadowDOMSetting.removeEventListener(null, null, this);
         WebInspector.domTreeManager.removeEventListener(null, null, this);
 
         this._domTreeOutline.close();
@@ -132,7 +123,7 @@ WebInspector.DOMTreeContentView.prototype = {
             }
 
             var pathComponent = new WebInspector.DOMTreeElementPathComponent(treeElement, treeElement.representedObject);
-            pathComponent.addEventListener(WebInspector.HierarchicalPathComponent.Event.SiblingWasSelected, this._pathComponentSelected, this);
+            pathComponent.addEventListener(WebInspector.HierarchicalPathComponent.Event.Clicked, this._pathComponentSelected, this);
             pathComponents.unshift(pathComponent);
             treeElement = treeElement.parent;
         }
@@ -356,6 +347,7 @@ WebInspector.DOMTreeContentView.prototype = {
         {
             if (!WebInspector.domTreeManager.restoreSelectedNodeIsAllowed)
                 return;
+
             selectNode.call(this, WebInspector.domTreeManager.nodeForId(nodeId));
         }
 

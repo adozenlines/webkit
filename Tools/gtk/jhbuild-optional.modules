@@ -45,7 +45,7 @@
   </autotools>
 
   <autotools id="llvm"
-             autogenargs="--enable-optimized --disable-terminfo --disable-zlib --enable-targets=host --disable-backtraces --disable-crash-overrides --disable-expensive-checks --disable-debug-runtime --disable-assertions">
+             autogenargs="--enable-optimized --disable-terminfo --disable-zlib --enable-targets=host --disable-backtraces --disable-crash-overrides --disable-expensive-checks --disable-debug-runtime --disable-assertions --enable-shared">
     <branch repo="llvm.org"
             module="/releases/3.5.0/llvm-3.5.0.src.tar.xz" version="3.5.0" checkoutdir="llvm-3.5.0"
             hash="sha256:28e199f368ef0a4666708f31c7991ad3bcc3a578342b0306526dd35f07595c03">
@@ -53,18 +53,6 @@
       <patch file="llvm-elf-allow-fde-references-outside-the-2gb-range-arm64.patch" strip="1"/>
       <patch file="llvm-elf-add-stackmaps.patch" strip="1"/>
       <patch file="llvm-elf-add-stackmaps-arm64.patch" strip="1"/>
-    </branch>
-  </autotools>
-
-  <autotools id="pango" autogen-sh="configure"
-             autogenargs="--enable-cairo">
-    <dependencies>
-      <dep package="cairo"/>
-      <dep package="fontconfig"/>
-    </dependencies>
-    <branch module="/pub/GNOME/sources/pango/1.34/pango-1.34.0.tar.xz" version="1.34.0"
-            repo="ftp.gnome.org"
-            hash="sha256:105da1efe019018a9de81681d88c9ace83d2111509ab625c4be9d124a1fdce27">
     </branch>
   </autotools>
 

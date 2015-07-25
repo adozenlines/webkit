@@ -27,6 +27,7 @@
 #include "WebUserContentController.h"
 
 #include "DataReference.h"
+#include "SecurityOriginData.h"
 #include "WebCompiledContentExtension.h"
 #include "WebFrame.h"
 #include "WebPage.h"
@@ -69,7 +70,7 @@ PassRefPtr<WebUserContentController> WebUserContentController::getOrCreate(uint6
 
 WebUserContentController::WebUserContentController(uint64_t identifier)
     : m_identifier(identifier)
-    , m_userContentController(*UserContentController::create())
+    , m_userContentController(UserContentController::create())
 {
     WebProcess::singleton().addMessageReceiver(Messages::WebUserContentController::messageReceiverName(), m_identifier, *this);
 }
@@ -117,6 +118,7 @@ public:
 
     virtual ~WebUserMessageHandlerDescriptorProxy()
     {
+        m_descriptor->invalidateClient();
     }
 
     // WebCore::UserMessageHandlerDescriptor::Client
@@ -134,7 +136,7 @@ public:
         if (!webPage)
             return;
 
-        WebProcess::singleton().parentProcessConnection()->send(Messages::WebUserContentControllerProxy::DidPostMessage(webPage->pageID(), webFrame->frameID(), m_identifier, IPC::DataReference(value->data())), m_controller->identifier());
+        WebProcess::singleton().parentProcessConnection()->send(Messages::WebUserContentControllerProxy::DidPostMessage(webPage->pageID(), webFrame->frameID(), SecurityOriginData::fromFrame(webFrame), m_identifier, IPC::DataReference(value->data())), m_controller->identifier());
     }
 
     WebCore::UserMessageHandlerDescriptor& descriptor() { return *m_descriptor; }

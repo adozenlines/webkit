@@ -28,7 +28,7 @@
 
 #if PLATFORM(IOS)
 
-#include "MediaSessionManager.h"
+#include "PlatformMediaSessionManager.h"
 #include <wtf/RetainPtr.h>
 
 OBJC_CLASS WebMediaSessionHelper;
@@ -41,7 +41,7 @@ extern NSString* WebUIApplicationDidBecomeActiveNotification;
 
 namespace WebCore {
 
-class MediaSessionManageriOS : public MediaSessionManager {
+class MediaSessionManageriOS : public PlatformMediaSessionManager {
 public:
     virtual ~MediaSessionManageriOS();
 
@@ -49,12 +49,12 @@ public:
     virtual bool hasWirelessTargetsAvailable() override;
 
 private:
-    friend class MediaSessionManager;
+    friend class PlatformMediaSessionManager;
 
     MediaSessionManageriOS();
 
-    virtual bool sessionWillBeginPlayback(MediaSession&) override;
-    virtual void sessionWillEndPlayback(MediaSession&) override;
+    virtual bool sessionWillBeginPlayback(PlatformMediaSession&) override;
+    virtual void sessionWillEndPlayback(PlatformMediaSession&) override;
     
     void updateNowPlayingInfo();
     
@@ -62,7 +62,7 @@ private:
 
     virtual void configureWireLessTargetMonitoring() override;
 
-    virtual bool sessionCanLoadMedia(const MediaSession&) const override;
+    virtual bool sessionCanLoadMedia(const PlatformMediaSession&) const override;
     
     RetainPtr<WebMediaSessionHelper> m_objcObserver;
 };

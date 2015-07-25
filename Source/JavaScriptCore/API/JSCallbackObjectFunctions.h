@@ -62,13 +62,11 @@ JSCallbackObject<Parent>::JSCallbackObject(ExecState* exec, Structure* structure
 {
 }
 
-extern const GlobalObjectMethodTable javaScriptCoreAPIGlobalObjectMethodTable;
-
 // Global object constructor.
 // FIXME: Move this into a separate JSGlobalCallbackObject class derived from this one.
 template <class Parent>
 JSCallbackObject<Parent>::JSCallbackObject(VM& vm, JSClassRef jsClass, Structure* structure)
-    : Parent(vm, structure, &javaScriptCoreAPIGlobalObjectMethodTable)
+    : Parent(vm, structure)
     , m_callbackObjectData(std::make_unique<JSCallbackObjectData>(nullptr, jsClass))
 {
 }
@@ -270,6 +268,9 @@ void JSCallbackObject<Parent>::put(JSCell* cell, ExecState* exec, PropertyName p
             
             if (OpaqueJSClassStaticFunctionsTable* staticFunctions = jsClass->staticFunctions(exec)) {
                 if (StaticFunctionEntry* entry = staticFunctions->get(name)) {
+                    PropertySlot getSlot(thisObject);
+                    if (Parent::getOwnPropertySlot(thisObject, exec, propertyName, getSlot))
+                        return Parent::put(thisObject, exec, propertyName, value, slot);
                     if (entry->attributes & kJSPropertyAttributeReadOnly)
                         return;
                     thisObject->JSCallbackObject<Parent>::putDirect(exec->vm(), propertyName, value); // put as override property

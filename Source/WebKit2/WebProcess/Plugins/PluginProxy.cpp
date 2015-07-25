@@ -43,7 +43,6 @@
 #include "WebProcess.h"
 #include "WebProcessConnectionMessages.h"
 #include <WebCore/GraphicsContext.h>
-#include <WebCore/NotImplemented.h>
 #include <WebCore/SharedBuffer.h>
 
 using namespace WebCore;
@@ -56,9 +55,9 @@ static uint64_t generatePluginInstanceID()
     return ++uniquePluginInstanceID;
 }
 
-PassRefPtr<PluginProxy> PluginProxy::create(uint64_t pluginProcessToken, bool isRestartedProcess)
+Ref<PluginProxy> PluginProxy::create(uint64_t pluginProcessToken, bool isRestartedProcess)
 {
-    return adoptRef(new PluginProxy(pluginProcessToken, isRestartedProcess));
+    return adoptRef(*new PluginProxy(pluginProcessToken, isRestartedProcess));
 }
 
 PluginProxy::PluginProxy(uint64_t pluginProcessToken, bool isRestartedProcess)
@@ -224,7 +223,6 @@ void PluginProxy::paint(GraphicsContext* graphicsContext, const IntRect& dirtyRe
     if (m_waitingForPaintInResponseToUpdate) {
         m_waitingForPaintInResponseToUpdate = false;
         m_connection->connection()->send(Messages::PluginControllerProxy::DidUpdate(), m_pluginInstanceID);
-        return;
     }
 }
 
@@ -240,16 +238,16 @@ bool PluginProxy::supportsSnapshotting() const
     return isSupported;
 }
 
-PassRefPtr<ShareableBitmap> PluginProxy::snapshot()
+RefPtr<ShareableBitmap> PluginProxy::snapshot()
 {
     ShareableBitmap::Handle snapshotStoreHandle;
     m_connection->connection()->sendSync(Messages::PluginControllerProxy::Snapshot(), Messages::PluginControllerProxy::Snapshot::Reply(snapshotStoreHandle), m_pluginInstanceID);
 
     if (snapshotStoreHandle.isNull())
-        return 0;
+        return nullptr;
 
     RefPtr<ShareableBitmap> snapshotBuffer = ShareableBitmap::create(snapshotStoreHandle);
-    return snapshotBuffer.release();
+    return snapshotBuffer;
 }
 
 bool PluginProxy::isTransparent()
@@ -368,11 +366,8 @@ bool PluginProxy::handleMouseEvent(const WebMouseEvent& mouseEvent)
     if (m_waitingOnAsynchronousInitialization)
         return false;
 
-    bool handled = false;
-    if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::HandleMouseEvent(mouseEvent), Messages::PluginControllerProxy::HandleMouseEvent::Reply(handled), m_pluginInstanceID))
-        return false;
-
-    return handled;
+    m_connection->connection()->send(Messages::PluginControllerProxy::HandleMouseEvent(mouseEvent), m_pluginInstanceID);
+    return true;
 }
 
 bool PluginProxy::handleWheelEvent(const WebWheelEvent& wheelEvent)
@@ -718,9 +713,9 @@ IntPoint PluginProxy::convertToRootView(const IntPoint& point) const
     return m_pluginToRootViewTransform.mapPoint(point);
 }
 
-PassRefPtr<WebCore::SharedBuffer> PluginProxy::liveResourceData() const
+RefPtr<WebCore::SharedBuffer> PluginProxy::liveResourceData() const
 {
-    return 0;
+    return nullptr;
 }
 
 #if PLATFORM(COCOA)

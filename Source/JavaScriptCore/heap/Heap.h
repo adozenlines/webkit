@@ -75,7 +75,6 @@ class Worklist;
 
 static void* const zombifiedBits = reinterpret_cast<void*>(0xdeadbeef);
 
-typedef std::pair<JSValue, WTF::String> ValueStringPair;
 typedef HashCountedSet<JSCell*> ProtectCountSet;
 typedef HashCountedSet<const char*> TypeCountSet;
 
@@ -155,6 +154,7 @@ public:
     void notifyIsSafeToCollect() { m_isSafeToCollect = true; }
     bool isSafeToCollect() const { return m_isSafeToCollect; }
 
+    JS_EXPORT_PRIVATE void collectAllGarbageIfNotDoneRecently();
     void collectAllGarbage() { collectAndSweep(FullCollection); }
     JS_EXPORT_PRIVATE void collectAndSweep(HeapOperation collectionType = AnyCollection);
     bool shouldCollect();
@@ -185,9 +185,6 @@ public:
     JS_EXPORT_PRIVATE std::unique_ptr<TypeCountSet> protectedObjectTypeCounts();
     JS_EXPORT_PRIVATE std::unique_ptr<TypeCountSet> objectTypeCounts();
     void showStatistics();
-
-    void pushTempSortVector(Vector<ValueStringPair, 0, UnsafeVectorOverflow>*);
-    void popTempSortVector(Vector<ValueStringPair, 0, UnsafeVectorOverflow>*);
 
     HashSet<MarkedArgumentBuffer*>& markListSet();
     
@@ -300,7 +297,6 @@ private:
     void visitCompilerWorklistWeakReferences();
     void removeDeadCompilerWorklistEntries();
     void visitProtectedObjects(HeapRootVisitor&);
-    void visitTempSortVectors(HeapRootVisitor&);
     void visitArgumentBuffers(HeapRootVisitor&);
     void visitException(HeapRootVisitor&);
     void visitStrongHandles(HeapRootVisitor&);
@@ -371,7 +367,6 @@ private:
     HashSet<const JSCell*> m_copyingRememberedSet;
 
     ProtectCountSet m_protectedValues;
-    Vector<Vector<ValueStringPair, 0, UnsafeVectorOverflow>*> m_tempSortingVectors;
     std::unique_ptr<HashSet<MarkedArgumentBuffer*>> m_markListSet;
 
     MachineThreads m_machineThreads;
@@ -400,7 +395,7 @@ private:
     Vector<WeakBlock*> m_logicallyEmptyWeakBlocks;
     size_t m_indexOfNextLogicallyEmptyWeakBlockToSweep { WTF::notFound };
     
-    RefPtr<GCActivityCallback> m_fullActivityCallback;
+    RefPtr<FullGCActivityCallback> m_fullActivityCallback;
     RefPtr<GCActivityCallback> m_edenActivityCallback;
     std::unique_ptr<IncrementalSweeper> m_sweeper;
     Vector<MarkedBlock*> m_blockSnapshot;

@@ -42,7 +42,7 @@ struct AttachmentLayout;
 
 class RenderThemeMac final : public RenderTheme {
 public:
-    static PassRefPtr<RenderTheme> create();
+    static Ref<RenderTheme> create();
 
     // A method asking if the control changes its tint when the window has focus or not.
     virtual bool controlSupportsTints(const RenderObject&) const override;
@@ -96,7 +96,6 @@ public:
     virtual double animationDurationForProgressBar(RenderProgress&) const override;
     virtual IntRect progressBarRectForBounds(const RenderObject&, const IntRect&) const override;
 
-    virtual Color systemColor(CSSValueID) const override;
     // Controls color values returned from platformFocusRingColor(). systemColor() will be used when false.
     bool usesTestModeFocusRingColor() const;
     // A view associated to the contained document.
@@ -163,7 +162,6 @@ protected:
     virtual bool supportsClosedCaptioning() const override { return true; }
 #endif
 
-    virtual bool shouldShowPlaceholderWhenFocused() const override;
     virtual bool shouldHaveCapsLockIndicator(HTMLInputElement&) const override;
 
     virtual bool paintSnapshottedPluginOverlay(const RenderObject&, const PaintInfo&, const IntRect&) override;
@@ -178,6 +176,8 @@ private:
     virtual String fileListNameForWidth(const FileList*, const FontCascade&, int width, bool multipleFilesAllowed) const override;
 
     FloatRect convertToPaintingRect(const RenderObject& inputRenderer, const RenderObject& partRenderer, const FloatRect& inputRect, const IntRect&) const;
+
+    virtual Color systemColor(CSSValueID) const override;
 
     // Get the control size based off the font. Used by some of the controls (like buttons).
     NSControlSize controlSizeForFont(RenderStyle&) const;
@@ -247,7 +247,7 @@ private:
     bool m_isSliderThumbHorizontalPressed;
     bool m_isSliderThumbVerticalPressed;
 
-    mutable HashMap<int, RGBA32> m_systemColorCache;
+    mutable HashMap<int, Color> m_systemColorCache;
 
     RetainPtr<WebCoreRenderThemeNotificationObserver> m_notificationObserver;
 

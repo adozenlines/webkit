@@ -27,8 +27,8 @@
 #include <webkit2/webkit-web-extension.h>
 #include <wtf/Deque.h>
 #include <wtf/ProcessID.h>
-#include <wtf/gobject/GRefPtr.h>
-#include <wtf/gobject/GUniquePtr.h>
+#include <wtf/glib/GRefPtr.h>
+#include <wtf/glib/GUniquePtr.h>
 #include <wtf/text/CString.h>
 
 #define WEBKIT_DOM_USE_UNSTABLE_API
@@ -104,7 +104,7 @@ static void documentLoadedCallback(WebKitWebPage* webPage, WebKitWebExtension* e
     if (WebKitDOMWebKitNamespace* webkit = webkit_dom_dom_window_get_webkit_namespace(window.get())) {
         WebKitDOMUserMessageHandlersNamespace* messageHandlers = webkit_dom_webkit_namespace_get_message_handlers(webkit);
         if (WebKitDOMUserMessageHandler* handler = webkit_dom_user_message_handlers_namespace_get_handler(messageHandlers, "dom"))
-            webkit_dom_user_message_handler_post_message(handler, "DocumentLoaded");
+            webkit_dom_user_message_handler_post_message(handler, "DocumentLoaded", nullptr);
     }
 
     webkit_dom_dom_window_webkit_message_handlers_post_message(window.get(), "dom-convenience", "DocumentLoaded");

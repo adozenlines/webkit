@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
- * Copyright (C) 2006 Apple Inc.
+ * Copyright (C) 2006, 2015 Apple Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -26,6 +26,7 @@
 #include "LayoutState.h"
 #include "Region.h"
 #include "RenderBlockFlow.h"
+#include "RenderWidget.h"
 #include "SelectionSubtreeRoot.h"
 #include <memory>
 #include <wtf/HashSet.h>
@@ -241,6 +242,15 @@ public:
     void scheduleLazyRepaint(RenderBox&);
     void unscheduleLazyRepaint(RenderBox&);
 
+    void protectRenderWidgetUntilLayoutIsDone(RenderWidget& widget) { m_protectedRenderWidgets.append(&widget); }
+    void releaseProtectedRenderWidgets() { m_protectedRenderWidgets.clear(); }
+
+#if ENABLE(CSS_SCROLL_SNAP)
+    void registerBoxWithScrollSnapCoordinates(const RenderBox&);
+    void unregisterBoxWithScrollSnapCoordinates(const RenderBox&);
+    const HashSet<const RenderBox*>& boxesWithScrollSnapCoordinates() { return m_boxesWithScrollSnapCoordinates; }
+#endif
+
 protected:
     virtual void mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState&, MapCoordinatesFlags, bool* wasFixed) const override;
     virtual const RenderObject* pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap&) const override;
@@ -358,9 +368,13 @@ private:
     bool m_hasSoftwareFilters;
 
     HashSet<RenderElement*> m_renderersWithPausedImageAnimation;
+    Vector<RefPtr<RenderWidget>> m_protectedRenderWidgets;
 
 #if ENABLE(SERVICE_CONTROLS)
     SelectionRectGatherer m_selectionRectGatherer;
+#endif
+#if ENABLE(CSS_SCROLL_SNAP)
+    HashSet<const RenderBox*> m_boxesWithScrollSnapCoordinates;
 #endif
 };
 

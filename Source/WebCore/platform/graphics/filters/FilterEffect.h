@@ -58,9 +58,6 @@ class FilterEffect : public RefCounted<FilterEffect> {
 public:
     virtual ~FilterEffect();
 
-    static bool isFilterSizeValid(const FloatRect&);
-    static float maxFilterArea();
-
     void clearResult();
     void clearResultsRecursive();
 
@@ -179,6 +176,8 @@ protected:
 
     // If a pre-multiplied image, check every pixel for validity and correct if necessary.
     void forceValidPreMultipliedPixels();
+
+    void clipAbsolutePaintRect();
 
 private:
     std::unique_ptr<ImageBuffer> m_imageBufferResult;

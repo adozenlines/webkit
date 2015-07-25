@@ -791,7 +791,7 @@ static LayoutUnit computeMargin(const RenderInline* renderer, const Length& marg
         return 0;
     if (margin.isFixed())
         return margin.value();
-    if (margin.isPercent())
+    if (margin.isPercentOrCalculated())
         return minimumValueForLength(margin, std::max<LayoutUnit>(0, renderer->containingBlock()->availableLogicalWidth()));
     return 0;
 }
@@ -990,9 +990,11 @@ InlineBox* RenderInline::culledInlineFirstLineBox() const
             
         // We want to get the margin box in the inline direction, and then use our font ascent/descent in the block
         // direction (aligned to the root box's baseline).
-        if (is<RenderBox>(*current))
-            return downcast<RenderBox>(*current).inlineBoxWrapper();
-        if (is<RenderLineBreak>(*current)) {
+        if (is<RenderBox>(*current)) {
+            const auto& renderBox = downcast<RenderBox>(*current);
+            if (renderBox.inlineBoxWrapper())
+                return renderBox.inlineBoxWrapper();
+        } else if (is<RenderLineBreak>(*current)) {
             RenderLineBreak& renderBR = downcast<RenderLineBreak>(*current);
             if (renderBR.inlineBoxWrapper())
                 return renderBR.inlineBoxWrapper();
@@ -1017,9 +1019,11 @@ InlineBox* RenderInline::culledInlineLastLineBox() const
             
         // We want to get the margin box in the inline direction, and then use our font ascent/descent in the block
         // direction (aligned to the root box's baseline).
-        if (is<RenderBox>(*current))
-            return downcast<RenderBox>(*current).inlineBoxWrapper();
-        if (is<RenderLineBreak>(*current)) {
+        if (is<RenderBox>(*current)) {
+            const auto& renderBox = downcast<RenderBox>(*current);
+            if (renderBox.inlineBoxWrapper())
+                return renderBox.inlineBoxWrapper();
+        } else if (is<RenderLineBreak>(*current)) {
             RenderLineBreak& renderBR = downcast<RenderLineBreak>(*current);
             if (renderBR.inlineBoxWrapper())
                 return renderBR.inlineBoxWrapper();

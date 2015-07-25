@@ -52,7 +52,7 @@ using namespace WebCore;
 
 namespace WebKit {
 
-const unsigned WebInspectorProxy::minimumWindowWidth = 750;
+const unsigned WebInspectorProxy::minimumWindowWidth = 500;
 const unsigned WebInspectorProxy::minimumWindowHeight = 400;
 
 const unsigned WebInspectorProxy::initialWindowWidth = 1000;
@@ -283,6 +283,11 @@ void WebInspectorProxy::setAttachedWindowWidth(unsigned width)
     platformSetAttachedWindowWidth(width);
 }
 
+void WebInspectorProxy::startWindowDrag()
+{
+    platformStartWindowDrag();
+}
+
 void WebInspectorProxy::togglePageProfiling()
 {
     if (!m_inspectedPage)
@@ -509,6 +514,8 @@ void WebInspectorProxy::createInspectorPage(IPC::Attachment connectionIdentifier
             }
         } else
             m_inspectorPage->process().send(Messages::WebInspectorUI::Detached(), m_inspectorPage->pageID());
+
+        m_inspectorPage->process().send(Messages::WebInspectorUI::SetDockingUnavailable(!m_canAttach), m_inspectorPage->pageID());
     }
 
     m_inspectorPage->loadRequest(URL(URL(), m_underTest ? inspectorTestPageURL() : inspectorPageURL()));
@@ -571,6 +578,9 @@ void WebInspectorProxy::attachAvailabilityChanged(bool available)
 
     if (previousCanAttach == m_canAttach)
         return;
+
+    if (m_inspectorPage && !m_underTest)
+        m_inspectorPage->process().send(Messages::WebInspectorUI::SetDockingUnavailable(!m_canAttach), m_inspectorPage->pageID());
 
     platformAttachAvailabilityChanged(m_canAttach);
 }
@@ -687,6 +697,11 @@ void WebInspectorProxy::platformSetAttachedWindowHeight(unsigned)
 }
 
 void WebInspectorProxy::platformSetToolbarHeight(unsigned)
+{
+    notImplemented();
+}
+
+void WebInspectorProxy::platformStartWindowDrag()
 {
     notImplemented();
 }

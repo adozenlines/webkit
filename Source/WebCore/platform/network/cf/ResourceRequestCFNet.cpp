@@ -227,19 +227,6 @@ void ResourceRequest::doUpdatePlatformHTTPBody()
 #endif
 }
 
-void ResourceRequest::updateFromDelegatePreservingOldProperties(const ResourceRequest& delegateProvidedRequest)
-{
-    ResourceLoadPriority oldPriority = priority();
-    RefPtr<FormData> oldHTTPBody = httpBody();
-    bool isHiddenFromInspector = hiddenFromInspector();
-
-    *this = delegateProvidedRequest;
-
-    setPriority(oldPriority);
-    setHTTPBody(oldHTTPBody.release());
-    setHiddenFromInspector(isHiddenFromInspector);
-}
-
 void ResourceRequest::doUpdateResourceRequest()
 {
     if (!m_cfRequest) {
@@ -308,7 +295,7 @@ void ResourceRequest::doUpdateResourceRequest()
 void ResourceRequest::doUpdateResourceHTTPBody()
 {
     if (!m_cfRequest) {
-        m_httpBody = 0;
+        m_httpBody = nullptr;
         return;
     }
 
@@ -338,6 +325,22 @@ void ResourceRequest::setStorageSession(CFURLStorageSessionRef storageSession)
 }
 
 #endif // USE(CFNETWORK)
+
+void ResourceRequest::updateFromDelegatePreservingOldProperties(const ResourceRequest& delegateProvidedRequest)
+{
+    // These are things we don't want willSendRequest delegate to mutate or reset.
+    ResourceLoadPriority oldPriority = priority();
+    RefPtr<FormData> oldHTTPBody = httpBody();
+    bool isHiddenFromInspector = hiddenFromInspector();
+    auto oldRequester = requester();
+
+    *this = delegateProvidedRequest;
+
+    setPriority(oldPriority);
+    setHTTPBody(oldHTTPBody.release());
+    setHiddenFromInspector(isHiddenFromInspector);
+    setRequester(oldRequester);
+}
 
 bool ResourceRequest::httpPipeliningEnabled()
 {
@@ -421,6 +424,14 @@ void initializeHTTPConnectionSettingsOnStartup()
     wkSetHTTPRequestMaximumPriority(toPlatformRequestPriority(ResourceLoadPriority::Highest));
     wkSetHTTPRequestMinimumFastLanePriority(toPlatformRequestPriority(ResourceLoadPriority::Medium));
     _CFNetworkHTTPConnectionCacheSetLimit(kHTTPNumFastLanes, fastLaneConnectionCount);
+}
+#endif
+
+#if PLATFORM(COCOA)
+CFStringRef ResourceRequest::isUserInitiatedKey()
+{
+    static CFStringRef key = CFSTR("ResourceRequestIsUserInitiatedKey");
+    return key;
 }
 #endif
 

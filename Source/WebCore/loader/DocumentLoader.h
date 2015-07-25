@@ -88,10 +88,9 @@ namespace WebCore {
         }
         WEBCORE_EXPORT virtual ~DocumentLoader();
 
-        WEBCORE_EXPORT void setFrame(Frame*);
+        void attachToFrame(Frame&);
         Frame* frame() const { return m_frame; }
 
-        WEBCORE_EXPORT virtual void attachToFrame();
         WEBCORE_EXPORT virtual void detachFromFrame();
 
         WEBCORE_EXPORT FrameLoader* frameLoader() const;
@@ -158,6 +157,7 @@ namespace WebCore {
 
         WEBCORE_EXPORT bool scheduleArchiveLoad(ResourceLoader*, const ResourceRequest&);
 #endif
+        void scheduleSubstituteResourceLoad(ResourceLoader&, SubstituteResource&);
 
         // Return the ArchiveResource for the URL only when loading an Archive
         ArchiveResource* archiveResourceForURL(const URL&) const;
@@ -178,7 +178,7 @@ namespace WebCore {
         const ResponseVector& responses() const { return m_responses; }
 
         const NavigationAction& triggeringAction() const { return m_triggeringAction; }
-        void setTriggeringAction(const NavigationAction& action) { m_triggeringAction = action; }
+        void setTriggeringAction(const NavigationAction&);
         void setOverrideEncoding(const String& encoding) { m_overrideEncoding = encoding; }
         void setLastCheckedRequest(const ResourceRequest& request) { m_lastCheckedRequest = request; }
         const ResourceRequest& lastCheckedRequest()  { return m_lastCheckedRequest; }
@@ -274,8 +274,13 @@ namespace WebCore {
         void addPendingContentExtensionDisplayNoneSelector(const String& identifier, const String& selector, uint32_t selectorID);
 #endif
 
+        void setShouldOpenExternalURLsPolicy(ShouldOpenExternalURLsPolicy shouldOpenExternalURLsPolicy) { m_shouldOpenExternalURLsPolicy = shouldOpenExternalURLsPolicy; }
+        ShouldOpenExternalURLsPolicy shouldOpenExternalURLsPolicyToPropagate() const;
+
     protected:
         WEBCORE_EXPORT DocumentLoader(const ResourceRequest&, const SubstituteData&);
+
+        WEBCORE_EXPORT virtual void attachToFrame();
 
         bool m_deferMainResourceDataLoad;
 
@@ -426,8 +431,8 @@ namespace WebCore {
         RefPtr<IconDataCallback> m_iconDataCallback;
 
         bool m_subresourceLoadersArePageCacheAcceptable;
+        ShouldOpenExternalURLsPolicy m_shouldOpenExternalURLsPolicy { ShouldOpenExternalURLsPolicy::ShouldNotAllow };
 
-        friend class ApplicationCacheHost;  // for substitute resource delivery
         std::unique_ptr<ApplicationCacheHost> m_applicationCacheHost;
 
 #if ENABLE(CONTENT_FILTERING)
@@ -440,9 +445,12 @@ namespace WebCore {
 
 #if ENABLE(CONTENT_EXTENSIONS)
         HashMap<String, RefPtr<StyleSheetContents>> m_pendingNamedContentExtensionStyleSheets;
-        HashMap<String, std::pair<String, uint32_t>> m_pendingContentExtensionDisplayNoneSelectors;
+        HashMap<String, Vector<std::pair<String, uint32_t>>> m_pendingContentExtensionDisplayNoneSelectors;
 #endif
 
+#ifndef NDEBUG
+        bool m_hasEverBeenAttached { false };
+#endif
     };
 
     inline void DocumentLoader::recordMemoryCacheLoadForFutureClientNotification(const ResourceRequest& request)

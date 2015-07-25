@@ -118,6 +118,10 @@ public:
     virtual void receivedChallengeRejection(const AuthenticationChallenge&) override;
 #endif
 
+#if PLATFORM(COCOA) || USE(CFNETWORK)
+    bool tryHandlePasswordBasedAuthentication(const AuthenticationChallenge&);
+#endif
+
 #if PLATFORM(COCOA) && USE(PROTECTION_SPACE_AUTH_CALLBACK)
     bool canAuthenticateAgainstProtectionSpace(const ProtectionSpace&);
 #endif
@@ -177,6 +181,7 @@ public:
 #endif
 
 #if USE(SOUP)
+    RefPtr<ResourceHandle> releaseForDownload(ResourceHandleClient*);
     void continueDidReceiveAuthenticationChallenge(const Credential& credentialFromPersistentStorage);
     void sendPendingRequest();
     bool cancelledOrClientless();

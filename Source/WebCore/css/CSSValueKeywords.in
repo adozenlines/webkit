@@ -186,6 +186,16 @@ threedshadow
 window
 windowframe
 windowtext
+-apple-wireless-playback-target-active
+-apple-system-blue
+-apple-system-brown
+-apple-system-gray
+-apple-system-green
+-apple-system-orange
+-apple-system-pink
+-apple-system-purple
+-apple-system-red
+-apple-system-yellow
 -webkit-focus-ring-color
 currentcolor
 //
@@ -536,6 +546,7 @@ flex-end
 // center
 space-between
 space-around
+space-evenly
 // stretch
 
 // CSS_PROP_ALIGN_ITEMS / CSS_PROP_ALIGN_SELF
@@ -547,11 +558,15 @@ last-baseline
 // stretch
 
 // CSS_PROP_JUSTIFY_CONTENT
+// start
+// end
 // flex-start
 // flex-end
 // center
 // space-between
 // space-around
+// space-evenly
+// stretch
 
 // CSS_PROP_JUSTIFY_ITEMS / CSS_PROP_JUSTIFY_SELF
 // auto
@@ -666,6 +681,7 @@ skip-white-space
 // CSS_PROP_WORD_BREAK
 //
 break-all
+keep-all
 
 //
 // CSS_PROP_WORD_WRAP

@@ -48,7 +48,6 @@
 #include "AccessibilitySVGRoot.h"
 #include "AccessibilityScrollView.h"
 #include "AccessibilityScrollbar.h"
-#include "AccessibilitySearchFieldButtons.h"
 #include "AccessibilitySlider.h"
 #include "AccessibilitySpinButton.h"
 #include "AccessibilityTable.h"
@@ -92,6 +91,7 @@ using namespace HTMLNames;
 
 // Post value change notifications for password fields or elements contained in password fields at a 40hz interval to thwart analysis of typing cadence
 static double AccessibilityPasswordValueChangeNotificationInterval = 0.025;
+static double AccessibilityLiveRegionChangedNotificationInterval = 0.020;
 
 AccessibilityObjectInclusion AXComputedObjectAttributeCache::getIgnored(AXID id) const
 {
@@ -133,12 +133,14 @@ AXObjectCache::AXObjectCache(Document& document)
     : m_document(document)
     , m_notificationPostTimer(*this, &AXObjectCache::notificationPostTimerFired)
     , m_passwordNotificationPostTimer(*this, &AXObjectCache::passwordNotificationPostTimerFired)
+    , m_liveRegionChangedPostTimer(*this, &AXObjectCache::liveRegionChangedNotificationPostTimerFired)
 {
 }
 
 AXObjectCache::~AXObjectCache()
 {
     m_notificationPostTimer.stop();
+    m_liveRegionChangedPostTimer.stop();
 
     for (const auto& object : m_objects.values()) {
         detachWrapper(object.get(), CacheDestroyed);
@@ -282,11 +284,11 @@ static Ref<AccessibilityObject> createFromRenderer(RenderObject* renderer)
         return AccessibilityList::create(renderer);
 
     // aria tables
-    if (nodeHasRole(node, "grid") || nodeHasRole(node, "treegrid"))
+    if (nodeHasRole(node, "grid") || nodeHasRole(node, "treegrid") || nodeHasRole(node, "table"))
         return AccessibilityARIAGrid::create(renderer);
     if (nodeHasRole(node, "row"))
         return AccessibilityARIAGridRow::create(renderer);
-    if (nodeHasRole(node, "gridcell") || nodeHasRole(node, "columnheader") || nodeHasRole(node, "rowheader"))
+    if (nodeHasRole(node, "gridcell") || nodeHasRole(node, "cell") || nodeHasRole(node, "columnheader") || nodeHasRole(node, "rowheader"))
         return AccessibilityARIAGridCell::create(renderer);
 
 #if ENABLE(VIDEO)
@@ -297,10 +299,6 @@ static Ref<AccessibilityObject> createFromRenderer(RenderObject* renderer)
 
     if (is<RenderSVGRoot>(*renderer))
         return AccessibilitySVGRoot::create(renderer);
-    
-    // Search field buttons
-    if (is<Element>(node) && downcast<Element>(*node).isSearchFieldCancelButtonElement())
-        return AccessibilitySearchFieldCancelButton::create(renderer);
     
     if (is<RenderBoxModelObject>(*renderer)) {
         RenderBoxModelObject& cssBox = downcast<RenderBoxModelObject>(*renderer);
@@ -396,6 +394,11 @@ AccessibilityObject* AXObjectCache::getOrCreate(Node* node)
     
     if (!inCanvasSubtree && !isHidden && !insideMeterElement)
         return nullptr;
+
+    // Fallback content is only focusable as long as the canvas is displayed and visible.
+    // Update the style before Element::isFocusable() gets called.
+    if (inCanvasSubtree)
+        node->document().updateStyleIfNeeded();
 
     RefPtr<AccessibilityObject> newObj = createFromNode(node);
 
@@ -911,6 +914,9 @@ void AXObjectCache::showIntent(const AXTextStateChangeIntent &intent)
         case AXTextEditTypePaste:
             dataLog("Paste");
             break;
+        case AXTextEditTypeAttributesChange:
+            dataLog("AttributesChange");
+            break;
         }
         break;
     case AXTextStateChangeTypeSelectionMove:
@@ -976,15 +982,18 @@ void AXObjectCache::showIntent(const AXTextStateChangeIntent &intent)
         }
         break;
     }
-    if (intent.isSynchronizing)
-        dataLog("-Sync");
     dataLog("\n");
 }
 #endif
 
-void AXObjectCache::setTextSelectionIntent(AXTextStateChangeIntent intent)
+void AXObjectCache::setTextSelectionIntent(const AXTextStateChangeIntent& intent)
 {
     m_textSelectionIntent = intent;
+}
+    
+void AXObjectCache::setIsSynchronizingSelection(bool isSynchronizing)
+{
+    m_isSynchronizingSelection = isSynchronizing;
 }
 
 static bool isPasswordFieldOrContainedByPasswordField(AccessibilityObject* object)
@@ -1000,21 +1009,63 @@ void AXObjectCache::postTextStateChangeNotification(Node* node, const AXTextStat
 #if PLATFORM(COCOA)
     stopCachingComputedObjectAttributes();
 
-    AccessibilityObject* object = getOrCreate(node);
-    if (object) {
-        if (isPasswordFieldOrContainedByPasswordField(object))
-            return;
-        object = object->observableObject();
-    }
-
-    postTextStateChangePlatformNotification(object, (intent.type == AXTextStateChangeTypeUnknown) ? m_textSelectionIntent : intent, selection);
+    postTextStateChangeNotification(getOrCreate(node), intent, selection);
 #else
     postNotification(node->renderer(), AXObjectCache::AXSelectedTextChanged, TargetObservableParent);
     UNUSED_PARAM(intent);
     UNUSED_PARAM(selection);
 #endif
+}
+
+void AXObjectCache::postTextStateChangeNotification(const Position& position, const AXTextStateChangeIntent& intent, const VisibleSelection& selection)
+{
+    Node* node = position.deprecatedNode();
+    if (!node)
+        return;
+
+    stopCachingComputedObjectAttributes();
+
+#if PLATFORM(COCOA)
+    AccessibilityObject* object = getOrCreate(node);
+    if (object && object->accessibilityIsIgnored()) {
+        if (position.atLastEditingPositionForNode()) {
+            if (AccessibilityObject* nextSibling = object->nextSiblingUnignored(1))
+                object = nextSibling;
+        } else if (position.atFirstEditingPositionForNode()) {
+            if (AccessibilityObject* previousSibling = object->previousSiblingUnignored(1))
+                object = previousSibling;
+        }
+    }
+
+    postTextStateChangeNotification(object, intent, selection);
+#else
+    postTextStateChangeNotification(node, intent, selection);
+#endif
+}
+
+void AXObjectCache::postTextStateChangeNotification(AccessibilityObject* object, const AXTextStateChangeIntent& intent, const VisibleSelection& selection)
+{
+    stopCachingComputedObjectAttributes();
+
+#if PLATFORM(COCOA)
+    if (object) {
+        if (isPasswordFieldOrContainedByPasswordField(object))
+            return;
+
+        if (auto observableObject = object->observableObject())
+            object = observableObject;
+    }
+
+    const AXTextStateChangeIntent& newIntent = (intent.type == AXTextStateChangeTypeUnknown || (m_isSynchronizingSelection && m_textSelectionIntent.type != AXTextStateChangeTypeUnknown)) ? m_textSelectionIntent : intent;
+    postTextStateChangePlatformNotification(object, newIntent, selection);
+#else
+    UNUSED_PARAM(object);
+    UNUSED_PARAM(intent);
+    UNUSED_PARAM(selection);
+#endif
 
     setTextSelectionIntent(AXTextStateChangeIntent());
+    setIsSynchronizingSelection(false);
 }
 
 void AXObjectCache::postTextStateChangeNotification(Node* node, AXTextEditType type, const String& text, const VisiblePosition& position)
@@ -1094,6 +1145,29 @@ void AXObjectCache::frameLoadingEventNotification(Frame* frame, AXLoadingEvent l
 
     AccessibilityObject* obj = getOrCreate(contentRenderer);
     frameLoadingEventPlatformNotification(obj, loadingEvent);
+}
+
+void AXObjectCache::postLiveRegionChangeNotification(AccessibilityObject* object)
+{
+    if (m_liveRegionChangedPostTimer.isActive())
+        m_liveRegionChangedPostTimer.stop();
+
+    if (!m_liveRegionObjectsSet.contains(object))
+        m_liveRegionObjectsSet.add(object);
+
+    m_liveRegionChangedPostTimer.startOneShot(AccessibilityLiveRegionChangedNotificationInterval);
+}
+
+void AXObjectCache::liveRegionChangedNotificationPostTimerFired()
+{
+    m_liveRegionChangedPostTimer.stop();
+
+    if (m_liveRegionObjectsSet.isEmpty())
+        return;
+
+    for (auto& object : m_liveRegionObjectsSet)
+        postNotification(object.get(), object->document(), AXObjectCache::AXLiveRegionChanged);
+    m_liveRegionObjectsSet.clear();
 }
 
 void AXObjectCache::handleScrollbarUpdate(ScrollView* view)
@@ -1288,20 +1362,30 @@ bool isNodeAriaVisible(Node* node)
 {
     if (!node)
         return false;
-    
-    // To determine if a node is ARIA visible, we need to check the parent hierarchy to see if anyone specifies
-    // aria-hidden explicitly.
+
+    // ARIA Node visibility is controlled by aria-hidden
+    //  1) if aria-hidden=true, the whole subtree is hidden
+    //  2) if aria-hidden=false, and the object is rendered, there's no effect
+    //  3) if aria-hidden=false, and the object is NOT rendered, then it must have
+    //     aria-hidden=false on each parent until it gets to a rendered object
+    //  3b) a text node inherits a parents aria-hidden value
+    bool requiresAriaHiddenFalse = !node->renderer();
+    bool ariaHiddenFalsePresent = false;
     for (Node* testNode = node; testNode; testNode = testNode->parentNode()) {
         if (is<Element>(*testNode)) {
             const AtomicString& ariaHiddenValue = downcast<Element>(*testNode).fastGetAttribute(aria_hiddenAttr);
-            if (equalIgnoringCase(ariaHiddenValue, "false"))
-                return true;
             if (equalIgnoringCase(ariaHiddenValue, "true"))
                 return false;
+            
+            bool ariaHiddenFalse = equalIgnoringCase(ariaHiddenValue, "false");
+            if (!testNode->renderer() && !ariaHiddenFalse)
+                return false;
+            if (!ariaHiddenFalsePresent && ariaHiddenFalse)
+                ariaHiddenFalsePresent = true;
         }
     }
     
-    return false;
+    return !requiresAriaHiddenFalse || ariaHiddenFalsePresent;
 }
 
 AccessibilityObject* AXObjectCache::rootWebArea()
@@ -1337,6 +1421,8 @@ AXTextChange AXObjectCache::textChangeForEditType(AXTextEditType type)
     case AXTextEditTypeTyping:
     case AXTextEditTypePaste:
         return AXTextInserted;
+    case AXTextEditTypeAttributesChange:
+        return AXTextAttributesChanged;
     case AXTextEditTypeUnknown:
         break;
     }

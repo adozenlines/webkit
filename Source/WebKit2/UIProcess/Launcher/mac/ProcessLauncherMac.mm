@@ -51,9 +51,9 @@ namespace WebKit {
 namespace {
 
 struct UUIDHolder : public RefCounted<UUIDHolder> {
-    static PassRefPtr<UUIDHolder> create()
+    static Ref<UUIDHolder> create()
     {
-        return adoptRef(new UUIDHolder);
+        return adoptRef(*new UUIDHolder);
     }
 
     UUIDHolder()
@@ -93,6 +93,38 @@ static const char* copyASanDynamicLibraryPath()
 }
 #endif
 
+#if PLATFORM(MAC)
+static RetainPtr<NSString> computeProcessShimPath(const ProcessLauncher::LaunchOptions& launchOptions, NSBundle *webKitBundle)
+{
+#if ENABLE(NETSCAPE_PLUGIN_API)
+    if (launchOptions.processType == ProcessLauncher::PluginProcess) {
+        NSString *processPath = [webKitBundle pathForAuxiliaryExecutable:@"PluginProcess.app"];
+        NSString *processAppExecutablePath = [[NSBundle bundleWithPath:processPath] executablePath];
+
+        return [[processAppExecutablePath stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"PluginProcessShim.dylib"];
+    }
+#endif
+
+#if ENABLE(NETWORK_PROCESS)
+    if (launchOptions.processType == ProcessLauncher::NetworkProcess) {
+        NSString *processPath = [webKitBundle pathForAuxiliaryExecutable:@"NetworkProcess.app"];
+        NSString *processAppExecutablePath = [[NSBundle bundleWithPath:processPath] executablePath];
+
+        return [[processAppExecutablePath stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"SecItemShim.dylib"];
+    }
+#endif
+
+    if (launchOptions.processType == ProcessLauncher::WebProcess) {
+        NSString *processPath = [webKitBundle pathForAuxiliaryExecutable:@"WebProcess.app"];
+        NSString *processAppExecutablePath = [[NSBundle bundleWithPath:processPath] executablePath];
+
+        return [[processAppExecutablePath stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"WebProcessShim.dylib"];
+    }
+
+    return nil;
+}
+#endif
+
 static void addDYLDEnvironmentAdditions(const ProcessLauncher::LaunchOptions& launchOptions, bool isWebKitDevelopmentBuild, EnvironmentVariables& environmentVariables)
 {
     DynamicLinkerEnvironmentExtractor environmentExtractor([[NSBundle mainBundle] executablePath], _NSGetMachExecuteHeader()->cputype);
@@ -107,30 +139,6 @@ static void addDYLDEnvironmentAdditions(const ProcessLauncher::LaunchOptions& la
     if (isWebKitDevelopmentBuild)
         environmentVariables.appendValue("DYLD_FRAMEWORK_PATH", [frameworksPath fileSystemRepresentation], ':');
 
-    NSString *processShimPathNSString = nil;
-#if ENABLE(NETSCAPE_PLUGIN_API)
-    if (launchOptions.processType == ProcessLauncher::PluginProcess) {
-        NSString *processPath = [webKitBundle pathForAuxiliaryExecutable:@"PluginProcess.app"];
-        NSString *processAppExecutablePath = [[NSBundle bundleWithPath:processPath] executablePath];
-
-        processShimPathNSString = [[processAppExecutablePath stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"PluginProcessShim.dylib"];
-    } else
-#endif // ENABLE(NETSCAPE_PLUGIN_API)
-#if ENABLE(NETWORK_PROCESS)
-    if (launchOptions.processType == ProcessLauncher::NetworkProcess) {
-        NSString *processPath = [webKitBundle pathForAuxiliaryExecutable:@"NetworkProcess.app"];
-        NSString *processAppExecutablePath = [[NSBundle bundleWithPath:processPath] executablePath];
-
-        processShimPathNSString = [[processAppExecutablePath stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"SecItemShim.dylib"];
-    } else
-#endif // ENABLE(NETWORK_PROCESS)
-    if (launchOptions.processType == ProcessLauncher::WebProcess) {
-        NSString *processPath = [webKitBundle pathForAuxiliaryExecutable:@"WebProcess.app"];
-        NSString *processAppExecutablePath = [[NSBundle bundleWithPath:processPath] executablePath];
-
-        processShimPathNSString = [[processAppExecutablePath stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"WebProcessShim.dylib"];
-    }
-
 #if ASAN_ENABLED
     static const char* asanLibraryPath = copyASanDynamicLibraryPath();
     ASSERT(asanLibraryPath); // ASan runtime library was not found in the current process. This code may need to be updated if the library name has changed.
@@ -139,14 +147,15 @@ static void addDYLDEnvironmentAdditions(const ProcessLauncher::LaunchOptions& la
         environmentVariables.appendValue("DYLD_INSERT_LIBRARIES", asanLibraryPath, ':');
 #endif
 
-    // Make sure that the shim library file exists and insert it.
-    if (processShimPathNSString) {
-        const char* processShimPath = [processShimPathNSString fileSystemRepresentation];
+#if PLATFORM(MAC)
+    if (auto shimPath = computeProcessShimPath(launchOptions, webKitBundle)) {
+        // Make sure that the shim library file exists and insert it.
+        const char* processShimPath = [shimPath fileSystemRepresentation];
         struct stat statBuf;
         if (stat(processShimPath, &statBuf) == 0 && (statBuf.st_mode & S_IFMT) == S_IFREG)
             environmentVariables.appendValue("DYLD_INSERT_LIBRARIES", processShimPath, ':');
     }
-
+#endif
 }
 
 typedef void (ProcessLauncher::*DidFinishLaunchingProcessFunction)(PlatformProcessIdentifier, IPC::Connection::Identifier);
@@ -210,7 +219,11 @@ static void connectToService(const ProcessLauncher::LaunchOptions& launchOptions
 {
     // Create a connection to the WebKit XPC service.
     auto connection = adoptOSObject(xpc_connection_create(serviceName(launchOptions, forDevelopment), 0));
+#if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
+    xpc_connection_set_oneshot_instance(connection.get(), instanceUUID->uuid);
+#else
     xpc_connection_set_instance(connection.get(), instanceUUID->uuid);
+#endif
 
 #if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
     // Inherit UI process localization. It can be different from child process default localization:
@@ -257,7 +270,10 @@ static void connectToService(const ProcessLauncher::LaunchOptions& launchOptions
     auto bootstrapMessage = adoptOSObject(xpc_dictionary_create(nullptr, nullptr, 0));
     xpc_dictionary_set_string(bootstrapMessage.get(), "message-name", "bootstrap");
     xpc_dictionary_set_string(bootstrapMessage.get(), "framework-executable-path", [[[NSBundle bundleWithIdentifier:@"com.apple.WebKit"] executablePath] fileSystemRepresentation]);
+
     xpc_dictionary_set_mach_send(bootstrapMessage.get(), "server-port", listeningPort);
+    mach_port_deallocate(mach_task_self(), listeningPort);
+
     xpc_dictionary_set_string(bootstrapMessage.get(), "client-identifier", clientIdentifier.data());
     xpc_dictionary_set_string(bootstrapMessage.get(), "ui-process-name", [[[NSProcessInfo processInfo] processName] UTF8String]);
 
@@ -318,14 +334,17 @@ static void connectToReExecService(const ProcessLauncher::LaunchOptions& launchO
     }
 #endif
 
-    // Generate the uuid for the service instance we are about to create.
     // FIXME: This UUID should be stored on the ChildProcessProxy.
     RefPtr<UUIDHolder> instanceUUID = UUIDHolder::create();
 
     // FIXME: It would be nice if we could use OSObjectPtr for this connection as well, but we'd have to be careful
     // not to introduce any retain cycles in the call to xpc_connection_set_event_handler below.
     xpc_connection_t reExecConnection = xpc_connection_create(serviceName(launchOptions, true), 0);
+#if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
+    xpc_connection_set_oneshot_instance(reExecConnection, instanceUUID->uuid);
+#else
     xpc_connection_set_instance(reExecConnection, instanceUUID->uuid);
+#endif
 
     // Keep the ProcessLauncher alive while we do the re-execing (balanced in event handler).
     that->ref();

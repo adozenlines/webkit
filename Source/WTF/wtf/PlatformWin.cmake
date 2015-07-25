@@ -1,10 +1,8 @@
 list(APPEND WTF_SOURCES
-    text/cf/AtomicStringCF.cpp
+    text/cf/AtomicStringImplCF.cpp
     text/cf/StringCF.cpp
     text/cf/StringImplCF.cpp
     text/cf/StringViewCF.cpp
-
-    threads/win/BinarySemaphoreWin.cpp
 
     win/MainThreadWin.cpp
     win/RunLoopWin.cpp

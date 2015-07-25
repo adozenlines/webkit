@@ -72,9 +72,12 @@ struct WebProcessCreationParameters {
     SandboxExtension::Handle applicationCacheDirectoryExtensionHandle;
     String webSQLDatabaseDirectory;
     SandboxExtension::Handle webSQLDatabaseDirectoryExtensionHandle;
-    String diskCacheDirectory;
-    SandboxExtension::Handle diskCacheDirectoryExtensionHandle;
+#if ENABLE(SECCOMP_FILTERS)
     String cookieStorageDirectory;
+#endif
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100
+    Vector<uint8_t> uiProcessCookieStorageIdentifier;
+#endif
 #if PLATFORM(IOS)
     SandboxExtension::Handle cookieStorageDirectoryExtensionHandle;
     SandboxExtension::Handle containerCachesDirectoryExtensionHandle;
@@ -98,6 +101,7 @@ struct WebProcessCreationParameters {
 #endif
     Vector<String> urlSchemesRegisteredForCustomProtocols;
 #if USE(SOUP)
+    String diskCacheDirectory;
     String cookiePersistentStoragePath;
     uint32_t cookiePersistentStorageType;
     HTTPCookieAcceptPolicy cookieAcceptPolicy;
@@ -132,9 +136,6 @@ struct WebProcessCreationParameters {
     pid_t presenterApplicationPid;
 
     bool accessibilityEnhancedUserInterfaceEnabled;
-
-    uint64_t nsURLCacheMemoryCapacity;
-    uint64_t nsURLCacheDiskCapacity;
 
     WebCore::MachSendRight acceleratedCompositingPort;
 

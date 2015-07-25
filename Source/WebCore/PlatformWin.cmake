@@ -21,6 +21,9 @@ list(APPEND WebCore_SOURCES
     platform/Cursor.cpp
     platform/LocalizedStrings.cpp
     platform/PlatformStrategies.cpp
+    platform/VNodeTracker.cpp
+
+    platform/audio/PlatformMediaSessionManager.cpp
 
     platform/graphics/opentype/OpenTypeUtilities.cpp
 
@@ -44,10 +47,12 @@ list(APPEND WebCore_SOURCES
     platform/win/DragImageWin.cpp
     platform/win/EventLoopWin.cpp
     platform/win/FileSystemWin.cpp
+    platform/win/GDIUtilities.cpp
     platform/win/KeyEventWin.cpp
     platform/win/LanguageWin.cpp
     platform/win/LocalizedStringsWin.cpp
     platform/win/LoggingWin.cpp
+    platform/win/MemoryPressureHandlerWin.cpp
     platform/win/MIMETypeRegistryWin.cpp
     platform/win/PasteboardWin.cpp
     platform/win/PlatformMouseEventWin.cpp
@@ -75,9 +80,9 @@ if (${WTF_PLATFORM_WIN_CAIRO})
 endif ()
 
 set(WebCore_FORWARDING_HEADERS_DIRECTORIES
-    bridge/c
-
     Modules/indexeddb
+
+    bridge/c
 )
 
 WEBKIT_CREATE_FORWARDING_HEADERS(WebCore DIRECTORIES ${WebCore_FORWARDING_HEADERS_DIRECTORIES})

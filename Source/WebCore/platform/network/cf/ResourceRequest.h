@@ -30,7 +30,6 @@
 #include "ResourceRequestBase.h"
 #include <wtf/RetainPtr.h>
 
-OBJC_CLASS NSMutableURLRequest;
 OBJC_CLASS NSURLRequest;
 
 #if PLATFORM(COCOA) || USE(CFNETWORK)
@@ -95,6 +94,8 @@ namespace WebCore {
         bool encodingRequiresPlatformData() const { return m_httpBody || m_nsRequest; }
 #endif
         WEBCORE_EXPORT NSURLRequest *nsURLRequest(HTTPBodyUpdatePolicy) const;
+
+        WEBCORE_EXPORT static CFStringRef isUserInitiatedKey();
 #endif
 
 #if ENABLE(CACHE_PARTITIONING)
@@ -125,10 +126,6 @@ namespace WebCore {
         void doUpdateResourceRequest();
         void doUpdatePlatformHTTPBody();
         void doUpdateResourceHTTPBody();
-
-#if PLATFORM(COCOA)
-        NSMutableURLRequest *ensureMutableNSURLRequest();
-#endif
 
         std::unique_ptr<CrossThreadResourceRequestData> doPlatformCopyData(std::unique_ptr<CrossThreadResourceRequestData>) const;
         void doPlatformAdopt(std::unique_ptr<CrossThreadResourceRequestData>);

@@ -20,8 +20,10 @@ find_path(PDFKIT_INCLUDE_DIRECTORY PDFKit.h HINTS ${PDFKIT_FRAMEWORK}/Versions/*
 
 if ("${CURRENT_OSX_VERSION}" MATCHES "10.9")
 set(WEBKITSYSTEMINTERFACE_LIBRARY libWebKitSystemInterfaceMavericks.a)
-else ()
+elif ("${CURRENT_OSX_VERSION}" MATCHES "10.10")
 set(WEBKITSYSTEMINTERFACE_LIBRARY libWebKitSystemInterfaceYosemite.a)
+else ()
+set(WEBKITSYSTEMINTERFACE_LIBRARY libWebKitSystemInterfaceElCapitan.a)
 endif ()
 link_directories(../../WebKitLibraries)
 
@@ -51,7 +53,6 @@ list(APPEND WebKit_INCLUDE_DIRECTORIES
     "${DERIVED_SOURCES_WEBCORE_DIR}"
     "${DERIVED_SOURCES_WEBKITLEGACY_DIR}"
     "${JAVASCRIPTCORE_DIR}/dfg"
-    "${PDFKIT_INCLUDE_DIRECTORY}"
     "${WEBCORE_DIR}/accessibility/mac"
     "${WEBCORE_DIR}/bindings/objc"
     "${WEBCORE_DIR}/bridge"
@@ -81,7 +82,11 @@ list(APPEND WebKit_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/text/cf"
     "${WEBCORE_DIR}/platform/text/mac"
     "${WEBCORE_DIR}/plugins/mac"
+    ../../WebKitLibraries
+)
 
+list(APPEND WebKit_SYSTEM_INCLUDE_DIRECTORIES
+    "${PDFKIT_INCLUDE_DIRECTORY}"
     mac
     mac/Carbon
     mac/DefaultDelegates
@@ -97,10 +102,18 @@ list(APPEND WebKit_INCLUDE_DIRECTORIES
     mac/WebInspector
     mac/WebView
     Storage
-    ../../WebKitLibraries
 )
 
 list(APPEND WebKit_SOURCES
+    Storage/StorageAreaImpl.cpp
+    Storage/StorageAreaSync.cpp
+    Storage/StorageNamespaceImpl.cpp
+    Storage/StorageSyncManager.cpp
+    Storage/StorageThread.cpp
+    Storage/StorageTracker.cpp
+    Storage/WebDatabaseProvider.cpp
+    Storage/WebStorageNamespaceProvider.cpp
+
     mac/Carbon/CarbonUtils.m
     mac/Carbon/CarbonWindowAdapter.mm
     mac/Carbon/CarbonWindowContentView.m
@@ -125,11 +138,9 @@ list(APPEND WebKit_SOURCES
     mac/Misc/WebKitLogging.m
     mac/Misc/WebKitNSStringExtras.mm
     mac/Misc/WebKitStatistics.m
-    mac/Misc/WebKitSystemBits.m
     mac/Misc/WebKitVersionChecks.m
     mac/Misc/WebLocalizableStrings.mm
     mac/Misc/WebLocalizableStringsInternal.mm
-    mac/Misc/WebNSArrayExtras.m
     mac/Misc/WebNSControlExtras.m
     mac/Misc/WebNSDataExtras.m
     mac/Misc/WebNSDictionaryExtras.m
@@ -166,7 +177,6 @@ list(APPEND WebKit_SOURCES
     mac/Plugins/WebPluginDatabase.mm
     mac/Plugins/WebPluginPackage.mm
     mac/Plugins/WebPluginRequest.m
-    mac/Plugins/WebPluginsPrivate.m
     mac/Plugins/npapi.mm
 
     mac/Plugins/Hosted/HostedNetscapePluginStream.mm
@@ -215,7 +225,6 @@ list(APPEND WebKit_SOURCES
     mac/WebCoreSupport/WebSecurityOrigin.mm
     mac/WebCoreSupport/WebSystemInterface.mm
     mac/WebCoreSupport/WebUserMediaClient.mm
-    mac/WebCoreSupport/WebViewGroup.mm
 
     mac/WebInspector/WebInspector.mm
     mac/WebInspector/WebInspectorFrontend.mm
@@ -256,15 +265,6 @@ list(APPEND WebKit_SOURCES
     mac/WebView/WebTextIterator.mm
     mac/WebView/WebView.mm
     mac/WebView/WebViewData.mm
-
-    Storage/StorageAreaImpl.cpp
-    Storage/StorageAreaSync.cpp
-    Storage/StorageNamespaceImpl.cpp
-    Storage/StorageSyncManager.cpp
-    Storage/StorageThread.cpp
-    Storage/StorageTracker.cpp
-    Storage/WebDatabaseProvider.cpp
-    Storage/WebStorageNamespaceProvider.cpp
 )
 
 set(WebKit_LIBRARY_TYPE SHARED)

@@ -37,6 +37,15 @@
 #if ENABLE(JIT)
 namespace JSC {
 
+void CallLinkInfo::clearStub()
+{
+    if (!stub())
+        return;
+
+    m_stub->clearCallNodesFor(this);
+    m_stub = nullptr;
+}
+
 void CallLinkInfo::unlink(RepatchBuffer& repatchBuffer)
 {
     if (!isLinked()) {
@@ -48,8 +57,8 @@ void CallLinkInfo::unlink(RepatchBuffer& repatchBuffer)
     
     unlinkFor(
         repatchBuffer, *this,
-        (callType == Construct || callType == ConstructVarargs)? CodeForConstruct : CodeForCall,
-        isFTL ? MustPreserveRegisters : RegisterPreservationNotRequired);
+        (m_callType == Construct || m_callType == ConstructVarargs)? CodeForConstruct : CodeForCall,
+        m_isFTL ? MustPreserveRegisters : RegisterPreservationNotRequired);
 
     // It will be on a list if the callee has a code block.
     if (isOnList())
@@ -58,30 +67,41 @@ void CallLinkInfo::unlink(RepatchBuffer& repatchBuffer)
 
 void CallLinkInfo::visitWeak(RepatchBuffer& repatchBuffer)
 {
+    auto handleSpecificCallee = [&] (JSFunction* callee) {
+        if (Heap::isMarked(callee->executable()))
+            m_hasSeenClosure = true;
+        else
+            m_clearedByGC = true;
+    };
+    
     if (isLinked()) {
-        if (stub) {
-            if (!stub->visitWeak(repatchBuffer)) {
+        if (stub()) {
+            if (!stub()->visitWeak(repatchBuffer)) {
                 if (Options::verboseOSR()) {
                     dataLog(
                         "Clearing closure call from ", *repatchBuffer.codeBlock(), " to ",
-                        listDump(stub->variants()), ", stub routine ", RawPointer(stub.get()),
+                        listDump(stub()->variants()), ", stub routine ", RawPointer(stub()),
                         ".\n");
                 }
                 unlink(repatchBuffer);
+                m_clearedByGC = true;
             }
-        } else if (!Heap::isMarked(callee.get())) {
+        } else if (!Heap::isMarked(m_callee.get())) {
             if (Options::verboseOSR()) {
                 dataLog(
                     "Clearing call from ", *repatchBuffer.codeBlock(), " to ",
-                    RawPointer(callee.get()), " (",
-                    callee.get()->executable()->hashFor(specializationKind()),
+                    RawPointer(m_callee.get()), " (",
+                    m_callee.get()->executable()->hashFor(specializationKind()),
                     ").\n");
             }
+            handleSpecificCallee(m_callee.get());
             unlink(repatchBuffer);
         }
     }
-    if (!!lastSeenCallee && !Heap::isMarked(lastSeenCallee.get()))
-        lastSeenCallee.clear();
+    if (haveLastSeenCallee() && !Heap::isMarked(lastSeenCallee())) {
+        handleSpecificCallee(lastSeenCallee());
+        clearLastSeenCallee();
+    }
 }
 
 CallLinkInfo& CallLinkInfo::dummy()

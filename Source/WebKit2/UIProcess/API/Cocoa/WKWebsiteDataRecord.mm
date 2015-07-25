@@ -33,9 +33,18 @@ NSString * const WKWebsiteDataTypeMemoryCache = @"WKWebsiteDataTypeMemoryCache";
 NSString * const WKWebsiteDataTypeOfflineWebApplicationCache = @"WKWebsiteDataTypeOfflineWebApplicationCache";
 
 NSString * const WKWebsiteDataTypeCookies = @"WKWebsiteDataTypeCookies";
+NSString * const WKWebsiteDataTypeSessionStorage = @"WKWebsiteDataTypeSessionStorage";
+
 NSString * const WKWebsiteDataTypeLocalStorage = @"WKWebsiteDataTypeLocalStorage";
 NSString * const WKWebsiteDataTypeWebSQLDatabases = @"WKWebsiteDataTypeWebSQLDatabases";
 NSString * const WKWebsiteDataTypeIndexedDBDatabases = @"WKWebsiteDataTypeIndexedDBDatabases";
+
+NSString * const _WKWebsiteDataTypeMediaKeys = @"_WKWebsiteDataTypeMediaKeys";
+NSString * const _WKWebsiteDataTypeHSTSCache = @"_WKWebsiteDataTypeHSTSCache";
+
+#if PLATFORM(MAC)
+NSString * const _WKWebsiteDataTypePlugInData = @"_WKWebsiteDataTypePlugInData";
+#endif
 
 @implementation WKWebsiteDataRecord
 
@@ -58,12 +67,22 @@ static NSString *dataTypesToString(NSSet *dataTypes)
         [array addObject:@"Offline Web Application Cache"];
     if ([dataTypes containsObject:WKWebsiteDataTypeCookies])
         [array addObject:@"Cookies"];
+    if ([dataTypes containsObject:WKWebsiteDataTypeSessionStorage])
+        [array addObject:@"Session Storage"];
     if ([dataTypes containsObject:WKWebsiteDataTypeLocalStorage])
         [array addObject:@"Local Storage"];
     if ([dataTypes containsObject:WKWebsiteDataTypeWebSQLDatabases])
         [array addObject:@"Web SQL"];
     if ([dataTypes containsObject:WKWebsiteDataTypeIndexedDBDatabases])
         [array addObject:@"IndexedDB"];
+    if ([dataTypes containsObject:_WKWebsiteDataTypeHSTSCache])
+        [array addObject:@"HSTS Cache"];
+    if ([dataTypes containsObject:_WKWebsiteDataTypeMediaKeys])
+        [array addObject:@"Media Keys"];
+#if PLATFORM(MAC)
+    if ([dataTypes containsObject:_WKWebsiteDataTypePlugInData])
+        [array addObject:@"Plug-in Data"];
+#endif
 
     return [array componentsJoinedByString:@", "];
 }

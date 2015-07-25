@@ -45,6 +45,7 @@ WebInspector.LayoutTimelineView = function(timeline, extraArguments)
 
     columns.eventType.scopeBar = WebInspector.TimelineDataGrid.createColumnScopeBar("layout", typeToLabelMap);
     columns.eventType.hidden = true;
+    this._scopeBar = columns.eventType.scopeBar;
 
     columns.location.title = WebInspector.UIString("Initiator");
     columns.location.width = "25%";
@@ -121,6 +122,14 @@ WebInspector.LayoutTimelineView.prototype = {
         this._dataGrid.hidden();
 
         WebInspector.ContentView.prototype.hidden.call(this);
+    },
+
+    closed: function()
+    {
+        console.assert(this.representedObject instanceof WebInspector.Timeline);
+        this.representedObject.removeEventListener(null, null, this);
+
+        this._dataGrid.closed();
     },
 
     filterDidChange: function()

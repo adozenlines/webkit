@@ -50,8 +50,6 @@ enum WKEditableLinkBehavior {
 typedef enum WKEditableLinkBehavior WKEditableLinkBehavior;
 
 enum WKJavaScriptRuntimeFlags {
-    kWKJavaScriptRuntimeFlagsSymbolDisabled = 1 << 0,
-    kWKJavaScriptRuntimeFlagsPromiseDisabled = 1 << 1,
     kWKJavaScriptRuntimeFlagsAllEnabled = 0
 };
 typedef unsigned WKJavaScriptRuntimeFlagSet;
@@ -179,9 +177,9 @@ WK_EXPORT bool WKPreferencesGetMediaPlaybackRequiresUserGesture(WKPreferencesRef
 WK_EXPORT void WKPreferencesSetMediaPlaybackAllowsInline(WKPreferencesRef preferencesRef, bool flag);
 WK_EXPORT bool WKPreferencesGetMediaPlaybackAllowsInline(WKPreferencesRef preferencesRef);
 
-// Defaults to true.
-WK_EXPORT void WKPreferencesSetAllowsAlternateFullscreen(WKPreferencesRef preferencesRef, bool flag);
-WK_EXPORT bool WKPreferencesGetAllowsAlternateFullscreen(WKPreferencesRef preferencesRef);
+// Defaults to false on iOS, true elsewhere.
+WK_EXPORT void WKPreferencesSetMediaControlsScaleWithPageZoom(WKPreferencesRef preferencesRef, bool flag);
+WK_EXPORT bool WKPreferencesGetMediaControlsScaleWithPageZoom(WKPreferencesRef preferencesRef);
 
 // Defaults to false.
 WK_EXPORT void WKPreferencesSetShowsToolTipOverTruncatedText(WKPreferencesRef preferencesRef, bool flag);
@@ -361,13 +359,21 @@ WK_EXPORT double WKPreferencesGetMinimumZoomFontSize(WKPreferencesRef preference
 WK_EXPORT void WKPreferencesSetScreenFontSubstitutionEnabled(WKPreferencesRef preferences, bool enabled);
 WK_EXPORT bool WKPreferencesGetScreenFontSubstitutionEnabled(WKPreferencesRef preferences);
 
-// Defaults to true.
+// Defaults to false.
 WK_EXPORT void WKPreferencesSetAntialiasedFontDilationEnabled(WKPreferencesRef preferences, bool enabled);
 WK_EXPORT bool WKPreferencesGetAntialiasedFontDilationEnabled(WKPreferencesRef preferences);
 
 // Defaults to 0.
 WK_EXPORT void WKPreferencesSetJavaScriptRuntimeFlags(WKPreferencesRef preferences, WKJavaScriptRuntimeFlagSet javascriptRuntimeFlagSet);
 WK_EXPORT WKJavaScriptRuntimeFlagSet WKPreferencesGetJavaScriptRuntimeFlags(WKPreferencesRef preferences);
+
+// Defaults to true.
+WK_EXPORT void WKPreferencesSetMetaRefreshEnabled(WKPreferencesRef preferences, bool enabled);
+WK_EXPORT bool WKPreferencesGetMetaRefreshEnabled(WKPreferencesRef preferences);
+
+// Defaults to true.
+WK_EXPORT void WKPreferencesSetHTTPEquivEnabled(WKPreferencesRef preferences, bool enabled);
+WK_EXPORT bool WKPreferencesGetHTTPEquivEnabled(WKPreferencesRef preferences);
 
 #ifdef __cplusplus
 }

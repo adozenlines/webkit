@@ -26,7 +26,7 @@
 
 #include "RenderTheme.h"
 
-#if WIN32
+#ifdef WIN32
 typedef void* HANDLE;
 typedef struct HINSTANCE__* HINSTANCE;
 typedef HINSTANCE HMODULE;
@@ -49,7 +49,7 @@ struct ThemeData {
 
 class RenderThemeWin final: public RenderTheme {
 public:
-    static PassRefPtr<RenderTheme> create();
+    static Ref<RenderTheme> create();
 
     virtual String extraDefaultStyleSheet() override;
     virtual String extraQuirksStyleSheet() override;
@@ -133,8 +133,6 @@ public:
     virtual void adjustMeterStyle(StyleResolver&, RenderStyle&, Element*) const override;
     virtual bool paintMeter(const RenderObject&, const PaintInfo&, const IntRect&) override;
 #endif
-
-    virtual bool shouldShowPlaceholderWhenFocused() const override { return true; }
 
 private:
     enum ControlSubPart {

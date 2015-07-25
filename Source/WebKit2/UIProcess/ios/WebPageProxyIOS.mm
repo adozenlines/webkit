@@ -107,10 +107,10 @@ String WebPageProxy::stringSelectionForPasteboard()
     return String();
 }
 
-PassRefPtr<WebCore::SharedBuffer> WebPageProxy::dataSelectionForPasteboard(const String&)
+RefPtr<WebCore::SharedBuffer> WebPageProxy::dataSelectionForPasteboard(const String&)
 {
     notImplemented();
-    return 0;
+    return nullptr;
 }
 
 bool WebPageProxy::readSelectionFromPasteboard(const String&)
@@ -217,8 +217,7 @@ static inline float adjustedUnexposedMaxEdge(float documentEdge, float exposedRe
 WebCore::FloatRect WebPageProxy::computeCustomFixedPositionRect(const FloatRect& unobscuredContentRect, double displayedContentScale, UnobscuredRectConstraint constraint) const
 {
     FloatRect constrainedUnobscuredRect = unobscuredContentRect;
-    FloatSize contentsSize = m_pageClient.contentsSize();
-    FloatRect documentRect = FloatRect(FloatPoint(), contentsSize);
+    FloatRect documentRect = m_pageClient.documentRect();
 
     if (m_pageClient.isAssistingNode())
         return documentRect;
@@ -238,7 +237,7 @@ WebCore::FloatRect WebPageProxy::computeCustomFixedPositionRect(const FloatRect&
         constrainedUnobscuredRect.setHeight(adjustedUnexposedMaxEdge(documentRect.maxY(), constrainedUnobscuredRect.maxY(), factor) - constrainedUnobscuredRect.y());
     }
     
-    return FrameView::rectForViewportConstrainedObjects(enclosingLayoutRect(constrainedUnobscuredRect), LayoutSize(contentsSize), displayedContentScale, false, StickToViewportBounds);
+    return FrameView::rectForViewportConstrainedObjects(enclosingLayoutRect(constrainedUnobscuredRect), LayoutSize(documentRect.size()), displayedContentScale, false, StickToViewportBounds);
 }
 
 void WebPageProxy::overflowScrollViewWillStartPanGesture()
@@ -452,6 +451,17 @@ void WebPageProxy::selectPositionAtBoundaryWithDirection(const WebCore::IntPoint
     m_process->send(Messages::WebPage::SelectPositionAtBoundaryWithDirection(point, static_cast<uint32_t>(granularity), static_cast<uint32_t>(direction), callbackID), m_pageID);
 }
 
+void WebPageProxy::moveSelectionAtBoundaryWithDirection(WebCore::TextGranularity granularity, WebCore::SelectionDirection direction, std::function<void(CallbackBase::Error)> callbackFunction)
+{
+    if (!isValid()) {
+        callbackFunction(CallbackBase::Error::Unknown);
+        return;
+    }
+    
+    uint64_t callbackID = m_callbacks.put(WTF::move(callbackFunction), m_process->throttler().backgroundActivityToken());
+    m_process->send(Messages::WebPage::MoveSelectionAtBoundaryWithDirection(static_cast<uint32_t>(granularity), static_cast<uint32_t>(direction), callbackID), m_pageID);
+}
+    
 void WebPageProxy::selectPositionAtPoint(const WebCore::IntPoint point, std::function<void (CallbackBase::Error)> callbackFunction)
 {
     if (!isValid()) {
@@ -483,6 +493,18 @@ void WebPageProxy::updateSelectionWithExtentPoint(const WebCore::IntPoint point,
     
     uint64_t callbackID = m_callbacks.put(WTF::move(callbackFunction), m_process->throttler().backgroundActivityToken());
     m_process->send(Messages::WebPage::UpdateSelectionWithExtentPoint(point, callbackID), m_pageID);
+    
+}
+
+void WebPageProxy::updateSelectionWithExtentPointAndBoundary(const WebCore::IntPoint point, WebCore::TextGranularity granularity, std::function<void(uint64_t, CallbackBase::Error)> callbackFunction)
+{
+    if (!isValid()) {
+        callbackFunction(0, CallbackBase::Error::Unknown);
+        return;
+    }
+    
+    uint64_t callbackID = m_callbacks.put(WTF::move(callbackFunction), m_process->throttler().backgroundActivityToken());
+    m_process->send(Messages::WebPage::UpdateSelectionWithExtentPointAndBoundary(point, granularity, callbackID), m_pageID);
     
 }
 
@@ -582,6 +604,11 @@ void WebPageProxy::didUpdateBlockSelectionWithTouch(uint32_t touch, uint32_t fla
     m_pageClient.didUpdateBlockSelectionWithTouch(touch, flags, growThreshold, shrinkThreshold);
 }
 
+void WebPageProxy::applicationDidEnterBackground()
+{
+    m_process->send(Messages::WebPage::ApplicationDidEnterBackground(), m_pageID);
+}
+
 void WebPageProxy::applicationWillEnterForeground()
 {
     m_process->send(Messages::WebPage::ApplicationWillEnterForeground(), m_pageID);
@@ -595,11 +622,6 @@ void WebPageProxy::applicationWillResignActive()
 void WebPageProxy::applicationDidBecomeActive()
 {
     m_process->send(Messages::WebPage::ApplicationDidBecomeActive(), m_pageID);
-}
-
-void WebPageProxy::notifyRevealedSelection()
-{
-    m_pageClient.selectionDidChange();
 }
 
 void WebPageProxy::extendSelection(WebCore::TextGranularity granularity)
@@ -755,6 +777,11 @@ void WebPageProxy::dynamicViewportUpdateChangedTarget(double newScale, const Web
         m_dynamicViewportSizeUpdateWaitingForTarget = false;
         m_pageClient.dynamicViewportUpdateChangedTarget(newScale, newScrollPosition, m_dynamicViewportSizeUpdateLayerTreeTransactionID);
     }
+}
+
+void WebPageProxy::couldNotRestorePageState()
+{
+    m_pageClient.couldNotRestorePageState();
 }
 
 void WebPageProxy::restorePageState(const WebCore::FloatRect& exposedRect, double scale)
@@ -913,7 +940,7 @@ void WebPageProxy::editorStateChanged(const EditorState& editorState)
     
     // We always need to notify the client on iOS to make sure the selection is redrawn,
     // even during composition to support phrase boundary gesture.
-    notifyRevealedSelection();
+    m_pageClient.selectionDidChange();
 }
 
 #if USE(QUICK_LOOK)

@@ -34,7 +34,6 @@
 #import "WebFrameNetworkingContext.h"
 #import "WebKitLogging.h"
 #import "WebKitNSStringExtras.h"
-#import "WebKitSystemBits.h"
 #import "WebKitSystemInterface.h"
 #import "WebKitVersionChecks.h"
 #import "WebNSDictionaryExtras.h"
@@ -418,7 +417,7 @@ public:
         @"0",                           WebKitMinimumFontSizePreferenceKey,
         @"9",                           WebKitMinimumLogicalFontSizePreferenceKey, 
         @"16",                          WebKitDefaultFontSizePreferenceKey,
-        @(YES),                         WebKitAntialiasedFontDilationEnabledKey,
+        @(NO),                          WebKitAntialiasedFontDilationEnabledKey,
         @"13",                          WebKitDefaultFixedFontSizePreferenceKey,
         @"ISO-8859-1",                  WebKitDefaultTextEncodingNamePreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitUsesEncodingDetectorPreferenceKey,
@@ -444,6 +443,8 @@ public:
 #endif
         [NSNumber numberWithBool:YES],  WebKitPluginsEnabledPreferenceKey,
         [NSNumber numberWithBool:YES],  WebKitDatabasesEnabledPreferenceKey,
+        [NSNumber numberWithBool:YES],  WebKitHTTPEquivEnabledPreferenceKey,
+
 #if PLATFORM(IOS)
         [NSNumber numberWithBool:NO],   WebKitStorageTrackerEnabledPreferenceKey,
 #endif
@@ -516,8 +517,9 @@ public:
         [NSNumber numberWithBool:YES],  WebKitAVFoundationEnabledKey,
         [NSNumber numberWithBool:NO],   WebKitSuppressesIncrementalRenderingKey,
 #if !PLATFORM(IOS)
-        [NSNumber numberWithBool:NO],   WebKitMediaPlaybackRequiresUserGesturePreferenceKey,
-        [NSNumber numberWithBool:YES],  WebKitMediaPlaybackAllowsInlinePreferenceKey,
+        [NSNumber numberWithBool:NO],   WebKitRequiresUserGestureForMediaPlaybackPreferenceKey,
+        [NSNumber numberWithBool:YES],  WebKitAllowsInlineMediaPlaybackPreferenceKey,
+        [NSNumber numberWithBool:YES],  WebKitMediaControlsScaleWithPageZoomPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitWebAudioEnabledPreferenceKey,
         [NSNumber numberWithBool:YES],  WebKitBackspaceKeyNavigationEnabledKey,
         [NSNumber numberWithBool:NO],   WebKitShouldDisplaySubtitlesPreferenceKey,
@@ -526,9 +528,9 @@ public:
         [NSNumber numberWithBool:YES],  WebKitNotificationsEnabledKey,
         [NSNumber numberWithBool:NO],   WebKitShouldRespectImageOrientationKey,
 #else
-        [NSNumber numberWithBool:YES],  WebKitMediaPlaybackRequiresUserGesturePreferenceKey,
-        [NSNumber numberWithBool:NO],   WebKitMediaPlaybackAllowsInlinePreferenceKey,
-        [NSNumber numberWithBool:YES],  WebKitMediaPlaybackAllowsAirPlayPreferenceKey,
+        [NSNumber numberWithBool:YES],  WebKitRequiresUserGestureForMediaPlaybackPreferenceKey,
+        [NSNumber numberWithBool:NO],   WebKitAllowsInlineMediaPlaybackPreferenceKey,
+        [NSNumber numberWithBool:NO],   WebKitMediaControlsScaleWithPageZoomPreferenceKey,
         [NSNumber numberWithUnsignedInt:AudioSession::None],  WebKitAudioSessionCategoryOverride,
 #if HAVE(AVKIT)
         [NSNumber numberWithBool:YES],  WebKitAVKitEnabled,
@@ -544,7 +546,10 @@ public:
 
         [NSNumber numberWithBool:YES],   WebKitShouldRespectImageOrientationKey,
 #endif // PLATFORM(IOS)
-        [NSNumber numberWithBool:YES],  WebKitAllowsAlternateFullscreenPreferenceKey,
+#if ENABLE(WIRELESS_TARGET_PLAYBACK)
+        [NSNumber numberWithBool:YES],  WebKitAllowsAirPlayForMediaPlaybackPreferenceKey,
+#endif
+        [NSNumber numberWithBool:YES],  WebKitAllowsPictureInPictureMediaPlaybackPreferenceKey,
         [NSNumber numberWithBool:YES],  WebKitRequestAnimationFrameEnabledPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitWantsBalancedSetDefersLoadingBehaviorKey,
         [NSNumber numberWithBool:NO],   WebKitDiagnosticLoggingEnabledKey,
@@ -1149,6 +1154,22 @@ public:
 - (BOOL)suppressesIncrementalRendering
 {
     return [self _boolValueForKey:WebKitSuppressesIncrementalRenderingKey];
+}
+
+- (BOOL)allowsAirPlayForMediaPlayback
+{
+#if ENABLE(WIRELESS_TARGET_PLAYBACK)
+    return [self _boolValueForKey:WebKitAllowsAirPlayForMediaPlaybackPreferenceKey];
+#else
+    return false;
+#endif
+}
+
+- (void)setAllowsAirPlayForMediaPlayback:(BOOL)flag
+{
+#if ENABLE(WIRELESS_TARGET_PLAYBACK)
+    [self _setBoolValue:flag forKey:WebKitAllowsAirPlayForMediaPlaybackPreferenceKey];
+#endif
 }
 
 @end
@@ -2078,12 +2099,12 @@ static NSString *classIBCreatorID = nil;
 #if PLATFORM(IOS)
 - (BOOL)mediaPlaybackAllowsAirPlay
 {
-    return [self _boolValueForKey:WebKitMediaPlaybackAllowsAirPlayPreferenceKey];
+    return [self _boolValueForKey:WebKitAllowsAirPlayForMediaPlaybackPreferenceKey];
 }
 
 - (void)setMediaPlaybackAllowsAirPlay:(BOOL)flag
 {
-    [self _setBoolValue:flag forKey:WebKitMediaPlaybackAllowsAirPlayPreferenceKey];
+    [self _setBoolValue:flag forKey:WebKitAllowsAirPlayForMediaPlaybackPreferenceKey];
 }
 
 - (unsigned)audioSessionCategoryOverride
@@ -2159,32 +2180,52 @@ static NSString *classIBCreatorID = nil;
 
 - (BOOL)mediaPlaybackRequiresUserGesture
 {
-    return [self _boolValueForKey:WebKitMediaPlaybackRequiresUserGesturePreferenceKey];
+    return [self _boolValueForKey:WebKitRequiresUserGestureForMediaPlaybackPreferenceKey];
 }
 
 - (void)setMediaPlaybackRequiresUserGesture:(BOOL)flag
 {
-    [self _setBoolValue:flag forKey:WebKitMediaPlaybackRequiresUserGesturePreferenceKey];
+    [self _setBoolValue:flag forKey:WebKitRequiresUserGestureForMediaPlaybackPreferenceKey];
 }
 
 - (BOOL)mediaPlaybackAllowsInline
 {
-    return [self _boolValueForKey:WebKitMediaPlaybackAllowsInlinePreferenceKey];
+    return [self _boolValueForKey:WebKitAllowsInlineMediaPlaybackPreferenceKey];
 }
 
 - (void)setMediaPlaybackAllowsInline:(BOOL)flag
 {
-    [self _setBoolValue:flag forKey:WebKitMediaPlaybackAllowsInlinePreferenceKey];
+    [self _setBoolValue:flag forKey:WebKitAllowsInlineMediaPlaybackPreferenceKey];
+}
+
+- (BOOL)mediaControlsScaleWithPageZoom
+{
+    return [self _boolValueForKey:WebKitMediaControlsScaleWithPageZoomPreferenceKey];
+}
+
+- (void)setMediaControlsScaleWithPageZoom:(BOOL)flag
+{
+    [self _setBoolValue:flag forKey:WebKitMediaControlsScaleWithPageZoomPreferenceKey];
 }
 
 - (BOOL)allowsAlternateFullscreen
 {
-    return [self _boolValueForKey:WebKitAllowsAlternateFullscreenPreferenceKey];
+    return [self allowsPictureInPictureMediaPlayback];
 }
 
 - (void)setAllowsAlternateFullscreen:(BOOL)flag
 {
-    [self _setBoolValue:flag forKey:WebKitAllowsAlternateFullscreenPreferenceKey];
+    [self setAllowsPictureInPictureMediaPlayback:flag];
+}
+
+- (BOOL)allowsPictureInPictureMediaPlayback
+{
+    return [self _boolValueForKey:WebKitAllowsPictureInPictureMediaPlaybackPreferenceKey];
+}
+
+- (void)setAllowsPictureInPictureMediaPlayback:(BOOL)flag
+{
+    [self _setBoolValue:flag forKey:WebKitAllowsPictureInPictureMediaPlaybackPreferenceKey];
 }
 
 - (BOOL)mockScrollbarsEnabled
@@ -2494,6 +2535,26 @@ static NSString *classIBCreatorID = nil;
 - (BOOL)antialiasedFontDilationEnabled
 {
     return [self _boolValueForKey:WebKitAntialiasedFontDilationEnabledKey];
+}
+
+- (void)setMetaRefreshEnabled:(BOOL)enabled
+{
+    [self setHTTPEquivEnabled:enabled];
+}
+
+- (BOOL)metaRefreshEnabled
+{
+    return [self httpEquivEnabled];
+}
+
+- (void)setHTTPEquivEnabled:(BOOL)enabled
+{
+    [self _setBoolValue:enabled forKey:WebKitHTTPEquivEnabledPreferenceKey];
+}
+
+- (BOOL)httpEquivEnabled
+{
+    return [self _boolValueForKey:WebKitHTTPEquivEnabledPreferenceKey];
 }
 
 - (BOOL)javaScriptMarkupEnabled

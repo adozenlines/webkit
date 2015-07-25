@@ -31,9 +31,10 @@
 #include "AudioDestinationNode.h"
 #include "EventListener.h"
 #include "EventTarget.h"
+#include "JSDOMPromise.h"
 #include "MediaCanStartListener.h"
 #include "MediaProducer.h"
-#include "MediaSession.h"
+#include "PlatformMediaSession.h"
 #include <atomic>
 #include <wtf/HashSet.h>
 #include <wtf/MainThread.h>
@@ -76,7 +77,7 @@ class PeriodicWave;
 // AudioContext is the cornerstone of the web audio API and all AudioNodes are created from it.
 // For thread safety between the audio thread and the main thread, it has a rendering graph locking mechanism. 
 
-class AudioContext : public ActiveDOMObject, public ThreadSafeRefCounted<AudioContext>, public EventTargetWithInlineData, public MediaCanStartListener, public MediaProducer, private MediaSessionClient {
+class AudioContext : public ActiveDOMObject, public ThreadSafeRefCounted<AudioContext>, public EventTargetWithInlineData, public MediaCanStartListener, public MediaProducer, private PlatformMediaSessionClient {
 public:
     // Create an AudioContext for rendering to the audio hardware.
     static RefPtr<AudioContext> create(Document&, ExceptionCode&);
@@ -88,6 +89,8 @@ public:
     bool isOfflineContext() { return m_isOfflineContext; }
 
     Document* document() const; // ASSERTs if document no longer exists.
+
+    const Document* hostingDocument() const override;
 
     AudioDestinationNode* destination() { return m_destinationNode.get(); }
     size_t currentSampleFrame() const { return m_destinationNode->currentSampleFrame(); }
@@ -106,9 +109,15 @@ public:
 
     AudioListener* listener() { return m_listener.get(); }
 
-    void suspendContext(std::function<void()>, std::function<void()>, ExceptionCode&);
-    void resumeContext(std::function<void()>, std::function<void()>, ExceptionCode&);
-    void closeContext(std::function<void()>, std::function<void()>, ExceptionCode&);
+    using ActiveDOMObject::suspend;
+    using ActiveDOMObject::resume;
+
+    typedef DOMPromise<std::nullptr_t, ExceptionCode> Promise;
+
+    void suspend(Promise&&);
+    void resume(Promise&&);
+    void close(Promise&&);
+
     const AtomicString& state() const;
 
     // The AudioNode create methods are called on the main thread (from JavaScript).
@@ -306,14 +315,14 @@ private:
     // Make sure to dereference them here.
     void derefUnfinishedSourceNodes();
 
-    // MediaSessionClient
-    virtual MediaSession::MediaType mediaType() const { return MediaSession::WebAudio; }
-    virtual MediaSession::MediaType presentationType() const { return MediaSession::WebAudio; }
-    virtual bool canReceiveRemoteControlCommands() const { return false; }
-    virtual void didReceiveRemoteControlCommand(MediaSession::RemoteControlCommandType) { }
-    virtual bool overrideBackgroundPlaybackRestriction() const { return false; }
-    virtual void suspendPlayback() override;
+    // PlatformMediaSessionClient
+    virtual PlatformMediaSession::MediaType mediaType() const override { return PlatformMediaSession::WebAudio; }
+    virtual PlatformMediaSession::MediaType presentationType() const override { return PlatformMediaSession::WebAudio; }
     virtual void mayResumePlayback(bool shouldResume) override;
+    virtual void suspendPlayback() override;
+    virtual bool canReceiveRemoteControlCommands() const override { return false; }
+    virtual void didReceiveRemoteControlCommand(PlatformMediaSession::RemoteControlCommandType) override { }
+    virtual bool overrideBackgroundPlaybackRestriction() const override { return false; }
 
     // EventTarget
     virtual void refEventTarget() override { ref(); }
@@ -322,7 +331,7 @@ private:
     void handleDirtyAudioSummingJunctions();
     void handleDirtyAudioNodeOutputs();
 
-    void addReaction(State, std::function<void()>);
+    void addReaction(State, Promise&&);
     void updateAutomaticPullNodes();
 
     // Only accessed in the audio thread.
@@ -359,9 +368,9 @@ private:
     Vector<AudioNode*> m_renderingAutomaticPullNodes;
     // Only accessed in the audio thread.
     Vector<AudioNode*> m_deferredFinishDerefList;
-    Vector<Vector<std::function<void()>>> m_stateReactions;
+    Vector<Vector<Promise>> m_stateReactions;
 
-    std::unique_ptr<MediaSession> m_mediaSession;
+    std::unique_ptr<PlatformMediaSession> m_mediaSession;
     std::unique_ptr<GenericEventQueue> m_eventQueue;
 
     RefPtr<AudioBuffer> m_renderTarget;

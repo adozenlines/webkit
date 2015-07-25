@@ -45,6 +45,7 @@
 #if PLATFORM(COCOA)
 OBJC_CLASS NSAttributedString;
 OBJC_CLASS NSDictionary;
+OBJC_CLASS NSMutableDictionary;
 #endif
 
 namespace WebCore {
@@ -183,8 +184,10 @@ public:
     bool dispatchCPPEvent(const AtomicString&, DataTransferAccessPolicy);
     
     WEBCORE_EXPORT void applyStyle(StyleProperties*, EditAction = EditActionUnspecified);
+    void applyStyle(RefPtr<EditingStyle>&&, EditAction);
     void applyParagraphStyle(StyleProperties*, EditAction = EditActionUnspecified);
     WEBCORE_EXPORT void applyStyleToSelection(StyleProperties*, EditAction);
+    WEBCORE_EXPORT void applyStyleToSelection(Ref<EditingStyle>&&, EditAction);
     void applyParagraphStyleToSelection(StyleProperties*, EditAction);
 
     void appliedEditing(PassRefPtr<CompositeEditCommand>);
@@ -361,7 +364,8 @@ public:
     const VisibleSelection& mark() const; // Mark, to be used as emacs uses it.
     void setMark(const VisibleSelection&);
 
-    WEBCORE_EXPORT void computeAndSetTypingStyle(StyleProperties* , EditAction = EditActionUnspecified);
+    void computeAndSetTypingStyle(EditingStyle& , EditAction = EditActionUnspecified);
+    WEBCORE_EXPORT void computeAndSetTypingStyle(StyleProperties& , EditAction = EditActionUnspecified);
     WEBCORE_EXPORT void applyEditingStyleToBodyElement() const;
     void applyEditingStyleToElement(Element*) const;
 
@@ -421,6 +425,7 @@ public:
 
 #if PLATFORM(COCOA)
     WEBCORE_EXPORT static RenderStyle* styleForSelectionStart(Frame* , Node *&nodeToRemove);
+    void getTextDecorationAttributesRespectingTypingStyle(RenderStyle&, NSMutableDictionary*) const;
     WEBCORE_EXPORT bool insertParagraphSeparatorInQuotedContent();
     WEBCORE_EXPORT const Font* fontForSelection(bool&) const;
     WEBCORE_EXPORT NSDictionary *fontAttributesForSelectionStart() const;

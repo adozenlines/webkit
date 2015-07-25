@@ -61,6 +61,9 @@ App.Bug = App.Model.extend({
     bugTracker: DS.belongsTo('BugTracker'),
     createdAt: DS.attr('date'),
     number: DS.attr('number'),
+    url: function () {
+        return this.get('bugTracker').urlFromBugNumber(this.get('number'));
+    }.property('bugTracker.bugUrl', 'number'),
     label: function () {
         return this.get('bugTracker').get('label') + ': ' + this.get('number');
     }.property('name', 'bugTracker'),
@@ -95,6 +98,12 @@ App.BugAdapter = DS.RESTAdapter.extend({
             param['id'] = data['bugId'];
             return {'bug': param};
         });
+    },
+    deleteRecord: function (store, type, record)
+    {
+        return PrivilegedAPI.sendRequest('associate-bug', {bugToDelete: record.get('id')}).then(function () {
+            return {};
+        });
     }
 });
 
@@ -120,21 +129,23 @@ App.TestGroup = App.NameLabelModel.extend({
     createdAt: DS.attr('date'),
     buildRequests: DS.hasMany('buildRequests'),
     rootSets: DS.hasMany('rootSets'),
+    platform: DS.belongsTo('platform'),
     _fetchTestResults: function ()
     {
         var task = this.get('task');
-        if (!task)
+        var platform = this.get('platform') || (task ? task.get('platform') : null)
+        if (!task || !platform)
             return null;
         var self = this;
         return App.Manifest.fetchRunsWithPlatformAndMetric(this.store,
-            task.get('platform').get('id'), task.get('metric').get('id'), this.get('id')).then(
+            platform.get('id'), task.get('metric').get('id'), this.get('id')).then(
             function (result) { self.set('testResults', result.data); },
             function (error) {
                 // FIXME: Somehow this never gets called.
                 alert('Failed to fetch the results:' + error);
                 return null;
             });
-    }.observes('task', 'task.platform', 'task.metric').on('init'),
+    }.observes('task', 'task.platform', 'task.metric', 'platform').on('init'),
 });
 
 App.TestGroup.create = function (analysisTask, name, rootSets, repetitionCount)

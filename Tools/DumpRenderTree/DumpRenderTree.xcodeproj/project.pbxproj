@@ -839,6 +839,8 @@
 		08FB7793FE84155DC02AAC07 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
+				LastSwiftUpdateCheck = 0700;
+				LastUpgradeCheck = 0700;
 			};
 			buildConfigurationList = 149C29C308902C6D008A9EFC /* Build configuration list for PBXProject "DumpRenderTree" */;
 			compatibilityVersion = "Xcode 3.2";
@@ -1133,7 +1135,7 @@
 			buildSettings = {
 				INSTALL_PATH = "$(SYSTEM_LIBRARY_DIR)/Frameworks/$(WEBKIT_FRAMEWORK_RESOURCES_PATH)";
 				PRODUCT_NAME = All;
-				WTF_USE_EXPORT_MACROS = 0;
+				USE_EXPORT_MACROS = 0;
 			};
 			name = Production;
 		};
@@ -1219,12 +1221,12 @@
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = All;
 				SECTORDER_FLAGS = "";
+				USE_EXPORT_MACROS = 0;
 				WARNING_CFLAGS = (
 					"-Wmost",
 					"-Wno-four-char-constants",
 					"-Wno-unknown-pragmas",
 				);
-				WTF_USE_EXPORT_MACROS = 0;
 			};
 			name = Debug;
 		};
@@ -1237,12 +1239,12 @@
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = All;
 				SECTORDER_FLAGS = "";
+				USE_EXPORT_MACROS = 0;
 				WARNING_CFLAGS = (
 					"-Wmost",
 					"-Wno-four-char-constants",
 					"-Wno-unknown-pragmas",
 				);
-				WTF_USE_EXPORT_MACROS = 0;
 			};
 			name = Release;
 		};

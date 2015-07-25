@@ -47,7 +47,7 @@ class RenderStyle;
 
 class RenderThemeSafari : public RenderTheme {
 public:
-    static PassRefPtr<RenderTheme> create();
+    static Ref<RenderTheme> create();
 
     // A method to obtain the baseline position for a "leaf" control.  This will only be used if a baseline
     // position cannot be determined by examining child content. Checkboxes and radio buttons are examples of
@@ -139,8 +139,6 @@ protected:
     virtual void adjustMeterStyle(StyleResolver&, RenderStyle&, Element*) const override;
     virtual bool paintMeter(const RenderObject&, const PaintInfo&, const IntRect&) override;
 #endif
-
-    virtual bool shouldShowPlaceholderWhenFocused() const { return true; }
 
 private:
     RenderThemeSafari();

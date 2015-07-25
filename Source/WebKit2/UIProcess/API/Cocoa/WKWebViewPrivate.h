@@ -39,6 +39,8 @@ typedef NS_ENUM(NSInteger, _WKPaginationMode) {
     _WKPaginationModeBottomToTop,
 } WK_ENUM_AVAILABLE(10_10, 8_0);
 
+WK_EXTERN NSString * const _WKShouldOpenExternalURLsKey WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
+
 @class WKBrowsingContextHandle;
 @class _WKRemoteObjectRegistry;
 @class _WKSessionState;
@@ -63,13 +65,15 @@ typedef NS_ENUM(NSInteger, _WKPaginationMode) {
 
 - (void)_loadAlternateHTMLString:(NSString *)string baseURL:(NSURL *)baseURL forUnreachableURL:(NSURL *)unreachableURL;
 
-@property (nonatomic, readonly) NSArray *_certificateChain;
+@property (nonatomic, readonly) NSArray *_certificateChain WK_DEPRECATED(10_10, WK_MAC_TBA, 8_0, WK_IOS_TBA, "use -certificateChain");
 @property (nonatomic, readonly) NSURL *_committedURL;
 @property (nonatomic, readonly) NSString *_MIMEType;
 @property (nonatomic, readonly) NSString *_userAgent WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
 
 @property (copy, setter=_setApplicationNameForUserAgent:) NSString *_applicationNameForUserAgent;
 @property (copy, setter=_setCustomUserAgent:) NSString *_customUserAgent;
+
+@property (nonatomic, setter=_setUserContentExtensionsEnabled:) BOOL _userContentExtensionsEnabled WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
 
 @property (nonatomic, readonly) pid_t _webProcessIdentifier;
 
@@ -93,7 +97,10 @@ typedef NS_ENUM(NSInteger, _WKPaginationMode) {
 - (void)_close;
 
 @property (nonatomic, setter=_setLayoutMode:) _WKLayoutMode _layoutMode;
+// For use with _layoutMode = _WKLayoutModeFixedSize:
 @property (nonatomic, setter=_setFixedLayoutSize:) CGSize _fixedLayoutSize;
+// For use with _layoutMode = _WKLayoutModeDynamicSizeWithMinimumViewSize:
+@property (nonatomic, setter=_setMinimumViewSize:) CGSize _minimumViewSize;
 
 @property (nonatomic, setter=_setViewScale:) CGFloat _viewScale;
 
@@ -124,8 +131,12 @@ typedef NS_ENUM(NSInteger, _WKPaginationMode) {
 
 @property (nonatomic, readonly) _WKWebViewPrintFormatter *_webViewPrintFormatter;
 
+// Indicating whether link preview is allowed. The default value is YES.
+@property (nonatomic, getter=_allowsLinkPreview, setter=_setAllowsLinkPreview:) BOOL _allowsLinkPreview WK_AVAILABLE(NA, WK_IOS_TBA);
+
 - (void)_beginInteractiveObscuredInsetsChange;
 - (void)_endInteractiveObscuredInsetsChange;
+- (void)_hideContentUntilNextUpdate;
 
 - (void)_beginAnimatedResizeWithUpdates:(void (^)(void))updateBlock;
 - (void)_endAnimatedResize;
@@ -151,6 +162,8 @@ typedef NS_ENUM(NSInteger, _WKPaginationMode) {
 - (void (^)(void))_retainActiveFocusedState WK_AVAILABLE(NA, WK_IOS_TBA);
 
 - (void)_becomeFirstResponderWithSelectionMovingForward:(BOOL)selectingForward completionHandler:(void (^)(BOOL didBecomeFirstResponder))completionHandler WK_AVAILABLE(NA, WK_IOS_TBA);
+
+- (id)_snapshotLayerContentsForBackForwardListItem:(WKBackForwardListItem *)item WK_AVAILABLE(NA, WK_IOS_TBA);
 
 #else
 @property (readonly) NSColor *_pageExtendedBackgroundColor;
@@ -190,9 +203,14 @@ typedef NS_ENUM(NSInteger, _WKPaginationMode) {
 @property (nonatomic, weak, setter=_setFormDelegate:) id <_WKFormDelegate> _formDelegate;
 
 @property (nonatomic, readonly, getter=_isDisplayingStandaloneImageDocument) BOOL _displayingStandaloneImageDocument;
+@property (nonatomic, readonly, getter=_isDisplayingStandaloneMediaDocument) BOOL _displayingStandaloneMediaDocument;
 
 @property (nonatomic, setter=_setScrollPerformanceDataCollectionEnabled:) BOOL _scrollPerformanceDataCollectionEnabled WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
 @property (nonatomic, readonly) NSArray *_scrollPerformanceData WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
+
+- (void)_saveBackForwardSnapshotForItem:(WKBackForwardListItem *)item WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
+
+@property (nonatomic, getter=_allowsMediaDocumentInlinePlayback, setter=_setAllowsMediaDocumentInlinePlayback:) BOOL _allowsMediaDocumentInlinePlayback;
 
 @end
 

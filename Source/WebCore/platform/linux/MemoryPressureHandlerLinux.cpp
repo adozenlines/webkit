@@ -65,7 +65,7 @@ static inline String nextToken(FILE* file)
     char buffer[bufferSize] = {0, };
     unsigned index = 0;
     while (index < bufferSize) {
-        char ch = fgetc(file);
+        int ch = fgetc(file);
         if (ch == EOF || (isASCIISpace(ch) && index)) // Break on non-initial ASCII space.
             break;
         if (!isASCIISpace(ch)) {
@@ -101,7 +101,7 @@ void MemoryPressureHandler::waitForMemoryPressureEvent(void*)
 
     MemoryPressureHandler::singleton().setUnderMemoryPressure(critical);
     callOnMainThread([critical] {
-        MemoryPressureHandler::singleton().respondToMemoryPressure(critical);
+        MemoryPressureHandler::singleton().respondToMemoryPressure(critical ? Critical::Yes : Critical::No);
     });
 }
 
@@ -189,17 +189,17 @@ void MemoryPressureHandler::holdOff(unsigned seconds)
     m_holdOffTimer.startOneShot(seconds);
 }
 
-void MemoryPressureHandler::respondToMemoryPressure(bool critical)
+void MemoryPressureHandler::respondToMemoryPressure(Critical critical, Synchronous synchronous)
 {
     uninstall();
 
     double startTime = monotonicallyIncreasingTime();
-    m_lowMemoryHandler(critical);
+    m_lowMemoryHandler(critical, synchronous);
     unsigned holdOffTime = (monotonicallyIncreasingTime() - startTime) * s_holdOffMultiplier;
     holdOff(std::max(holdOffTime, s_minimumHoldOffTime));
 }
 
-void MemoryPressureHandler::platformReleaseMemory(bool)
+void MemoryPressureHandler::platformReleaseMemory(Critical)
 {
     ReliefLogger log("Run malloc_trim");
     malloc_trim(0);

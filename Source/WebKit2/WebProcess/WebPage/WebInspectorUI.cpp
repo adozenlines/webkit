@@ -44,9 +44,9 @@ using namespace WebCore;
 
 namespace WebKit {
 
-PassRefPtr<WebInspectorUI> WebInspectorUI::create(WebPage* page)
+Ref<WebInspectorUI> WebInspectorUI::create(WebPage* page)
 {
-    return adoptRef(new WebInspectorUI(page));
+    return adoptRef(*new WebInspectorUI(page));
 }
 
 WebInspectorUI::WebInspectorUI(WebPage* page)
@@ -81,7 +81,7 @@ void WebInspectorUI::establishConnection(IPC::Attachment encodedConnectionIdenti
 
     m_page->corePage()->inspectorController().setInspectorFrontendClient(this);
 
-    m_backendConnection = IPC::Connection::createClientConnection(connectionIdentifier, *this, RunLoop::main());
+    m_backendConnection = IPC::Connection::createClientConnection(connectionIdentifier, *this);
     m_backendConnection->open();
 }
 
@@ -102,6 +102,11 @@ void WebInspectorUI::frontendLoaded()
     bringToFront();
 }
 
+void WebInspectorUI::startWindowDrag()
+{
+    WebProcess::singleton().parentProcessConnection()->send(Messages::WebInspectorProxy::StartWindowDrag(), m_inspectedPageIdentifier);
+}
+
 void WebInspectorUI::moveWindowBy(float x, float y)
 {
     FloatRect frameRect = m_page->corePage()->chrome().windowRect();
@@ -118,7 +123,8 @@ void WebInspectorUI::closeWindow()
 {
     WebProcess::singleton().parentProcessConnection()->send(Messages::WebInspectorProxy::DidClose(), m_inspectedPageIdentifier);
 
-    m_backendConnection->invalidate();
+    if (m_backendConnection)
+        m_backendConnection->invalidate();
     m_backendConnection = nullptr;
 
     m_inspectedPageIdentifier = 0;
@@ -162,6 +168,11 @@ void WebInspectorUI::setDockSide(DockSide side)
     m_dockSide = side;
 
     evaluateCommandOnLoad(ASCIILiteral("setDockSide"), ASCIILiteral(sideString));
+}
+
+void WebInspectorUI::setDockingUnavailable(bool unavailable)
+{
+    evaluateCommandOnLoad(ASCIILiteral("setDockingUnavailable"), unavailable);
 }
 
 void WebInspectorUI::changeAttachedWindowHeight(unsigned height)
@@ -210,7 +221,7 @@ void WebInspectorUI::showResources()
     evaluateCommandOnLoad(ASCIILiteral("showResources"));
 }
 
-void WebInspectorUI::showMainResourceForFrame(String frameIdentifier)
+void WebInspectorUI::showMainResourceForFrame(const String& frameIdentifier)
 {
     evaluateCommandOnLoad(ASCIILiteral("showMainResourceForFrame"), frameIdentifier);
 }

@@ -33,8 +33,8 @@
 
 #include "FloatRect.h"
 #include "IntRect.h"
-#include "LayoutBoxExtent.h"
 #include "LayoutPoint.h"
+#include "LengthBox.h"
 #include <wtf/Vector.h>
 
 namespace WebCore {
@@ -149,7 +149,7 @@ public:
         m_size.setHeight(m_size.height() + dy + dy);
     }
     void inflate(LayoutUnit d) { inflateX(d); inflateY(d); }
-    WEBCORE_EXPORT void scale(float s);
+    WEBCORE_EXPORT void scale(float);
     void scale(float xScale, float yScale);
 
     LayoutRect transposedRect() const { return LayoutRect(m_location.transposedPoint(), m_size.transposedSize()); }

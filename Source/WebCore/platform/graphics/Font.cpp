@@ -335,8 +335,8 @@ PassRefPtr<Font> Font::nonSyntheticItalicFont() const
         m_derivedFontData = std::make_unique<DerivedFontData>(isCustomFont());
     if (!m_derivedFontData->nonSyntheticItalic) {
         FontPlatformData nonSyntheticItalicFontPlatformData(m_platformData);
-#if PLATFORM(COCOA)
-        nonSyntheticItalicFontPlatformData.m_syntheticOblique = false;
+#if PLATFORM(COCOA) || USE(CAIRO)
+        nonSyntheticItalicFontPlatformData.setSyntheticOblique(false);
 #endif
         m_derivedFontData->nonSyntheticItalic = create(nonSyntheticItalicFontPlatformData, isCustomFont());
     }
@@ -363,7 +363,7 @@ const OpenTypeMathData* Font::mathData() const
     if (!m_mathData) {
         m_mathData = OpenTypeMathData::create(m_platformData);
         if (!m_mathData->hasMathData())
-            m_mathData.clear();
+            m_mathData = nullptr;
     }
     return m_mathData.get();
 }

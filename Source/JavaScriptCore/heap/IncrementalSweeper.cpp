@@ -59,11 +59,6 @@ void IncrementalSweeper::cancelTimer()
     CFRunLoopTimerSetNextFireDate(m_timer.get(), CFAbsoluteTimeGetCurrent() + s_decade);
 }
 
-void IncrementalSweeper::fullSweep()
-{
-    while (sweepNextBlock()) { }
-}
-
 void IncrementalSweeper::doWork()
 {
     doSweep(WTF::monotonicallyIncreasingTime());
@@ -101,18 +96,8 @@ bool IncrementalSweeper::sweepNextBlock()
     return m_vm->heap.sweepNextLogicallyEmptyWeakBlock();
 }
 
-void IncrementalSweeper::startSweeping(Vector<MarkedBlock*>&& blockSnapshot)
+void IncrementalSweeper::startSweeping()
 {
-    m_blocksToSweep = WTF::move(blockSnapshot);
-    scheduleTimer();
-}
-
-void IncrementalSweeper::addBlocksAndContinueSweeping(Vector<MarkedBlock*>&& blockSnapshot)
-{
-    Vector<MarkedBlock*> blocks = WTF::move(blockSnapshot);
-    m_blocksToSweep.appendVector(blocks);
-    std::sort(m_blocksToSweep.begin(), m_blocksToSweep.end());
-    m_blocksToSweep.shrink(std::unique(m_blocksToSweep.begin(), m_blocksToSweep.end()) - m_blocksToSweep.begin());
     scheduleTimer();
 }
 
@@ -134,11 +119,7 @@ void IncrementalSweeper::doWork()
 {
 }
 
-void IncrementalSweeper::startSweeping(Vector<MarkedBlock*>&&)
-{
-}
-
-void IncrementalSweeper::addBlocksAndContinueSweeping(Vector<MarkedBlock*>&&)
+void IncrementalSweeper::startSweeping()
 {
 }
 

@@ -3,7 +3,7 @@
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
  *           (C) 2005 Allan Sandfeld Jensen (kde@carewolf.com)
  *           (C) 2005, 2006 Samuel Weinig (sam.weinig@gmail.com)
- * Copyright (C) 2005, 2006, 2007, 2008, 2009, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2005, 2006, 2007, 2008, 2009, 2013, 2015 Apple Inc. All rights reserved.
  * Copyright (C) 2010, 2012 Google Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -123,8 +123,6 @@ RenderElement::~RenderElement()
         for (const FillLayer* maskLayer = m_style->maskLayers(); maskLayer; maskLayer = maskLayer->next()) {
             if (StyleImage* maskImage = maskLayer->image())
                 maskImage->removeClient(this);
-            else if (maskLayer->maskImage().get())
-                maskLayer->maskImage()->removeRendererImageClient(this);
         }
 
         if (StyleImage* borderImage = m_style->borderImage().image())
@@ -332,17 +330,13 @@ void RenderElement::updateFillImages(const FillLayer* oldLayers, const FillLayer
     
     // Go through the new layers and addClients first, to avoid removing all clients of an image.
     for (const FillLayer* currNew = newLayers; currNew; currNew = currNew->next()) {
-        if (StyleImage* image = currNew->image())
-            image->addClient(this);
-        else if (currNew->maskImage().get())
-            currNew->maskImage()->addRendererImageClient(this);
+        if (currNew->image())
+            currNew->image()->addClient(this);
     }
 
     for (const FillLayer* currOld = oldLayers; currOld; currOld = currOld->next()) {
-        if (StyleImage* image = currOld->image())
-            image->removeClient(this);
-        else if (currOld->maskImage().get())
-            currOld->maskImage()->removeRendererImageClient(this);
+        if (currOld->image())
+            currOld->image()->removeClient(this);
     }
 }
 
@@ -593,6 +587,8 @@ void RenderElement::insertChildInternal(RenderObject* newChild, RenderObject* be
 
     if (AXObjectCache* cache = document().axObjectCache())
         cache->childrenChanged(this, newChild);
+    if (is<RenderBlockFlow>(*this))
+        downcast<RenderBlockFlow>(*this).invalidateLineLayoutPath();
 }
 
 void RenderElement::removeChildInternal(RenderObject& oldChild, NotifyChildrenType notifyChildren)
@@ -902,6 +898,16 @@ void RenderElement::styleWillChange(StyleDifference diff, const RenderStyle& new
         }
     }
 
+#if ENABLE(CSS_SCROLL_SNAP)
+    if (!newStyle.scrollSnapCoordinates().isEmpty() || (oldStyle && !oldStyle->scrollSnapCoordinates().isEmpty())) {
+        ASSERT(is<RenderBox>(this));
+        if (newStyle.scrollSnapCoordinates().isEmpty())
+            view().unregisterBoxWithScrollSnapCoordinates(downcast<RenderBox>(*this));
+        else
+            view().registerBoxWithScrollSnapCoordinates(downcast<RenderBox>(*this));
+    }
+#endif
+
     if (isRoot() || isBody())
         view().frameView().updateExtendBackgroundIfNecessary();
 }
@@ -1055,6 +1061,14 @@ void RenderElement::willBeRemovedFromTree()
 
     if (auto* containerFlowThread = parent()->renderNamedFlowThreadWrapper())
         containerFlowThread->removeFlowChild(*this);
+
+    
+#if ENABLE(CSS_SCROLL_SNAP)
+    if (!m_style->scrollSnapCoordinates().isEmpty()) {
+        ASSERT(is<RenderBox>(this));
+        view().unregisterBoxWithScrollSnapCoordinates(downcast<RenderBox>(*this));
+    }
+#endif
 
     RenderObject::willBeRemovedFromTree();
 }
@@ -1216,7 +1230,7 @@ static bool mustRepaintFillLayers(const RenderElement& renderer, const FillLayer
 
     if (sizeType == SizeLength) {
         LengthSize size = layer->sizeLength();
-        if (size.width().isPercent() || size.height().isPercent())
+        if (size.width().isPercentOrCalculated() || size.height().isPercentOrCalculated())
             return true;
         // If the image has neither an intrinsic width nor an intrinsic height, its size is determined as for 'contain'.
         if ((size.width().isAuto() || size.height().isAuto()) && image->isGeneratedImage())
@@ -1561,7 +1575,7 @@ Color RenderElement::selectionColor(int colorProperty) const
     // If the element is unselectable, or we are only painting the selection,
     // don't override the foreground color with the selection foreground color.
     if (style().userSelect() == SELECT_NONE
-        || (view().frameView().paintBehavior() & PaintBehaviorSelectionOnly))
+        || (view().frameView().paintBehavior() & (PaintBehaviorSelectionOnly | PaintBehaviorSelectionAndBackgroundsOnly)))
         return Color();
 
     if (RefPtr<RenderStyle> pseudoStyle = selectionPseudoStyle()) {
@@ -1717,17 +1731,8 @@ bool RenderElement::getTrailingCorner(FloatPoint& point) const
 LayoutRect RenderElement::anchorRect() const
 {
     FloatPoint leading, trailing;
-    bool foundLeading = getLeadingCorner(leading);
-    bool foundTrailing = getTrailingCorner(trailing);
-    
-    // If we've found one corner, but not the other,
-    // then we should just return a point at the corner that we did find.
-    if (foundLeading != foundTrailing) {
-        if (foundLeading)
-            foundTrailing = foundLeading;
-        else
-            foundLeading = foundTrailing;
-    }
+    getLeadingCorner(leading);
+    getTrailingCorner(trailing);
 
     FloatPoint upperLeft = leading;
     FloatPoint lowerRight = trailing;

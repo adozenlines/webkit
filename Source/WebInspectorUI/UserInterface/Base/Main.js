@@ -41,6 +41,12 @@ WebInspector.DebuggableType = {
 WebInspector.SelectedSidebarPanelCookieKey = "selected-sidebar-panel";
 WebInspector.TypeIdentifierCookieKey = "represented-object-type";
 
+WebInspector.StateRestorationType = {
+    Load: "state-restoration-load",
+    Navigation: "state-restoration-navigation",
+    Delayed: "state-restoration-delayed",
+};
+
 WebInspector.loaded = function()
 {
     // Initialize WebSocket to communication.
@@ -84,7 +90,7 @@ WebInspector.loaded = function()
         InspectorAgent.enable();
 
     // Perform one-time tasks.
-    WebInspector.CSSCompletions.requestCSSNameCompletions();
+    WebInspector.CSSCompletions.requestCSSCompletions();
     this._generateDisclosureTriangleImages();
 
     // Listen for the ProvisionalLoadStarted event before registering for events so our code gets called before any managers or sidebars.
@@ -140,7 +146,7 @@ WebInspector.loaded = function()
     this._showingSplitConsoleSetting = new WebInspector.Setting("showing-split-console", false);
     this._splitConsoleHeightSetting = new WebInspector.Setting("split-console-height", 150);
 
-    this._openTabsSetting = new WebInspector.Setting("open-tabs", ["elements", "resources", "timeline", "debugger", "console"]);
+    this._openTabsSetting = new WebInspector.Setting("open-tab-types", ["elements", "network", "resources", "timeline", "debugger", "storage", "console"]);
     this._selectedTabIndexSetting = new WebInspector.Setting("selected-tab-index", 0);
 
     this.showShadowDOMSetting = new WebInspector.Setting("show-shadow-dom", false);
@@ -184,8 +190,6 @@ WebInspector.contentLoaded = function()
     document.body.classList.add(WebInspector.Platform.name + "-platform");
     if (WebInspector.Platform.isNightlyBuild)
         document.body.classList.add("nightly-build");
-    if (WebInspector.Platform.isLegacyMacOS)
-        document.body.classList.add("legacy");
     if (WebInspector.Platform.version.name)
         document.body.classList.add(WebInspector.Platform.version.name);
 
@@ -254,7 +258,7 @@ WebInspector.contentLoaded = function()
     this.stepIntoAlternateKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.CommandOrControl, WebInspector.KeyboardShortcut.Key.Semicolon, this.debuggerStepInto.bind(this));
     this.stepOutAlternateKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.Shift | WebInspector.KeyboardShortcut.Modifier.CommandOrControl, WebInspector.KeyboardShortcut.Key.Semicolon, this.debuggerStepOut.bind(this));
 
-    this._closeToolbarButton = new WebInspector.ControlToolbarItem("dock-close", WebInspector.UIString("Close"), platformImagePath("Close.svg"), 16, 14);
+    this._closeToolbarButton = new WebInspector.ControlToolbarItem("dock-close", WebInspector.UIString("Close"), "Images/Close.svg", 16, 14);
     this._closeToolbarButton.addEventListener(WebInspector.ButtonNavigationItem.Event.Clicked, this.close, this);
 
     this._undockToolbarButton = new WebInspector.ButtonToolbarItem("undock", WebInspector.UIString("Detach into separate window"), null, "Images/Undock.svg");
@@ -317,7 +321,6 @@ WebInspector.contentLoaded = function()
     this.applicationCacheDetailsSidebarPanel = new WebInspector.ApplicationCacheDetailsSidebarPanel;
     this.scopeChainDetailsSidebarPanel = new WebInspector.ScopeChainDetailsSidebarPanel;
     this.probeDetailsSidebarPanel = new WebInspector.ProbeDetailsSidebarPanel;
-    this.renderingFrameDetailsSidebarPanel = new WebInspector.RenderingFrameDetailsSidebarPanel;
 
     if (window.LayerTreeAgent)
         this.layerTreeDetailsSidebarPanel = new WebInspector.LayerTreeDetailsSidebarPanel;
@@ -326,6 +329,8 @@ WebInspector.contentLoaded = function()
 
     this.toolbar.element.addEventListener("mousedown", this._toolbarMouseDown.bind(this));
     document.getElementById("docked-resizer").addEventListener("mousedown", this._dockedResizerMouseDown.bind(this));
+
+    this._dockingAvailable = false;
 
     this._updateDockNavigationItems();
     this._updateToolbarHeight();
@@ -344,7 +349,7 @@ WebInspector.contentLoaded = function()
         this.tabBrowser.addTabForContentView(tabContentView, true);
     }
 
-    this._restoreCookieForOpenTabs();
+    this._restoreCookieForOpenTabs(WebInspector.StateRestorationType.Load);
 
     this.tabBar.selectedTabBarItem = this._selectedTabIndexSetting.value;
 
@@ -378,6 +383,10 @@ WebInspector.isTabTypeAllowed = function(tabType)
     switch (tabType) {
     case WebInspector.ElementsTabContentView.Type:
         return !!window.DOMAgent;
+    case WebInspector.NetworkTabContentView.Type:
+        return !!window.NetworkAgent && !!window.PageAgent;
+    case WebInspector.StorageTabContentView.Type:
+        return !!window.DOMStorageAgent || !!window.DatabaseAgent || !!window.IndexedDBAgent;
     case WebInspector.TimelineTabContentView.Type:
         return !!window.TimelineAgent;
     }
@@ -388,20 +397,24 @@ WebInspector.isTabTypeAllowed = function(tabType)
 WebInspector._tabContentViewForType = function(tabType)
 {
     switch (tabType) {
-    case WebInspector.ElementsTabContentView.Type:
-        return new WebInspector.ElementsTabContentView;
-    case WebInspector.ResourcesTabContentView.Type:
-        return new WebInspector.ResourcesTabContentView;
-    case WebInspector.TimelineTabContentView.Type:
-        return new WebInspector.TimelineTabContentView;
-    case WebInspector.DebuggerTabContentView.Type:
-        return new WebInspector.DebuggerTabContentView;
     case WebInspector.ConsoleTabContentView.Type:
         return new WebInspector.ConsoleTabContentView;
+    case WebInspector.DebuggerTabContentView.Type:
+        return new WebInspector.DebuggerTabContentView;
+    case WebInspector.ElementsTabContentView.Type:
+        return new WebInspector.ElementsTabContentView;
+    case WebInspector.NetworkTabContentView.Type:
+        return new WebInspector.NetworkTabContentView;
+    case WebInspector.NewTabContentView.Type:
+        return new WebInspector.NewTabContentView;
+    case WebInspector.ResourcesTabContentView.Type:
+        return new WebInspector.ResourcesTabContentView;
     case WebInspector.SearchTabContentView.Type:
         return new WebInspector.SearchTabContentView;
-    case WebInspector.NewTabTabContentView.Type:
-        return new WebInspector.NewTabTabContentView;
+    case WebInspector.StorageTabContentView.Type:
+        return new WebInspector.StorageTabContentView;
+    case WebInspector.TimelineTabContentView.Type:
+        return new WebInspector.TimelineTabContentView;
     default:
         console.error("Unknown tab type", tabType);
     }
@@ -428,7 +441,10 @@ WebInspector._rememberOpenTabs = function()
 
 WebInspector._updateNewTabButtonState = function(event)
 {
-    var newTabAllowed = this.isNewTabWithTypeAllowed(WebInspector.ConsoleTabContentView.Type) || this.isNewTabWithTypeAllowed(WebInspector.ElementsTabContentView.Type);
+    var newTabAllowed = this.isNewTabWithTypeAllowed(WebInspector.ConsoleTabContentView.Type) || this.isNewTabWithTypeAllowed(WebInspector.ElementsTabContentView.Type)
+        || this.isNewTabWithTypeAllowed(WebInspector.ResourcesTabContentView.Type) || this.isNewTabWithTypeAllowed(WebInspector.StorageTabContentView.Type)
+        || this.isNewTabWithTypeAllowed(WebInspector.TimelineTabContentView.Type) || this.isNewTabWithTypeAllowed(WebInspector.DebuggerTabContentView.Type)
+        || this.isNewTabWithTypeAllowed(WebInspector.NetworkTabContentView.Type);
     this.tabBar.newTabItem.disabled = !newTabAllowed;
 };
 
@@ -485,7 +501,7 @@ WebInspector.activateExtraDomains = function(domains)
 
     this.notifications.dispatchEventToListeners(WebInspector.Notification.ExtraDomainsActivated, {"domains": domains});
 
-    WebInspector.CSSCompletions.requestCSSNameCompletions();
+    WebInspector.CSSCompletions.requestCSSCompletions();
 
     this._updateReloadToolbarButton();
     this._updateDownloadToolbarButton();
@@ -503,10 +519,12 @@ WebInspector.activateExtraDomains = function(domains)
 
         this.tabBrowser.addTabForContentView(tabContentView, true);
 
-        tabContentView.restoreStateFromCookie();
+        tabContentView.restoreStateFromCookie(WebInspector.StateRestorationType.Load);
     }
 
     this._pendingOpenTabTypes = stillPendingOpenTabTypes;
+
+    this._updateNewTabButtonState();
 };
 
 WebInspector.contentBrowserTreeElementForRepresentedObject = function(contentBrowser, representedObject)
@@ -544,6 +562,13 @@ WebInspector.updateWindowTitle = function()
     // The name "inspectedURLChanged" sounds like the whole URL is required, however this is only
     // used for updating the window title and it can be any string.
     InspectorFrontendHost.inspectedURLChanged(title);
+};
+
+WebInspector.updateDockingAvailability = function(available)
+{
+    this._dockingAvailable = available;
+
+    this._updateDockNavigationItems();
 };
 
 WebInspector.updateDockedState = function(side)
@@ -633,6 +658,25 @@ WebInspector.close = function()
     this._isClosing = true;
 
     InspectorFrontendHost.closeWindow();
+};
+
+WebInspector.saveDataToFile = function(saveData, forceSaveAs)
+{
+    console.assert(saveData);
+    if (!saveData)
+        return;
+
+    if (typeof saveData.customSaveHandler === "function") {
+        saveData.customSaveHandler(forceSaveAs);
+        return;
+    }
+
+    console.assert(saveData.url);
+    console.assert(typeof saveData.content === "string");
+    if (!saveData.url || typeof saveData.content !== "string")
+        return;
+
+    InspectorFrontendHost.save(saveData.url, saveData.content, false, forceSaveAs || saveData.forceSaveAs);
 };
 
 WebInspector.isConsoleFocused = function()
@@ -735,7 +779,7 @@ WebInspector.showElementsTab = function()
     this.tabBrowser.showTabForContentView(tabContentView);
 };
 
-WebInspector.showDebuggerTab = function(breakpointToSelect)
+WebInspector.showDebuggerTab = function(breakpointToSelect, showScopeChainDetailsSidebarPanel)
 {
     var tabContentView = this.tabBrowser.bestTabContentViewForClass(WebInspector.DebuggerTabContentView);
     if (!tabContentView)
@@ -743,6 +787,9 @@ WebInspector.showDebuggerTab = function(breakpointToSelect)
 
     if (breakpointToSelect instanceof WebInspector.Breakpoint)
         tabContentView.revealAndSelectBreakpoint(breakpointToSelect);
+
+    if (showScopeChainDetailsSidebarPanel)
+        tabContentView.showScopeChainDetailsSidebarPanel();
 
     this.tabBrowser.showTabForContentView(tabContentView);
 };
@@ -752,6 +799,22 @@ WebInspector.showResourcesTab = function()
     var tabContentView = this.tabBrowser.bestTabContentViewForClass(WebInspector.ResourcesTabContentView);
     if (!tabContentView)
         tabContentView = new WebInspector.ResourcesTabContentView;
+    this.tabBrowser.showTabForContentView(tabContentView);
+};
+
+WebInspector.showStorageTab = function()
+{
+    var tabContentView = this.tabBrowser.bestTabContentViewForClass(WebInspector.StorageTabContentView);
+    if (!tabContentView)
+        tabContentView = new WebInspector.StorageTabContentView;
+    this.tabBrowser.showTabForContentView(tabContentView);
+};
+
+WebInspector.showNetworkTab = function()
+{
+    var tabContentView = this.tabBrowser.bestTabContentViewForClass(WebInspector.NetworkTabContentView);
+    if (!tabContentView)
+        tabContentView = new WebInspector.NetworkTabContentView;
     this.tabBrowser.showTabForContentView(tabContentView);
 };
 
@@ -868,33 +931,31 @@ WebInspector.tabContentViewForRepresentedObject = function(representedObject)
     return tabContentView;
 };
 
-WebInspector.showRepresentedObject = function(representedObject, cookie, forceShowTab)
+WebInspector.showRepresentedObject = function(representedObject, cookie)
 {
     var tabContentView = this.tabContentViewForRepresentedObject(representedObject);
     console.assert(tabContentView);
     if (!tabContentView)
         return;
 
-    if (window.event || forceShowTab)
-        this.tabBrowser.showTabForContentView(tabContentView);
-
+    this.tabBrowser.showTabForContentView(tabContentView);
     tabContentView.showRepresentedObject(representedObject, cookie);
 };
 
-WebInspector.showMainFrameDOMTree = function(nodeToSelect, forceShowTab)
+WebInspector.showMainFrameDOMTree = function(nodeToSelect)
 {
     console.assert(WebInspector.frameResourceManager.mainFrame);
     if (!WebInspector.frameResourceManager.mainFrame)
         return;
-    this.showRepresentedObject(WebInspector.frameResourceManager.mainFrame.domTree, {nodeToSelect}, forceShowTab);
+    this.showRepresentedObject(WebInspector.frameResourceManager.mainFrame.domTree, {nodeToSelect});
 };
 
-WebInspector.showContentFlowDOMTree = function(contentFlow, nodeToSelect, forceShowTab)
+WebInspector.showContentFlowDOMTree = function(contentFlow, nodeToSelect)
 {
-    this.showRepresentedObject(contentFlow, {nodeToSelect}, forceShowTab);
+    this.showRepresentedObject(contentFlow, {nodeToSelect});
 };
 
-WebInspector.showSourceCodeForFrame = function(frameIdentifier, forceShowTab)
+WebInspector.showSourceCodeForFrame = function(frameIdentifier)
 {
     var frame = WebInspector.frameResourceManager.frameForIdentifier(frameIdentifier);
     if (!frame) {
@@ -904,10 +965,10 @@ WebInspector.showSourceCodeForFrame = function(frameIdentifier, forceShowTab)
 
     this._frameIdentifierToShowSourceCodeWhenAvailable = undefined;
 
-    this.showRepresentedObject(frame, null, forceShowTab);
+    this.showRepresentedObject(frame);
 };
 
-WebInspector.showSourceCode = function(sourceCode, positionToReveal, textRangeToSelect, forceUnformatted, forceShowTab)
+WebInspector.showSourceCode = function(sourceCode, positionToReveal, textRangeToSelect, forceUnformatted)
 {
     console.assert(!positionToReveal || positionToReveal instanceof WebInspector.SourceCodePosition, positionToReveal);
     var representedObject = sourceCode;
@@ -918,33 +979,33 @@ WebInspector.showSourceCode = function(sourceCode, positionToReveal, textRangeTo
     }
 
     var cookie = positionToReveal ? {lineNumber: positionToReveal.lineNumber, columnNumber: positionToReveal.columnNumber} : {};
-    this.showRepresentedObject(representedObject, cookie, forceShowTab);
+    this.showRepresentedObject(representedObject, cookie);
 };
 
-WebInspector.showSourceCodeLocation = function(sourceCodeLocation, forceShowTab)
+WebInspector.showSourceCodeLocation = function(sourceCodeLocation)
 {
-    this.showSourceCode(sourceCodeLocation.displaySourceCode, sourceCodeLocation.displayPosition(), null, false, forceShowTab);
+    this.showSourceCode(sourceCodeLocation.displaySourceCode, sourceCodeLocation.displayPosition());
 };
 
-WebInspector.showOriginalUnformattedSourceCodeLocation = function(sourceCodeLocation, forceShowTab)
+WebInspector.showOriginalUnformattedSourceCodeLocation = function(sourceCodeLocation)
 {
     this.showSourceCode(sourceCodeLocation.sourceCode, sourceCodeLocation.position(), null, true);
 };
 
-WebInspector.showOriginalOrFormattedSourceCodeLocation = function(sourceCodeLocation, forceShowTab)
+WebInspector.showOriginalOrFormattedSourceCodeLocation = function(sourceCodeLocation)
 {
-    this.showSourceCode(sourceCodeLocation.sourceCode, sourceCodeLocation.formattedPosition(), null, false, forceShowTab);
+    this.showSourceCode(sourceCodeLocation.sourceCode, sourceCodeLocation.formattedPosition());
 };
 
-WebInspector.showOriginalOrFormattedSourceCodeTextRange = function(sourceCodeTextRange, forceShowTab)
+WebInspector.showOriginalOrFormattedSourceCodeTextRange = function(sourceCodeTextRange)
 {
     var textRangeToSelect = sourceCodeTextRange.formattedTextRange;
-    this.showSourceCode(sourceCodeTextRange.sourceCode, textRangeToSelect.startPosition(), textRangeToSelect, false, forceShowTab);
+    this.showSourceCode(sourceCodeTextRange.sourceCode, textRangeToSelect.startPosition(), textRangeToSelect);
 };
 
-WebInspector.showResourceRequest = function(resource, forceShowTab)
+WebInspector.showResourceRequest = function(resource)
 {
-    this.showRepresentedObject(resource, {[WebInspector.ResourceClusterContentView.ContentViewIdentifierCookieKey]: WebInspector.ResourceClusterContentView.RequestIdentifier}, forceShowTab);
+    this.showRepresentedObject(resource, {[WebInspector.ResourceClusterContentView.ContentViewIdentifierCookieKey]: WebInspector.ResourceClusterContentView.RequestIdentifier});
 };
 
 WebInspector.debuggerToggleBreakpoints = function(event)
@@ -1057,7 +1118,7 @@ WebInspector._captureDidStart = function(event)
 
 WebInspector._debuggerDidPause = function(event)
 {
-    this.showDebuggerTab();
+    this.showDebuggerTab(null, true);
 
     this._dashboardContainer.showDashboardViewForRepresentedObject(this.dashboardManager.dashboards.debugger);
 
@@ -1078,7 +1139,14 @@ WebInspector._frameWasAdded = function(event)
     if (frame.id !== this._frameIdentifierToShowSourceCodeWhenAvailable)
         return;
 
-    this.showSourceCodeForFrame(frame.id);
+    function delayedWork()
+    {
+        this.showSourceCodeForFrame(frame.id);
+    }
+
+    // Delay showing the frame since FrameWasAdded is called before MainFrameChanged.
+    // Calling showSourceCodeForFrame before MainFrameChanged will show the frame then close it.
+    setTimeout(delayedWork.bind(this));
 };
 
 WebInspector._mainFrameDidChange = function(event)
@@ -1095,7 +1163,9 @@ WebInspector._mainResourceDidChange = function(event)
 
     this._inProvisionalLoad = false;
 
-    this._restoreCookieForOpenTabs();
+    // Run cookie restoration after we are sure all of the Tabs and NavigationSidebarPanels
+    // have updated with respect to the main resource change.
+    setTimeout(this._restoreCookieForOpenTabs.bind(this, WebInspector.StateRestorationType.Navigation));
 
     this._updateDownloadToolbarButton();
 
@@ -1112,13 +1182,13 @@ WebInspector._provisionalLoadStarted = function(event)
     this._inProvisionalLoad = true;
 };
 
-WebInspector._restoreCookieForOpenTabs = function(causedByReload)
+WebInspector._restoreCookieForOpenTabs = function(restorationType)
 {
     for (var tabBarItem of this.tabBar.tabBarItems) {
         var tabContentView = tabBarItem.representedObject;
         if (!(tabContentView instanceof WebInspector.TabContentView))
             continue;
-        tabContentView.restoreStateFromCookie(causedByReload);
+        tabContentView.restoreStateFromCookie(restorationType);
     }
 };
 
@@ -1207,10 +1277,17 @@ WebInspector._dockRight = function(event)
 
 WebInspector._updateDockNavigationItems = function()
 {
-    this._closeToolbarButton.hidden = !this.docked;
-    this._undockToolbarButton.hidden = this._dockSide === "undocked";
-    this._dockBottomToolbarButton.hidden = this._dockSide === "bottom";
-    this._dockRightToolbarButton.hidden = this._dockSide === "right";
+    if (this._dockingAvailable || this.docked) {
+        this._closeToolbarButton.hidden = !this.docked;
+        this._undockToolbarButton.hidden = this._dockSide === "undocked";
+        this._dockBottomToolbarButton.hidden = this._dockSide === "bottom";
+        this._dockRightToolbarButton.hidden = this._dockSide === "right";
+    } else {
+        this._closeToolbarButton.hidden = true;
+        this._undockToolbarButton.hidden = true;
+        this._dockBottomToolbarButton.hidden = true;
+        this._dockRightToolbarButton.hidden = true;
+    }
 };
 
 WebInspector._tabBrowserSizeDidChange = function()
@@ -1232,7 +1309,7 @@ WebInspector._sidebarWidthDidChange = function(event)
 
 WebInspector._updateToolbarHeight = function()
 {
-    if (WebInspector.Platform.isLegacyMacOS)
+    if (WebInspector.Platform.name === "mac" && WebInspector.Platform.version.release < 10)
         InspectorFrontendHost.setToolbarHeight(this.toolbar.element.offsetHeight);
 };
 
@@ -1403,12 +1480,21 @@ WebInspector._moveWindowMouseDown = function(event)
         !event.target.classList.contains("item-section"))
         return;
 
-    // Ignore dragging on the top of the toolbar on Mac where the inspector content fills the entire window.
-    if (WebInspector.Platform.name === "mac" && WebInspector.Platform.version.release >= 10) {
-        const windowDragHandledTitleBarHeight = 22;
-        if (event.pageY < windowDragHandledTitleBarHeight) {
+    if (WebInspector.Platform.name === "mac") {
+        // New Mac releases can start a window drag.
+        if (WebInspector.Platform.version.release >= 11) {
+            InspectorFrontendHost.startWindowDrag();
             event.preventDefault();
             return;
+        }
+
+        // Ignore dragging on the top of the toolbar on Mac if the system handles it.
+        if (WebInspector.Platform.version.release === 10) {
+            const windowDragHandledTitleBarHeight = 22;
+            if (event.pageY < windowDragHandledTitleBarHeight) {
+                event.preventDefault();
+                return;
+            }
         }
     }
 
@@ -1442,8 +1528,7 @@ WebInspector._moveWindowMouseDown = function(event)
 
 WebInspector._storageWasInspected = function(event)
 {
-    // FIXME: This should show a Storage tab when we have one.
-    this.showResourcesTab();
+    this.showStorageTab();
 };
 
 WebInspector._domNodeWasInspected = function(event)
@@ -1453,7 +1538,7 @@ WebInspector._domNodeWasInspected = function(event)
     InspectorFrontendHost.bringToFront();
 
     this.showElementsTab();
-    this.showMainFrameDOMTree(event.data.node, true);
+    this.showMainFrameDOMTree(event.data.node);
 };
 
 WebInspector._inspectModeStateChanged = function(event)
@@ -1524,8 +1609,12 @@ WebInspector._showConsoleTab = function(event)
 
 WebInspector._focusedContentView = function()
 {
-    if (this.tabBrowser.element.isSelfOrAncestor(this.currentFocusElement))
-        return this.tabBrowser.selectedTabContentView;
+    if (this.tabBrowser.element.isSelfOrAncestor(this.currentFocusElement)) {
+        var tabContentView = this.tabBrowser.selectedTabContentView;
+        if (tabContentView instanceof WebInspector.ContentBrowserTabContentView)
+            return tabContentView.contentBrowser.currentContentView;
+        return tabContentView;
+    }
     if (this.splitContentBrowser.element.isSelfOrAncestor(this.currentFocusElement))
         return  this.splitContentBrowser.currentContentView;
     return null;
@@ -1699,20 +1788,9 @@ WebInspector.createSourceCodeLocationLink = function(sourceCodeLocation, dontFlo
     if (!sourceCodeLocation)
         return null;
 
-    function showSourceCodeLocation(event)
-    {
-        event.stopPropagation();
-        event.preventDefault();
-
-        if (event.metaKey)
-            this.showOriginalUnformattedSourceCodeLocation(sourceCodeLocation);
-        else
-            this.showSourceCodeLocation(sourceCodeLocation);
-    }
-
     var linkElement = document.createElement("a");
     linkElement.className = "go-to-link";
-    linkElement.addEventListener("click", showSourceCodeLocation.bind(this));
+    WebInspector.linkifyElement(linkElement, sourceCodeLocation);
     sourceCodeLocation.populateLiveDisplayLocationTooltip(linkElement);
 
     if (useGoToArrowButton)
@@ -1728,12 +1806,7 @@ WebInspector.createSourceCodeLocationLink = function(sourceCodeLocation, dontFlo
 
 WebInspector.linkifyLocation = function(url, lineNumber, columnNumber, className)
 {
-    var sourceCode = WebInspector.frameResourceManager.resourceForURL(url);
-    if (!sourceCode) {
-        sourceCode = WebInspector.debuggerManager.scriptsForURL(url)[0];
-        if (sourceCode)
-            sourceCode = sourceCode.resource || sourceCode;
-    }
+    var sourceCode = WebInspector.sourceCodeForURL(url);
 
     if (!sourceCode) {
         var anchor = document.createElement("a");
@@ -1752,7 +1825,34 @@ WebInspector.linkifyLocation = function(url, lineNumber, columnNumber, className
     return linkElement;
 };
 
-WebInspector.linkifyURLAsNode = function(url, linkText, classes, tooltipText)
+WebInspector.linkifyElement = function(linkElement, sourceCodeLocation) {
+    console.assert(sourceCodeLocation);
+
+    function showSourceCodeLocation(event)
+    {
+        event.stopPropagation();
+        event.preventDefault();
+
+        if (event.metaKey)
+            this.showOriginalUnformattedSourceCodeLocation(sourceCodeLocation);
+        else
+            this.showSourceCodeLocation(sourceCodeLocation);
+    }
+
+    linkElement.addEventListener("click", showSourceCodeLocation.bind(this));
+};
+
+WebInspector.sourceCodeForURL = function(url) {
+    var sourceCode = WebInspector.frameResourceManager.resourceForURL(url);
+    if (!sourceCode) {
+        sourceCode = WebInspector.debuggerManager.scriptsForURL(url)[0];
+        if (sourceCode)
+            sourceCode = sourceCode.resource || sourceCode;
+    }
+    return sourceCode || null;
+};
+
+WebInspector.linkifyURLAsNode = function(url, linkText, classes)
 {
     if (!linkText)
         linkText = url;
@@ -1762,11 +1862,6 @@ WebInspector.linkifyURLAsNode = function(url, linkText, classes, tooltipText)
     var a = document.createElement("a");
     a.href = url;
     a.className = classes;
-
-    if (tooltipText === undefined)
-        a.title = url;
-    else if (typeof tooltipText !== "string" || tooltipText.length)
-        a.title = tooltipText;
 
     a.textContent = linkText;
     a.style.maxWidth = "100%";

@@ -1,3 +1,77 @@
+2015-07-21  Tim Horton  <timothy_horton@apple.com>
+
+        Expose shrink-wrapping as UIKit support SPI
+        https://bugs.webkit.org/show_bug.cgi?id=147148
+        <rdar://problem/21920008>
+
+        * WebKit.iOS.exp:
+        Also export.
+
+2015-07-21  Tim Horton  <timothy_horton@apple.com>
+
+        Expose shrink-wrapping as UIKit support SPI
+        https://bugs.webkit.org/show_bug.cgi?id=147148
+        <rdar://problem/21920008>
+
+        Reviewed by Simon Fraser.
+
+        * Misc/WebUIKitSupport.h:
+        * Misc/WebUIKitSupport.mm:
+        (WebKitCreatePathWithShrinkWrappedRects):
+
+2015-07-02  Timothy Horton  <timothy_horton@apple.com>
+
+        iOS WebKitLegacy should match WebKit2's viewport behavior
+        https://bugs.webkit.org/show_bug.cgi?id=146564
+        <rdar://problem/20574017>
+
+        Reviewed by Brent Fulgham.
+
+        * WebCoreSupport/WebChromeClientIOS.mm:
+        (dictionaryForViewportArguments):
+
+2015-07-02  Timothy Horton  <timothy_horton@apple.com>
+
+        iOS WebKitLegacy should match WebKit2's viewport behavior
+        https://bugs.webkit.org/show_bug.cgi?id=146540
+        <rdar://problem/20574017>
+
+        Reviewed by Dan Bernstein.
+
+        * WebKit.iOS.exp:
+
+2015-06-25  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Unreviewed, attempt to fix the iOS build after r185968.
+
+        * WebCoreSupport/WebInspectorClientIOS.mm:
+        (WebInspectorFrontendClient::startWindowDrag):
+
+2015-06-02  Brady Eidson  <beidson@apple.com>
+
+        WebKit policy delegate should suggest if a navigation should be allowed to open URLs externally.
+        rdar://problem/21025301 and https://bugs.webkit.org/show_bug.cgi?id=145280
+
+        Reviewed by Alex Christensen.
+
+        * WebView/WebPDFViewPlaceholder.mm:
+        (-[WebPDFViewPlaceholder simulateClickOnLinkToURL:]):
+
+2015-05-25  Dan Bernstein  <mitz@apple.com>
+
+        ASSERT_MAIN_THREAD and DOM_ASSERT_MAIN_THREAD are unnecessary no-ops
+        https://bugs.webkit.org/show_bug.cgi?id=145372
+
+        Reviewed by Sam Weinig.
+
+        * Misc/WebGeolocationCoreLocationProvider.mm:
+        (-[WebGeolocationCoreLocationProvider initWithListener:]): Removed use of ASSERT_MAIN_THREAD.
+        (-[WebGeolocationCoreLocationProvider dealloc]): Ditto.
+        (-[WebGeolocationCoreLocationProvider requestGeolocationAuthorization]): Ditto.
+        (-[WebGeolocationCoreLocationProvider start]): Ditto.
+        (-[WebGeolocationCoreLocationProvider stop]): Ditto.
+        (-[WebGeolocationCoreLocationProvider setEnableHighAccuracy:]): Ditto.
+
 2015-04-28  Brady Eidson  <beidson@apple.com>
 
         Consolidate most "frame load" arguments into FrameLoadRequest.

@@ -29,10 +29,11 @@
 #if ENABLE(NETWORK_CACHE)
 
 #include "Logging.h"
-#include "NetworkCacheFileSystemPosix.h"
+#include "NetworkCacheFileSystem.h"
 #include <WebCore/FileSystem.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <wtf/RunLoop.h>
 #include <wtf/SHA1.h>
 #include <wtf/text/StringBuilder.h>
@@ -58,7 +59,9 @@ void BlobStorage::synchronize()
 
     m_approximateSize = 0;
     auto blobDirectory = blobDirectoryPath();
-    traverseDirectory(blobDirectory, DT_REG, [this, &blobDirectory](const String& name) {
+    traverseDirectory(blobDirectory, [this, &blobDirectory](const String& name, DirectoryEntryType type) {
+        if (type != DirectoryEntryType::File)
+            return;
         auto path = WebCore::pathByAppendingComponent(blobDirectory, name);
         auto filePath = WebCore::fileSystemRepresentation(path);
         struct stat stat;
@@ -101,37 +104,13 @@ BlobStorage::Blob BlobStorage::add(const String& path, const Data& data)
         unlink(blobPath.data());
     }
 
-    int fd = open(blobPath.data(), O_CREAT | O_EXCL | O_RDWR , S_IRUSR | S_IWUSR);
-    if (fd < 0)
+    auto mappedData = data.mapToFile(blobPath.data());
+    if (mappedData.isNull())
         return { };
-
-    size_t size = data.size();
-    if (ftruncate(fd, size) < 0) {
-        close(fd);
-        return { };
-    }
-
-    void* map = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    close(fd);
-
-    if (map == MAP_FAILED)
-        return { };
-
-    uint8_t* mapData = static_cast<uint8_t*>(map);
-    data.apply([&mapData](const uint8_t* bytes, size_t bytesSize) {
-        memcpy(mapData, bytes, bytesSize);
-        mapData += bytesSize;
-        return true;
-    });
-
-    // Drop the write permission.
-    mprotect(map, size, PROT_READ);
-
-    auto mappedData = Data::adoptMap(map, size);
 
     link(blobPath.data(), linkPath.data());
 
-    m_approximateSize += size;
+    m_approximateSize += mappedData.size();
 
     return { mappedData, hash };
 }

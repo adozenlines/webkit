@@ -1,3 +1,732 @@
+2015-07-23  Alex Christensen  <achristensen@webkit.org>
+
+        Remove compile and runtime flags for promises.
+        https://bugs.webkit.org/show_bug.cgi?id=147244
+
+        Reviewed by Yusuke Suzuki.
+
+        * Source/cmake/OptionsMac.cmake:
+        * Source/cmake/OptionsWindows.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+
+2015-07-22  Sukolsak Sakshuwong  <sukolsak@gmail.com>
+
+        Add ENABLE_WEBASSEMBLY feature flag for WebAssembly
+        https://bugs.webkit.org/show_bug.cgi?id=147212
+
+        Reviewed by Filip Pizlo.
+
+        * Source/cmake/WebKitFeatures.cmake:
+
+2015-07-22  Alex Christensen  <achristensen@webkit.org>
+
+        Fix quirks in CMake build on Mac and Windows
+        https://bugs.webkit.org/show_bug.cgi?id=147174
+
+        Reviewed by Gyuyoung Kim.
+
+        * CMakeLists.txt:
+        * Source/cmake/OptionsWindows.cmake:
+        Added options I removed in r187022. They are indeed needed.
+        * Source/cmake/WebKitFS.cmake:
+        Make the DerivedSources/WebKit directory.
+
+2015-07-21  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update OptionsGTK.cmake and NEWS for 2.9.4 release.
+
+        * Source/cmake/OptionsGTK.cmake: Bump version numbers.
+
+2015-07-20  Alex Christensen  <achristensen@webkit.org>
+
+        Resurrect CMake build on Windows.
+        https://bugs.webkit.org/show_bug.cgi?id=147083
+
+        Reviewed by Gyuyoung Kim.
+
+        * Source/cmake/OptionsCommon.cmake:
+        * Source/cmake/OptionsWindows.cmake:
+        Change features to get it to compile.  Still not a complete feature set.
+
+2015-07-19  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] Add seccomp filters support
+        https://bugs.webkit.org/show_bug.cgi?id=110014
+
+        Reviewed by Žan Doberšek.
+
+        Find needed compiler and linker flags for libseccomp.
+
+        * Source/cmake/OptionsGTK.cmake:
+
+2015-07-17  Ting-Wei Lan  <lantw44@gmail.com>
+
+        Bring back the GNU ar check to create thin archives on non-Linux systems
+        https://bugs.webkit.org/show_bug.cgi?id=146681
+
+        Reviewed by Martin Robinson.
+
+        We already use GNU ar thin archive feature to save time and disk space
+        on creating static archives, but it is only enabled on Linux. Without
+        this feature, the debug build of WebCore can be larger than 4 GiB,
+        which can cause error because GNU ar format uses 32-bit integer to
+        store offsets in the symbol table. This patch is similar to
+        https://bugs.webkit.org/show_bug.cgi?id=128596.
+
+        * Source/cmake/OptionsCommon.cmake:
+
+2015-07-14  Carlos Alberto Lopez Perez  <clopez@igalia.com>
+
+        [GTK] [Wayland] Build by default the X11 and Wayland targets.
+        https://bugs.webkit.org/show_bug.cgi?id=146057
+
+        Reviewed by Carlos Garcia Campos.
+
+        * Source/cmake/OptionsGTK.cmake:
+
+2015-07-10  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] ar warning when linking static libraries
+        https://bugs.webkit.org/show_bug.cgi?id=144988
+
+        Reviewed by Carlos Garcia Campos.
+
+        Do not use 'u' when calling ar. This argument conflicts with 'D' and is ignored if 'D' is
+        used, and 'D' is used by default if binutils is built with --enable-deterministic-archives.
+        Using 'u' with 'D' causes a warning to be printed when linking static libraries. At least
+        Fedora and Debian have recently both chosen to use --enable-deterministic-archives, so we
+        should either stop using 'u' or else add 'U' as well in order to disable deterministic
+        archives. Using 'U' should result in a somewhat faster build (at least when using the
+        Makefile generator), but it's unlikely that the difference is significant, so let's simply
+        remove 'u' until someone determines otherwise. This seems like a better option than adding
+        'U' so as not to foil distributions' attempts to perform deterministic builds. This also
+        aligns us with the behavior of upstream CMake (which has never used 'u'). This is a minor
+        behavior change on distributions that do not use --enable-deterministic-archives, notably
+        Arch and openSUSE.
+
+        * Source/cmake/OptionsCommon.cmake:
+
+2015-07-03  Emanuele Aina  <emanuele.aina@collabora.com>
+
+        [GTK] Forcefully disable gtk-doc and gobject-introspection when crossbuilding
+        https://bugs.webkit.org/show_bug.cgi?id=146590
+
+        Reviewed by Martin Robinson.
+
+        * Source/PlatformGTK.cmake: override the cached variables to
+        forcefully disable gtk-doc and gobject-introspection when
+        crosscompiling.
+        * Source/cmake/OptionsGTK.cmake: avoid running gtk-doc to check the
+        documentation syntax when cross-building.
+
+
+2015-07-02  Przemek Piorkowski  <piorkowskiprzemyslaw@gmail.com>
+
+        [EFL] test_ewk2_application_cache_manager has been failed since r185527
+        https://bugs.webkit.org/show_bug.cgi?id=146016
+
+        Reviewed by Gyuyoung Kim.
+
+        In order to handle properly WebApplicationCacheManagerProxy implementation which use
+        WebsiteDataRecord it is necessary to enable PUBLIC_SUFFIX_LIST for EFL.
+        Implementation of PUBLIC_SUFFIX_LIST already exists for soup so EFL can use it as well.
+
+        * Source/cmake/OptionsEfl.cmake: set ENABLE_PUBLIC_SUFFIX_LIST to ON for EFL.
+
+2015-06-30  Andy VanWagoner  <thetalecrafter@gmail.com>
+
+        Implement ECMAScript Internationalization API
+        https://bugs.webkit.org/show_bug.cgi?id=90906
+
+        Reviewed by Benjamin Poulain.
+
+        Begin implementing the Intl apis behind ENABLE_INTL flag.
+        Create the base Intl namespace object.
+
+        * Source/cmake/WebKitFeatures.cmake: add ENABLE_INTL flag
+
+2015-06-30  Philippe Normand  <pnormand@igalia.com>
+
+        [CMake] Error when gst-plugins-base is missing is too confusing
+        https://bugs.webkit.org/show_bug.cgi?id=145682
+
+        Reviewed by Carlos Garcia Campos.
+
+        * Source/cmake/OptionsGTK.cmake: Error out if the required
+        GStreamer libraries are not found on the host.
+
+2015-06-28  Philip Chimento  <philip.chimento@gmail.com>
+
+        CairoGL should be checked unconditionally
+        https://bugs.webkit.org/show_bug.cgi?id=146390
+
+        Reviewed by Darin Adler.
+
+        * Source/cmake/OptionsGTK.cmake: Move check for CairoGL so that
+        it is run unconditionally; this is necessary because its result
+        is used later on, outside of any conditions.
+
+2015-06-27  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK][SOUP] Implement WebCore::PublicSuffix for soup and enable PUBLIC_SUFFIX_LIST for GTK+
+        https://bugs.webkit.org/show_bug.cgi?id=146318
+
+        Reviewed by Sergio Villar Senin.
+
+        Enable PUBLIC_SUFFIX_LIST for GTK+.
+
+        * Source/cmake/OptionsGTK.cmake:
+
+2015-06-22  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update OptionsGTK.cmake and NEWS for 2.9.3 release.
+
+        * Source/cmake/OptionsGTK.cmake: Bump version numbers.
+
+2015-06-22  Ryuan Choi  <ryuan.choi@navercorp.com>
+
+        [EFL] Hyphenation is not supported
+        https://bugs.webkit.org/show_bug.cgi?id=89830
+
+        Reviewed by Gyuyoung Kim.
+
+        * Source/cmake/OptionsEfl.cmake: Added an option for LibHyphen.
+
+2015-06-22  Zan Dobersek  <zdobersek@igalia.com>
+
+        [CMake] Add support for building with various sanitizer tools
+        https://bugs.webkit.org/show_bug.cgi?id=131941
+
+        Reviewed by Martin Robinson.
+
+        * Source/PlatformGTK.cmake: Don't generate any documentation
+        when compiling with sanitizers enabled.
+        * Source/cmake/OptionsCommon.cmake: Allow linking with
+        undefined symbols when compiling with sanitizers enabled.
+
+2015-06-21  Philip Chimento  <philip.chimento@gmail.com>
+
+        libwebkit2gtk fails to link without opengl
+        https://bugs.webkit.org/show_bug.cgi?id=138332
+
+        Reviewed by Carlos Garcia Campos.
+
+        * Source/cmake/OptionsGTK.cmake: USE(TEXTURE_MAPPER) must be
+        enabled regardless of whether OpenGL is, because certain symbols
+        such as WebCore::GraphicsLayer::create() need to be built.
+
+2015-06-20  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [EFL][GTK] Define GLIB_VERSION_MIN_REQUIRED and require glib 2.36 for GTK
+        https://bugs.webkit.org/show_bug.cgi?id=146181
+
+        Reviewed by Martin Robinson.
+
+        Bump our GLib requirement to 2.36 to reflect reality, since we are using GTask.
+
+        * Source/cmake/OptionsGTK.cmake:
+
+2015-06-20  Ryuan Choi  <ryuan.choi@navercorp.com>
+
+        [EFL] Do not consider test directories when DEVELOPER_MODE is OFF
+        https://bugs.webkit.org/show_bug.cgi?id=146171
+
+        Reviewed by Gyuyoung Kim.
+
+        * Source/cmake/OptionsEfl.cmake:
+        Exposed ENABLE_DEVELOPER_MODE to Compiler and CMake definition when DEVELOPER_MODE is ON.
+
+2015-06-19  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [CMake] FindGTK3.cmake should not modify the values of build options
+        https://bugs.webkit.org/show_bug.cgi?id=144613
+
+        Reviewed by Martin Robinson.
+
+        * Source/cmake/FindGTK3.cmake: Do not check or set the value of ENABLE_X11_TARGET and
+        ENABLE_WAYLAND_TARGET. Instead, simply define the variables GTK3_SUPPORTS_X11 and
+        GTK3_SUPPORTS_WAYLAND as appropriate. Also, rename GTK_SUPPORTS_GESTURES to
+        GTK3_SUPPORTS_GESTURES for consistency.
+        * Source/cmake/OptionsGTK.cmake: Fail the build if the appropriate GTK+ backend is not
+        available. It's not possible to automatically select a backend correctly anymore, since all
+        options are set at the same time.
+
+2015-06-19  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Remove unnecessary svn:executable flags
+        https://bugs.webkit.org/show_bug.cgi?id=146107
+
+        Reviewed by Alexey Proskuryakov.
+
+        * ManualTests/iframe_notifications/iframe-reparenting-close-window-child.html: Removed property svn:executable.
+        * ManualTests/iframe_notifications/iframe-reparenting-close-window-iframe.html: Removed property svn:executable.
+        * ManualTests/iframe_notifications/iframe-reparenting-close-window.html: Removed property svn:executable.
+        * ManualTests/select-menu-list-wrongly-positioned.html: Removed property svn:executable.
+        * ManualTests/svg-text-float-not-removed-crash.html: Removed property svn:executable.
+
+2015-06-18  Ryuan Choi  <ryuan.choi@navercorp.com>
+
+        [EFL] Use SET_AND_EXPOSE_TO_BUILD instead of definitions
+        https://bugs.webkit.org/show_bug.cgi?id=146108
+
+        Reviewed by Gyuyoung Kim.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2015-06-16  Ryuan Choi  <ryuan.choi@navercorp.com>
+
+        [EFL] Remove duplicated PUBLIC argument in OptionsEfl.cmake
+        https://bugs.webkit.org/show_bug.cgi?id=146035
+
+        Reviewed by Gyuyoung Kim.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2015-06-16  Carlos Alberto Lopez Perez  <clopez@igalia.com>
+
+        [GTK] [Wayland] Should be possible to build with support for both X11 and Wayland.
+        https://bugs.webkit.org/show_bug.cgi?id=145701
+
+        Reviewed by Darin Adler.
+
+        * Source/cmake/OptionsGTK.cmake: Remove conflicting options.
+
+2015-06-15  Jon Honeycutt  <jhoneycutt@apple.com>
+
+        [iOS] Crash long pressing on <input type=file>
+        https://bugs.webkit.org/show_bug.cgi?id=146009
+        <rdar://problem/21234453>
+
+        Reviewed by Ryosuke Niwa.
+
+        * ManualTests/ios/long-press-input-type-file-crash.html: Added.
+
+2015-06-16  Brent Fulgham  <bfulgham@apple.com>
+
+        Rollout accidental Xcode project change.
+
+        * WebKit.xcworkspace/xcshareddata/xcschemes/All Source (target WebProcess).xcscheme:
+
+2015-06-12  Gyuyoung Kim  <gyuyoung.kim@webkit.org>
+
+        [EFL] Bump EWebKit version from 1.11.0 to 1.14.0
+        https://bugs.webkit.org/show_bug.cgi?id=145909
+
+        Reviewed by Csaba Osztrogonác.
+
+        Bump EWebKit version based on efl library version used by the EWebKit.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2015-06-11  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r185453.
+        https://bugs.webkit.org/show_bug.cgi?id=145881
+
+        it broke the 32-bit build (Requested by clopez on #webkit).
+
+        Reverted changeset:
+
+        "[GTK] [Wayland] Should be possible to build with support for
+        both X11 and Wayland."
+        https://bugs.webkit.org/show_bug.cgi?id=145701
+        http://trac.webkit.org/changeset/185453
+
+2015-06-11  Carlos Alberto Lopez Perez  <clopez@igalia.com>
+
+        [GTK] [Wayland] Should be possible to build with support for both X11 and Wayland.
+        https://bugs.webkit.org/show_bug.cgi?id=145701
+
+        Reviewed by Žan Doberšek.
+
+        * Source/cmake/OptionsGTK.cmake: Remove conflicting options.
+
+2015-06-03  Daniel Bates  <dabates@apple.com>
+
+        Caps lock indicator should not be shown in read-only or disabled field
+        https://bugs.webkit.org/show_bug.cgi?id=145612
+        <rdar://problem/21227454>
+
+        Reviewed by Darin Adler.
+
+        * ManualTests/password-caps-lock-should-not-show-in-read-only-field.html: Added.
+        * ManualTests/password-caps-lock-should-not-show-when-field-becomes-disabled.html: Added.
+        * ManualTests/password-caps-lock-should-not-show-when-field-becomes-read-only.html: Added.
+
+2015-06-01  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [cmake] Suppress parentheses-equality warnings
+        https://bugs.webkit.org/show_bug.cgi?id=145126
+
+        Reviewed by Darin Adler.
+
+        * Source/cmake/WebKitHelpers.cmake:
+
+2015-05-28  Carlos Alberto Lopez Perez  <clopez@igalia.com>
+
+        [CMake] Improve detection and usage of GL/GLES/EGL libraries.
+        https://bugs.webkit.org/show_bug.cgi?id=145408
+
+        Reviewed by Carlos Garcia Campos.
+
+        * Source/cmake/FindEGL.cmake: Improve detection of EGL libraries.
+        * Source/cmake/FindGLES.cmake: Removed. It was used by the EGL port.
+        Remove it and make the EGL port use the improved FindOpenGLES2.cmake
+        instead.
+        * Source/cmake/FindOpenGL.cmake: Added. Add module to detect OpenGL
+        libraries. Detect also GLX libraries.
+        * Source/cmake/FindOpenGLES2.cmake: Improve detection of OpenGLES-v2
+        libraries. Use find_path() to get the include path.
+        * Source/cmake/OptionsEfl.cmake: Use now the improved FindOpenGLES2
+        module.
+        * Source/cmake/OptionsGTK.cmake: Set default value for ENABLE_GLES2
+        depending on the libraries found on the system.
+        Move the detection of GLX (and the include of CMakePushCheckState)
+        to FindOpenGL.cmake.
+        Ensure that we only define USE_GLX when we build with OpenGL
+        (but not with GLESv2).
+
+2015-05-27  Dean Jackson  <dino@apple.com>
+
+        img.currentSrc problem in strict mode with old picturefill
+        https://bugs.webkit.org/show_bug.cgi?id=144095
+        <rdar://problem/21087013>
+
+        Reviewed by Simon Fraser.
+
+        Add a PICTURE_SIZES flag.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsGTK.cmake:
+        * Source/cmake/OptionsMac.cmake:
+        * Source/cmake/OptionsWindows.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+
+2015-05-27  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update OptionsGTK.cmake and NEWS for 2.9.2 release.
+
+        * Source/cmake/OptionsGTK.cmake: Bump version numbers.
+
+2015-05-25  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Export DatabaseProcessMainUnix symbol.
+
+        Add DatabaseProcessMainUnix symbol to gtksymbols.filter so that it
+        is exported in production builds.
+
+        * Source/cmake/gtksymbols.filter:
+
+2015-05-25  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Enable IndexedDB
+        https://bugs.webkit.org/show_bug.cgi?id=98932
+
+        Reviewed by Žan Doberšek.
+
+        * Source/cmake/OptionsGTK.cmake: Enable DATABASE_PROCESS and INDEXED_DATABASE.
+        * Source/cmake/WebKitFeatures.cmake: Add ENABLE_DATABASE_PROCESS.
+
+2015-05-24  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Bump GCC requirements to 4.9.0
+        https://bugs.webkit.org/show_bug.cgi?id=145211
+
+        Reviewed by Žan Doberšek.
+
+        It's required to build with IndexedDB support when using GCC,
+        clang works just fine. See https://bugs.webkit.org/show_bug.cgi?id=98932.
+
+        * Source/cmake/OptionsGTK.cmake:
+
+2015-05-18  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [CMake] Ignore warnings in system headers
+        https://bugs.webkit.org/show_bug.cgi?id=144747
+
+        Reviewed by Darin Adler.
+
+        Require CMake 2.8.12 when compiling the GTK+ port. This is because we use the
+        target_include_directories command (added in 2.8.11) in GTK-specific cmake files, and also
+        use the SYSTEM argument to the command (added in 2.8.12). 
+
+        * CMakeLists.txt:
+
+2015-05-14  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [CMake] Error out when ruby is too old
+        https://bugs.webkit.org/show_bug.cgi?id=145014
+
+        Reviewed by Martin Robinson.
+
+        Error out immediately after checking for Ruby if the ruby executable is not found, or if it
+        is too old.
+
+        * CMakeLists.txt:
+
+2015-05-14  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Enable plugin-related CMake options and variables for the X11 target only
+        https://bugs.webkit.org/show_bug.cgi?id=144995
+
+        Reviewed by Carlos Garcia Campos.
+
+        * Source/cmake/OptionsGTK.cmake: Plugins are only supported for
+        the X11 windowing target at the moment, so the following options
+        and variables should be enabled or disabled accordingly:
+        - ENABLE_PLUGIN_PROCESS_GTK2
+        - ENABLE_NETSCAPE_PLUGIN_API
+        - ENABLE_PLUGIN_PROCESS
+
+2015-05-12  Ryuan Choi  <ryuan.choi@navercorp.com>
+
+        Linker fails without -DDEVELOPER_MODE=ON
+        https://bugs.webkit.org/show_bug.cgi?id=144117
+
+        Reviewed by Gyuyoung Kim.
+
+        * Source/cmake/OptionsEfl.cmake:
+        Remove fvisibility flags. linker script will cover the functionality for ewebkit2.so in release mode,
+        * Source/cmake/eflsymbols.filter: Updated symbol patterns which should be exposed for ewebkit2.
+
+2015-05-10  Philip Chimento  <philip.chimento@gmail.com>
+
+        CMake defines CAIROGL_FOUND, not CAIRO_GL_FOUND
+        https://bugs.webkit.org/show_bug.cgi?id=144846
+
+        Reviewed by Martin Robinson.
+
+        * Source/cmake/FindCairoGL.cmake: Use CAIROGL_* instead of
+        CAIRO_GL_* throughout, because find_package will define
+        CAIROGL_FOUND.
+        * Source/cmake/OptionsGTK.cmake: Ditto.
+
+2015-05-10  Philip Chimento  <philip.chimento@gmail.com>
+
+        [CMake] Some macros need to be defined/undefined, rather than ON/OFF
+        https://bugs.webkit.org/show_bug.cgi?id=144845
+
+        Reviewed by Martin Robinson.
+
+        * Source/cmake/OptionsGTK.cmake: Only define MOZ_X11 and XP_UNIX
+        if their corresponding WTF options are ON. The code in npapi.h
+        relies on these being undefined if they are to be switched off.
+
+2015-05-09  Yoav Weiss  <yoav@yoav.ws>
+
+        Remove the PICTURE_SIZES build flag
+        https://bugs.webkit.org/show_bug.cgi?id=144679
+
+        Reviewed by Benjamin Poulain.
+
+        Removed the PICTURE_SIZES build time flag.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsGTK.cmake:
+        * Source/cmake/OptionsMac.cmake:
+        * Source/cmake/OptionsWindows.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+
+2015-05-08  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] [CMake] Check for required X libraries
+        https://bugs.webkit.org/show_bug.cgi?id=144823
+
+        Reviewed by Martin Robinson.
+
+        Error out if missing libXcomposite, libXdamage, libXrender, or libXt.
+
+        * Source/cmake/OptionsGTK.cmake:
+
+015-05-08  Michael Catanzaro  <mcatanzaro@igalia.com>, Martin Robinson <mrobinson@igalia.com>
+
+        [GTK] Checks for DEVELOPMENT_BUILD are all wrong
+        https://bugs.webkit.org/show_bug.cgi?id=144746
+
+        Reviewed by Carlos Garcia Campos.
+
+        Don't set DEVELOPMENT_BUILD. We check whether it is defined for conditional compilation, not
+        what it is defined to, so defining it to 0 effectively turned it on always. Instead set
+        ENABLE_DEVELOPER_MODE so that we can use the ENABLE macro inside WebKit source code.
+
+        * Source/cmake/OptionsGTK.cmake:
+
+2015-05-08  Daniel Bates  <dabates@apple.com>
+
+        [iOS] WebSQL operations are not performed after device is locked
+        https://bugs.webkit.org/show_bug.cgi?id=137503
+        <rdar://problem/20844952>
+
+        Rubber-stamped by Alexey Proskuryakov.
+
+        Add a manual test to help verify that we do not regress this issue.
+
+        * ManualTests/ios/execute-sql-transaction-callback-after-locking-unlocking-device-in-earlier-transaction.html: Added.
+
+2015-05-08  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r183945.
+        https://bugs.webkit.org/show_bug.cgi?id=144789
+
+        "It broke all the GTK+ tests" (Requested by KaL on #webkit).
+
+        Reverted changeset:
+
+        "[GTK] Checks for DEVELOPMENT_BUILD are all wrong"
+        https://bugs.webkit.org/show_bug.cgi?id=144746
+        http://trac.webkit.org/changeset/183945
+
+2015-05-07  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Cleanup after r183940
+        https://bugs.webkit.org/show_bug.cgi?id=144768
+
+        Unreviewed.
+
+        Looks like the empty directories were not deleted.
+
+        * Source/PAL: Removed.
+        * Source/PAL/Configurations: Removed.
+        * Source/PAL/PAL.xcodeproj: Removed.
+        * Source/PAL/graphics: Removed.
+
+2015-05-07  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] Checks for DEVELOPMENT_BUILD are all wrong
+        https://bugs.webkit.org/show_bug.cgi?id=144746
+
+        Reviewed by Martin Robinson.
+
+        Don't set DEVELOPMENT_BUILD. We check whether it is defined for conditional compilation, not
+        what it is defined to, so defining it to 0 effectively turned it on always.
+
+        * Source/cmake/OptionsGTK.cmake:
+
+2015-05-05  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Revert "Introducing the Platform Abstraction Layer (PAL)"
+        https://bugs.webkit.org/show_bug.cgi?id=144751
+
+        Unreviewed.
+
+        PAL should be a new target inside WebCore, rather than a top-level folder.
+
+        * WebKit.xcworkspace/contents.xcworkspacedata: Add it to the workspace.
+
+2015-05-07  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update OptionsGTK.cmake and NEWS for 2.9.1 release.
+
+        * Source/cmake/OptionsGTK.cmake: Bump version numbers.
+
+2015-05-05  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Introducing the Platform Abstraction Layer (PAL)
+        https://bugs.webkit.org/show_bug.cgi?id=143358
+
+        Reviewed by Simon Fraser.
+
+        * WebKit.xcworkspace/contents.xcworkspacedata: Add it to the workspace.
+
+2015-05-04  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [cmake] Disable GNU Gold linker on Cortex A53
+        https://bugs.webkit.org/show_bug.cgi?id=144382
+
+        Reviewed by Carlos Garcia Campos.
+
+        * Source/cmake/OptionsCommon.cmake:
+
+2015-05-01  Martin Robinson  <mrobinson@igalia.com>
+
+        USE(...) macro should expect unprefixed variables
+        https://bugs.webkit.org/show_bug.cgi?id=144454
+
+        Reviewed by Daniel Bates.
+
+        * Source/cmake/OptionsAppleWin.cmake: Replace all occurrences WTF_USE with USE.
+        * Source/cmake/OptionsEfl.cmake: Ditto.
+        * Source/cmake/OptionsGTK.cmake: Ditto.
+        * Source/cmake/OptionsMac.cmake: Ditto.
+        * Source/cmake/OptionsWinCairo.cmake: Ditto.
+        * Source/cmake/WebKitFeatures.cmake: No longer expose WTF_USE when encountering
+        USE variables.
+
+2015-04-30  Martin Robinson  <mrobinson@igalia.com>
+
+        [CMake] Automatically expose WTF_USE_FOO to the build when USE_FOO is exposed
+        https://bugs.webkit.org/show_bug.cgi?id=144394
+
+        Reviewed by Carlos Garcia Campos.
+
+        Automatically expose WTF_USE_FOO when USE_FOO is exposed. A side-effect of this change
+        is that it fixes the redirected XComposite window for GTK+, which was accidentally
+        disabled in previous reworking of the CMake configuration.
+
+        * Source/cmake/OptionsGTK.cmake: We no longer need to expose the WTF_ prefixed
+        version of USE variables.
+        * Source/cmake/WebKitFeatures.cmake: Automatically expose WTF_USE_FOO when USE_FOO
+        is exposed to the build.
+
+2015-04-30  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Bump GTK+ version numbers.
+
+        * Source/cmake/OptionsGTK.cmake:
+
+2015-04-29  Ryuan Choi  <ryuan.choi@navercorp.com>
+
+        [EFL] CMake should be failed if openwebrtc package does not exist but ENABLE_MEDIA_STREAM is ON
+        https://bugs.webkit.org/show_bug.cgi?id=144435
+
+        Reviewed by Gyuyoung Kim.
+
+        This patch adds REQUIRED option for OpenWebRTC when ENABLE_MEDIA_STREAM is ON.
+        In addition, this adds DEFAULT_PORT_VALUE for ENABLE_MEDIA_STREAM to match with FeatureList.pm
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2015-04-29  Joseph Pecoraro  <pecoraro@apple.com>
+
+        REGRESSION(183583): [Mac] make without SDKROOT has issues
+        https://bugs.webkit.org/show_bug.cgi?id=144431
+
+        Reviewed by Dan Bernstein.
+
+        * Source/Makefile:
+        Assume an empty SDKROOT means an macosx variant, so only
+        enable settings if the SDKROOT is not empty and does not
+        contain "macosx".
+
+2015-04-29  Martin Robinson  <mrobinson@igalia.com>
+
+        Fix the GTK+ build after r183584
+
+        * Source/cmake/OptionsGTK.cmake: Properly use the USE_LIBHYPHEN and HYPHEN_FOUND variables.
+
+2015-04-29  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Add support for automatic hyphenation
+        https://bugs.webkit.org/show_bug.cgi?id=44478
+
+        Reviewed by Carlos Garcia Campos.
+
+        * Source/cmake/FindHyphen.cmake: Added. A CMake module for finding libhyphen.
+        * Source/cmake/OptionsGTK.cmake: Look for libhyphen and enable hyphenation if found.
+        * Source/cmakeconfig.h.cmake: Pass through the whether libhyphen is enabled.
+
+2015-04-29  Jake Nielsen  <jacob_nielsen@apple.com>
+
+        Failure when building WebKit for appletvsimulator.
+        https://bugs.webkit.org/show_bug.cgi?id=144356
+
+        Reviewed by Alexey Proskuryakov.
+
+        Changes Makefile logic to check for "not OS X" rather than "is iOS" to
+        make TVOS and WatchOS behave correctly.
+
+        * Source/Makefile:
+
 2015-04-29  Martin Robinson  <mrobinson@igalia.com>
 
         [CMake] [GTK] Organize and clean up unused CMake variables

@@ -1094,7 +1094,7 @@ bool RenderFlowThread::addForcedRegionBreak(const RenderBlock* block, LayoutUnit
         hasComputedAutoHeight = true;
 
         // Compute the region height pretending that the offsetBreakInCurrentRegion is the logicalHeight for the auto-height region.
-        LayoutUnit regionComputedAutoHeight = namedFlowFragment.constrainContentBoxLogicalHeightByMinMax(offsetBreakInCurrentRegion);
+        LayoutUnit regionComputedAutoHeight = namedFlowFragment.constrainContentBoxLogicalHeightByMinMax(offsetBreakInCurrentRegion, -1);
 
         // The new height of this region needs to be smaller than the initial value, the max height. A forced break is the only way to change the initial
         // height of an auto-height region besides content ending.
@@ -1193,7 +1193,7 @@ const RenderBox* RenderFlowThread::currentActiveRenderBox() const
 
 void RenderFlowThread::pushFlowThreadLayoutState(const RenderObject& object)
 {
-    m_activeObjectsStack.add(&object);
+    m_activeObjectsStack.append(&object);
 
     if (const RenderBox* currentBoxDescendant = currentActiveRenderBox()) {
         LayoutState* layoutState = currentBoxDescendant->view().layoutState();

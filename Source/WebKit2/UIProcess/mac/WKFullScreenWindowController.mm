@@ -102,12 +102,6 @@ static void makeResponderFirstResponderIfDescendantOfView(NSWindow *window, NSRe
     _clipView = adoptNS([[NSView alloc] initWithFrame:contentView.bounds]);
     [_clipView setWantsLayer:YES];
     [_clipView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
-    CALayer *maskLayer = [CALayer layer];
-    maskLayer.anchorPoint = CGPointZero;
-    maskLayer.frame = NSRectToCGRect(contentView.bounds);
-    maskLayer.backgroundColor = CGColorGetConstantColor(kCGColorBlack);
-    maskLayer.autoresizingMask = (NSViewWidthSizable | NSViewHeightSizable);
-    [_clipView layer].mask = maskLayer;
     [contentView addSubview:_clipView.get()];
 
     [self windowDidLoad];
@@ -284,6 +278,8 @@ static RetainPtr<CGImageRef> createImageWithCopiedData(CGImageRef sourceImage)
     [[self window] enterFullScreenMode:self];
 }
 
+static const float minVideoWidth = 480 + 20 + 20; // Note: Keep in sync with mediaControlsApple.css (video:-webkit-full-screen::-webkit-media-controls-panel)
+
 - (void)finishedEnterFullScreenAnimation:(bool)completed
 {
     if (_fullScreenState != EnteringFullScreen)
@@ -297,8 +293,19 @@ static RetainPtr<CGImageRef> createImageWithCopiedData(CGImageRef sourceImage)
         [self _manager]->didEnterFullScreen();
         [self _manager]->setAnimatingFullScreen(false);
 
+        NSView *contentView = [[self window] contentView];
+        [contentView.layer removeAllAnimations];
+        [[_clipView layer] removeAllAnimations];
+        [[_clipView layer] setMask:nil];
+
         [_webViewPlaceholder setExitWarningVisible:YES];
         [_webViewPlaceholder setTarget:self];
+
+        [_webView _setLayoutMode:kWKLayoutModeDynamicSizeWithMinimumViewSize];
+        
+        NSSize minContentSize = self.window.contentMinSize;
+        minContentSize.width = minVideoWidth;
+        self.window.contentMinSize = minContentSize;
     } else {
         // Transition to fullscreen failed. Clean up.
         _fullScreenState = NotInFullScreen;
@@ -385,6 +392,7 @@ static RetainPtr<CGImageRef> createImageWithCopiedData(CGImageRef sourceImage)
     makeResponderFirstResponderIfDescendantOfView(_webView.window, firstResponder, _webView);
 
     [[_webView window] makeKeyAndOrderFront:self];
+    [_webView _setLayoutMode:kWKLayoutModeViewSize];
 
     // These messages must be sent after the swap or flashing will occur during forceRepaint:
     [self _manager]->didExitFullScreen();
@@ -579,10 +587,17 @@ static CAAnimation *fadeAnimation(CFTimeInterval duration, AnimationDirection di
 
 - (void)_startEnterFullScreenAnimationWithDuration:(NSTimeInterval)duration
 {
-    [[_clipView layer] addAnimation:zoomAnimation(_initialFrame, _finalFrame, self.window.screen.frame, duration, AnimateIn) forKey:@"fullscreen"];
-    [[_clipView layer].mask addAnimation:maskAnimation(_initialFrame, _finalFrame, self.window.screen.frame, duration, AnimateIn) forKey:@"fullscreen"];
-
     NSView* contentView = [[self window] contentView];
+
+    [[_clipView layer] addAnimation:zoomAnimation(_initialFrame, _finalFrame, self.window.screen.frame, duration, AnimateIn) forKey:@"fullscreen"];
+    CALayer *maskLayer = [CALayer layer];
+    maskLayer.anchorPoint = CGPointZero;
+    maskLayer.frame = NSRectToCGRect(contentView.bounds);
+    maskLayer.backgroundColor = CGColorGetConstantColor(kCGColorBlack);
+    maskLayer.autoresizingMask = (NSViewWidthSizable | NSViewHeightSizable);
+    [maskLayer addAnimation:maskAnimation(_initialFrame, _finalFrame, self.window.screen.frame, duration, AnimateIn) forKey:@"fullscreen"];
+    [_clipView layer].mask = maskLayer;
+
     contentView.layer.hidden = NO;
     [contentView.layer addAnimation:fadeAnimation(duration, AnimateIn) forKey:@"fullscreen"];
 

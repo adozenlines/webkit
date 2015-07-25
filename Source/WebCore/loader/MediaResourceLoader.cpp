@@ -59,7 +59,9 @@ bool MediaResourceLoader::start(const ResourceRequest& request, LoadOptions opti
     DataBufferingPolicy bufferingPolicy = options & LoadOption::BufferData ? WebCore::BufferData : WebCore::DoNotBufferData;
     RequestOriginPolicy corsPolicy = !m_crossOriginMode.isNull() ? PotentiallyCrossOriginEnabled : UseDefaultOriginRestrictionsForType;
     StoredCredentials allowCredentials = m_crossOriginMode.isNull() || equalIgnoringCase(m_crossOriginMode, "use-credentials") ? AllowStoredCredentials : DoNotAllowStoredCredentials;
-    CachedResourceRequest cacheRequest(request, ResourceLoaderOptions(SendCallbacks, DoNotSniffContent, bufferingPolicy, allowCredentials, DoNotAskClientForCrossOriginCredentials, DoSecurityCheck, corsPolicy, DoNotIncludeCertificateInfo));
+
+    // ContentSecurityPolicyImposition::DoPolicyCheck is a placeholder value. It does not affect the request since Content Security Policy does not apply to raw resources.
+    CachedResourceRequest cacheRequest(request, ResourceLoaderOptions(SendCallbacks, DoNotSniffContent, bufferingPolicy, allowCredentials, DoNotAskClientForCrossOriginCredentials, DoSecurityCheck, corsPolicy, DoNotIncludeCertificateInfo, ContentSecurityPolicyImposition::DoPolicyCheck));
 
     if (!m_crossOriginMode.isNull())
         updateRequestForAccessControl(cacheRequest.mutableResourceRequest(), m_document.securityOrigin(), allowCredentials);
@@ -94,9 +96,7 @@ void MediaResourceLoader::responseReceived(CachedResource* resource, const Resou
     ASSERT_UNUSED(resource, resource == m_resource);
 
     RefPtr<MediaResourceLoader> protect(this);
-    if (!m_crossOriginMode.isNull()
-        && !m_document.securityOrigin()->canRequest(resource->response().url())
-        && !resource->passesAccessControlCheck(m_document.securityOrigin())) {
+    if (!m_crossOriginMode.isNull() && !resource->passesSameOriginPolicyCheck(*m_document.securityOrigin())) {
         static NeverDestroyed<const String> consoleMessage("Cross-origin media resource load denied by Cross-Origin Resource Sharing policy.");
         m_document.addConsoleMessage(MessageSource::Security, MessageLevel::Error, consoleMessage.get());
         m_didPassAccessControlCheck = false;

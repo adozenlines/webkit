@@ -83,6 +83,7 @@ public:
         bool m_shouldDisplayTextDescriptions;
 #endif
         String m_defaultVideoPosterURL;
+        bool m_forcePendingWebGLPolicy;
         bool m_originalTimeWithoutMouseMovementBeforeHidingControls;
         bool m_useLegacyBackgroundSizeShorthandBehavior;
         bool m_autoscrollForDragAndDropEnabled;
@@ -96,7 +97,7 @@ public:
         bool m_touchEventEmulationEnabled;
 #endif
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
-        bool m_mediaPlaybackAllowsAirPlay;
+        bool m_allowsAirPlayForMediaPlayback;
 #endif
     };
 
@@ -125,6 +126,7 @@ public:
     void setMediaTypeOverride(const String& mediaType, ExceptionCode&);
     void setCSSShapesEnabled(bool, ExceptionCode&);
     void setCanStartMedia(bool, ExceptionCode&);
+    void setWirelessPlaybackDisabled(bool);
     void setEditingBehavior(const String&, ExceptionCode&);
     void setShouldDisplayTrackKind(const String& kind, bool enabled, ExceptionCode&);
     bool shouldDisplayTrackKind(const String& kind, ExceptionCode&);
@@ -133,6 +135,7 @@ public:
     void setImagesEnabled(bool, ExceptionCode&);
     void setMinimumTimerInterval(double intervalInSeconds, ExceptionCode&);
     void setDefaultVideoPosterURL(const String& url, ExceptionCode&);
+    void setForcePendingWebGLPolicy(bool, ExceptionCode&);
     void setTimeWithoutMouseMovementBeforeHidingControls(double time, ExceptionCode&);
     void setUseLegacyBackgroundSizeShorthandBehavior(bool, ExceptionCode&);
     void setAutoscrollForDragAndDropEnabled(bool, ExceptionCode&);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008, 2009, 2010, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2006-2010, 2013, 2015 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
  *
  * This library is free software; you can redistribute it and/or
@@ -36,6 +36,7 @@
 #include "Supplementable.h"
 #include "ViewState.h"
 #include "ViewportArguments.h"
+#include "WheelEventTestTrigger.h"
 #include <memory>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
@@ -51,6 +52,10 @@
 
 #if PLATFORM(COCOA)
 #include <wtf/SchedulePair.h>
+#endif
+
+#if ENABLE(MEDIA_SESSION)
+#include "MediaSessionEvents.h"
 #endif
 
 namespace JSC {
@@ -112,7 +117,6 @@ class ViewStateChangeObserver;
 class VisitedLinkStore;
 
 typedef uint64_t LinkHash;
-class SharedBuffer;
 
 enum FindDirection { FindDirectionForward, FindDirectionBackward };
 
@@ -130,8 +134,6 @@ public:
     WEBCORE_EXPORT ~Page();
 
     WEBCORE_EXPORT uint64_t renderTreeSize() const;
-    
-    static std::unique_ptr<Page> createPageFromBuffer(PageConfiguration&, const SharedBuffer*, const String& mimeType, bool canHaveScrollbars, bool transparent);
 
     void setNeedsRecalcStyleInAllFrames();
 
@@ -150,6 +152,8 @@ public:
 
     MainFrame& mainFrame() { ASSERT(m_mainFrame); return *m_mainFrame; }
     const MainFrame& mainFrame() const { ASSERT(m_mainFrame); return *m_mainFrame; }
+
+    bool inPageCache() const;
 
     bool openedByDOM() const;
     void setOpenedByDOM();
@@ -195,7 +199,7 @@ public:
 
     WEBCORE_EXPORT String scrollingStateTreeAsText();
     WEBCORE_EXPORT String synchronousScrollingReasonsAsText();
-    WEBCORE_EXPORT Ref<ClientRectList> nonFastScrollableRects(const Frame&);
+    WEBCORE_EXPORT Ref<ClientRectList> nonFastScrollableRects();
 
     Settings& settings() const { return *m_settings; }
     ProgressTracker& progress() const { return *m_progress; }
@@ -258,6 +262,11 @@ public:
 
     WEBCORE_EXPORT void setPageScaleFactor(float scale, const IntPoint& origin, bool inStableState = true);
     float pageScaleFactor() const { return m_pageScaleFactor; }
+
+    // The view scale factor is multiplied into the page scale factor by all
+    // callers of setPageScaleFactor.
+    WEBCORE_EXPORT void setViewScaleFactor(float);
+    float viewScaleFactor() const { return m_viewScaleFactor; }
 
     WEBCORE_EXPORT void setZoomedOutPageScaleFactor(float);
     float zoomedOutPageScaleFactor() const { return m_zoomedOutPageScaleFactor; }
@@ -415,6 +424,9 @@ public:
     UserContentController* userContentController() { return m_userContentController.get(); }
     WEBCORE_EXPORT void setUserContentController(UserContentController*);
 
+    bool userContentExtensionsEnabled() const { return m_userContentExtensionsEnabled; }
+    void setUserContentExtensionsEnabled(bool enabled) { m_userContentExtensionsEnabled = enabled; }
+
     VisitedLinkStore& visitedLinkStore();
     WEBCORE_EXPORT void setVisitedLinkStore(Ref<VisitedLinkStore>&&);
 
@@ -428,6 +440,10 @@ public:
     bool isMuted() const { return m_muted; }
     WEBCORE_EXPORT void setMuted(bool);
 
+#if ENABLE(MEDIA_SESSION)
+    WEBCORE_EXPORT void handleMediaEvent(MediaEventType);
+#endif
+
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
     void addPlaybackTargetPickerClient(uint64_t);
     void removePlaybackTargetPickerClient(uint64_t);
@@ -437,6 +453,16 @@ public:
     WEBCORE_EXPORT void setPlaybackTarget(uint64_t, Ref<MediaPlaybackTarget>&&);
     WEBCORE_EXPORT void playbackTargetAvailabilityDidChange(uint64_t, bool);
     WEBCORE_EXPORT void setShouldPlayToPlaybackTarget(uint64_t, bool);
+#endif
+
+    RefPtr<WheelEventTestTrigger> testTrigger() const { return m_testTrigger; }
+    WEBCORE_EXPORT WheelEventTestTrigger& ensureTestTrigger();
+    void clearTrigger() { m_testTrigger = nullptr; }
+    bool expectsWheelEventTriggers() const { return !!m_testTrigger; }
+
+#if ENABLE(VIDEO)
+    bool allowsMediaDocumentInlinePlayback() const { return m_allowsMediaDocumentInlinePlayback; }
+    WEBCORE_EXPORT void setAllowsMediaDocumentInlinePlayback(bool);
 #endif
 
 private:
@@ -514,6 +540,7 @@ private:
     float m_pageScaleFactor;
     float m_zoomedOutPageScaleFactor;
     float m_deviceScaleFactor;
+    float m_viewScaleFactor { 1 };
 
     float m_topContentInset;
     
@@ -586,6 +613,7 @@ private:
     Ref<StorageNamespaceProvider> m_storageNamespaceProvider;
     RefPtr<UserContentController> m_userContentController;
     Ref<VisitedLinkStore> m_visitedLinkStore;
+    RefPtr<WheelEventTestTrigger> m_testTrigger;
 
     HashSet<ViewStateChangeObserver*> m_viewStateChangeObservers;
 
@@ -594,6 +622,9 @@ private:
     bool m_isClosing;
 
     MediaProducer::MediaStateFlags m_mediaState { MediaProducer::IsNotPlaying };
+    
+    bool m_userContentExtensionsEnabled { true };
+    bool m_allowsMediaDocumentInlinePlayback { false };
 };
 
 inline PageGroup& Page::group()

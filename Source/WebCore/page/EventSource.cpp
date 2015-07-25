@@ -72,7 +72,7 @@ inline EventSource::EventSource(ScriptExecutionContext& context, const URL& url,
     eventSourceInit.get("withCredentials", m_withCredentials);
 }
 
-PassRefPtr<EventSource> EventSource::create(ScriptExecutionContext& context, const String& url, const Dictionary& eventSourceInit, ExceptionCode& ec)
+RefPtr<EventSource> EventSource::create(ScriptExecutionContext& context, const String& url, const Dictionary& eventSourceInit, ExceptionCode& ec)
 {
     if (url.isEmpty()) {
         ec = SYNTAX_ERR;
@@ -91,7 +91,7 @@ PassRefPtr<EventSource> EventSource::create(ScriptExecutionContext& context, con
         Document& document = downcast<Document>(context);
         shouldBypassMainWorldContentSecurityPolicy = document.frame()->script().shouldBypassMainWorldContentSecurityPolicy();
     }
-    if (!shouldBypassMainWorldContentSecurityPolicy && !context.contentSecurityPolicy()->allowConnectToSource(fullURL)) {
+    if (!context.contentSecurityPolicy()->allowConnectToSource(fullURL, shouldBypassMainWorldContentSecurityPolicy)) {
         // FIXME: Should this be throwing an exception?
         ec = SECURITY_ERR;
         return nullptr;

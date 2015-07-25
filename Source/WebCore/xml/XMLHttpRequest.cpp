@@ -213,7 +213,7 @@ Document* XMLHttpRequest::responseXML(ExceptionCode& ec)
         if ((m_response.isHTTP() && !responseIsXML() && !isHTML)
             || (isHTML && m_responseTypeCode == ResponseTypeDefault)
             || scriptExecutionContext()->isWorkerGlobalScope()) {
-            m_responseDocument = 0;
+            m_responseDocument = nullptr;
         } else {
             if (isHTML)
                 m_responseDocument = HTMLDocument::create(0, m_url);
@@ -225,7 +225,7 @@ Document* XMLHttpRequest::responseXML(ExceptionCode& ec)
             m_responseDocument->overrideMIMEType(mimeType);
 
             if (!m_responseDocument->wellFormed())
-                m_responseDocument = 0;
+                m_responseDocument = nullptr;
         }
         m_createdDocument = true;
     }
@@ -245,7 +245,7 @@ Blob* XMLHttpRequest::responseBlob()
             data.append(m_binaryResponseBuilder->data(), m_binaryResponseBuilder->size());
             String normalizedContentType = Blob::normalizedContentType(responseMIMEType()); // responseMIMEType defaults to text/xml which may be incorrect.
             m_responseBlob = Blob::create(WTF::move(data), normalizedContentType);
-            m_binaryResponseBuilder.clear();
+            m_binaryResponseBuilder = nullptr;
         } else {
             // If we errored out or got no data, we still return a blob, just an empty one.
             m_responseBlob = Blob::create();
@@ -265,7 +265,7 @@ ArrayBuffer* XMLHttpRequest::responseArrayBuffer()
             m_responseArrayBuffer = m_binaryResponseBuilder->createArrayBuffer();
         else
             m_responseArrayBuffer = ArrayBuffer::create(nullptr, 0);
-        m_binaryResponseBuilder.clear();
+        m_binaryResponseBuilder = nullptr;
     }
 
     return m_responseArrayBuffer.get();
@@ -405,12 +405,12 @@ bool XMLHttpRequest::isAllowedHTTPMethod(const String& method)
 String XMLHttpRequest::uppercaseKnownHTTPMethod(const String& method)
 {
     const char* const methods[] = { "DELETE", "GET", "HEAD", "OPTIONS", "POST", "PUT" };
-    for (unsigned i = 0; i < WTF_ARRAY_LENGTH(methods); ++i) {
-        if (equalIgnoringCase(method, methods[i])) {
+    for (auto* value : methods) {
+        if (equalIgnoringCase(method, value)) {
             // Don't bother allocating a new string if it's already all uppercase.
-            if (method == methods[i])
+            if (method == value)
                 break;
-            return ASCIILiteral(methods[i]);
+            return ASCIILiteral(value);
         }
     }
     return method;
@@ -504,7 +504,7 @@ void XMLHttpRequest::open(const String& method, const URL& url, bool async, Exce
         if (document.frame())
             shouldBypassMainWorldContentSecurityPolicy = document.frame()->script().shouldBypassMainWorldContentSecurityPolicy();
     }
-    if (!shouldBypassMainWorldContentSecurityPolicy && !scriptExecutionContext()->contentSecurityPolicy()->allowConnectToSource(url)) {
+    if (!scriptExecutionContext()->contentSecurityPolicy()->allowConnectToSource(url, shouldBypassMainWorldContentSecurityPolicy)) {
         // FIXME: Should this be throwing an exception?
         ec = SECURITY_ERR;
         return;
@@ -833,7 +833,7 @@ bool XMLHttpRequest::internalAbort()
     // FIXME: when we add the support for multi-part XHR, we will have to think be careful with this initialization.
     m_receivedLength = 0;
 
-    m_decoder = 0;
+    m_decoder = nullptr;
 
     if (!m_loader)
         return true;
@@ -866,17 +866,17 @@ void XMLHttpRequest::clearResponseBuffers()
     m_responseBuilder.clear();
     m_responseEncoding = String();
     m_createdDocument = false;
-    m_responseDocument = 0;
-    m_responseBlob = 0;
-    m_binaryResponseBuilder.clear();
-    m_responseArrayBuffer.clear();
+    m_responseDocument = nullptr;
+    m_responseBlob = nullptr;
+    m_binaryResponseBuilder = nullptr;
+    m_responseArrayBuffer = nullptr;
     m_responseCacheIsValid = false;
 }
 
 void XMLHttpRequest::clearRequest()
 {
     m_requestHeaders.clear();
-    m_requestEntityBody = 0;
+    m_requestEntityBody = nullptr;
 }
 
 void XMLHttpRequest::genericError()
@@ -1112,11 +1112,11 @@ void XMLHttpRequest::didFinishLoading(unsigned long identifier, double)
     InspectorInstrumentation::didFinishXHRLoading(scriptExecutionContext(), this, identifier, m_responseBuilder.toStringPreserveCapacity(), m_url, m_lastSendURL, m_lastSendLineNumber, m_lastSendColumnNumber);
 
     bool hadLoader = m_loader;
-    m_loader = 0;
+    m_loader = nullptr;
 
     changeState(DONE);
     m_responseEncoding = String();
-    m_decoder = 0;
+    m_decoder = nullptr;
 
     if (hadLoader)
         dropProtection();

@@ -49,12 +49,12 @@ namespace WebKit {
 // The plug-in that we're currently calling NPP_New for.
 static NetscapePlugin* currentNPPNewPlugin;
 
-PassRefPtr<NetscapePlugin> NetscapePlugin::create(PassRefPtr<NetscapePluginModule> pluginModule)
+RefPtr<NetscapePlugin> NetscapePlugin::create(PassRefPtr<NetscapePluginModule> pluginModule)
 {
     if (!pluginModule)
-        return 0;
+        return nullptr;
 
-    return adoptRef(new NetscapePlugin(pluginModule));
+    return adoptRef(*new NetscapePlugin(pluginModule));
 }
     
 NetscapePlugin::NetscapePlugin(PassRefPtr<NetscapePluginModule> pluginModule)
@@ -112,10 +112,10 @@ NetscapePlugin::~NetscapePlugin()
     m_pluginModule->decrementLoadCount();
 }
 
-PassRefPtr<NetscapePlugin> NetscapePlugin::fromNPP(NPP npp)
+RefPtr<NetscapePlugin> NetscapePlugin::fromNPP(NPP npp)
 {
     if (!npp)
-        return 0;
+        return nullptr;
 
     return static_cast<NetscapePlugin*>(npp->ndata);
 }
@@ -277,7 +277,7 @@ void NetscapePlugin::cancelStreamLoad(NetscapePluginStream* pluginStream)
 void NetscapePlugin::removePluginStream(NetscapePluginStream* pluginStream)
 {
     if (pluginStream == m_manualStream) {
-        m_manualStream = 0;
+        m_manualStream = nullptr;
         return;
     }
 
@@ -709,10 +709,10 @@ void NetscapePlugin::paint(GraphicsContext* context, const IntRect& dirtyRect)
     platformPaint(context, dirtyRect);
 }
 
-PassRefPtr<ShareableBitmap> NetscapePlugin::snapshot()
+RefPtr<ShareableBitmap> NetscapePlugin::snapshot()
 {
     if (!supportsSnapshotting() || m_pluginSize.isEmpty())
-        return 0;
+        return nullptr;
 
     ASSERT(m_isStarted);
 
@@ -728,7 +728,7 @@ PassRefPtr<ShareableBitmap> NetscapePlugin::snapshot()
 
     platformPaint(context.get(), IntRect(IntPoint(), m_pluginSize), true);
 
-    return bitmap.release();
+    return bitmap;
 }
 
 bool NetscapePlugin::isTransparent()
@@ -760,8 +760,10 @@ void NetscapePlugin::geometryDidChange(const IntSize& pluginSize, const IntRect&
     m_clipRect = clipRect;
     m_pluginToRootViewTransform = pluginToRootViewTransform;
 
+#if PLUGIN_ARCHITECTURE(X11)
     IntPoint frameRectLocationInWindowCoordinates = m_pluginToRootViewTransform.mapPoint(IntPoint());
     m_frameRectInWindowCoordinates = IntRect(frameRectLocationInWindowCoordinates, m_pluginSize);
+#endif
 
     platformGeometryDidChange();
 
@@ -1062,9 +1064,9 @@ bool NetscapePlugin::supportsSnapshotting() const
     return false;
 }
 
-PassRefPtr<WebCore::SharedBuffer> NetscapePlugin::liveResourceData() const
+RefPtr<WebCore::SharedBuffer> NetscapePlugin::liveResourceData() const
 {
-    return 0;
+    return nullptr;
 }
 
 IntPoint NetscapePlugin::convertToRootView(const IntPoint& pointInPluginCoordinates) const

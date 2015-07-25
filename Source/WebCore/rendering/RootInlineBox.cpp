@@ -794,13 +794,6 @@ BidiStatus RootInlineBox::lineBreakBidiStatus() const
 
 void RootInlineBox::setLineBreakInfo(RenderObject* obj, unsigned breakPos, const BidiStatus& status)
 {
-    // When setting lineBreakObj, the RenderObject must not be a RenderInline
-    // with no line boxes, otherwise all sorts of invariants are broken later.
-    // This has security implications because if the RenderObject does not
-    // point to at least one line box, then that RenderInline can be deleted
-    // later without resetting the lineBreakObj, leading to use-after-free.
-    ASSERT_WITH_SECURITY_IMPLICATION(!obj || is<RenderText>(*obj) || !(is<RenderInline>(*obj) && is<RenderBox>(*obj) && !downcast<RenderBox>(*obj).inlineBoxWrapper()));
-
     m_lineBreakObj = obj;
     m_lineBreakPos = breakPos;
     m_lineBreakBidiStatusEor = status.eor;
@@ -1050,7 +1043,7 @@ LayoutUnit RootInlineBox::verticalPositionForBox(InlineBox* box, VerticalPositio
         else if (verticalAlign == LENGTH) {
             LayoutUnit lineHeight;
             //Per http://www.w3.org/TR/CSS21/visudet.html#propdef-vertical-align: 'Percentages: refer to the 'line-height' of the element itself'.
-            if (renderer->style().verticalAlignLength().isPercent())
+            if (renderer->style().verticalAlignLength().isPercentOrCalculated())
                 lineHeight = renderer->style().computedLineHeight();
             else
                 lineHeight = renderer->lineHeight(firstLine, lineDirection);

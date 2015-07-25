@@ -42,7 +42,7 @@
 namespace WebCore {
 
 // Delay time in second for start autoscroll if pointer is in border edge of scrollable element.
-static double autoscrollDelay = 0.2;
+static const double autoscrollDelay = 0.2;
 
 // When the autoscroll or the panScroll is triggered when do the scroll every 0.05s to make it smooth
 static const double autoscrollInterval = 0.05;
@@ -57,7 +57,7 @@ static Frame* getMainFrame(Frame* frame)
 
 AutoscrollController::AutoscrollController()
     : m_autoscrollTimer(*this, &AutoscrollController::autoscrollTimerFired)
-    , m_autoscrollRenderer(0)
+    , m_autoscrollRenderer(nullptr)
     , m_autoscrollType(NoAutoscroll)
     , m_dragAndDropAutoscrollStartTime(0)
 {
@@ -90,7 +90,7 @@ void AutoscrollController::stopAutoscrollTimer(bool rendererIsBeingDestroyed)
 {
     RenderBox* scrollable = m_autoscrollRenderer;
     m_autoscrollTimer.stop();
-    m_autoscrollRenderer = 0;
+    m_autoscrollRenderer = nullptr;
 
     if (!scrollable)
         return;

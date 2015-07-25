@@ -150,6 +150,10 @@ bool AccessibilityTable::isDataTable() const
         }
     }
     
+    // The following checks should only apply if this is a real <table> element.
+    if (!hasTagName(tableTag))
+        return false;
+    
     RenderTable& table = downcast<RenderTable>(*m_renderer);
     // go through the cell's and check for tell-tale signs of "data" table status
     // cells have borders, or use attributes like headers, abbr, scope or axis
@@ -324,13 +328,20 @@ bool AccessibilityTable::computeIsTableExposableThroughAccessibility() const
     if (hasARIARole())
         return false;
 
-    // Gtk+ ATs expect all tables to be exposed as tables.
-#if PLATFORM(GTK) || PLATFORM(EFL)
+    if (isDataTable())
+        return true;
+
+    // Gtk+ ATs used to expect all tables to be exposed as tables.
+    // N.B. Efl may wish to follow suit and also defer to WebCore. In the meantime, the following
+    // check fails for data tables with display:table-row-group. By checking for data tables first,
+    // we can handle that edge case without introducing regressions prior to switching to WebCore's
+    // default behavior for table exposure.
+#if PLATFORM(EFL)
     Element* tableNode = downcast<RenderTable>(*m_renderer).element();
     return is<HTMLTableElement>(tableNode);
 #endif
 
-    return isDataTable();
+    return false;
 }
 
 void AccessibilityTable::clearChildren()
@@ -398,6 +409,16 @@ void AccessibilityTable::addChildren()
     AccessibilityObject* headerContainerObject = headerContainer();
     if (headerContainerObject && !headerContainerObject->accessibilityIsIgnored())
         m_children.append(headerContainerObject);
+
+    // Sometimes the cell gets the wrong role initially because it is created before the parent
+    // determines whether it is an accessibility table. Iterate all the cells and allow them to
+    // update their roles now that the table knows its status.
+    // see bug: https://bugs.webkit.org/show_bug.cgi?id=147001
+    for (const auto& row : m_rows) {
+        for (const auto& cell : row->children())
+            cell->updateAccessibilityRole();
+    }
+
 }
 
 void AccessibilityTable::addChildrenFromSection(RenderTableSection* tableSection, unsigned& maxColumnCount)
@@ -429,10 +450,6 @@ void AccessibilityTable::addChildrenFromSection(RenderTableSection* tableSection
         m_rows.append(&row);
         if (!row.accessibilityIsIgnored())
             m_children.append(&row);
-#if PLATFORM(GTK) || PLATFORM(EFL)
-        else
-            m_children.appendVector(row.children());
-#endif
         appendedRows.add(&row);
     }
     
@@ -578,6 +595,10 @@ AccessibilityRole AccessibilityTable::roleValue() const
 {
     if (!isExposableThroughAccessibility())
         return AccessibilityRenderObject::roleValue();
+    
+    AccessibilityRole ariaRole = ariaRoleAttribute();
+    if (ariaRole == GridRole || ariaRole == TreeGridRole)
+        return GridRole;
 
     return TableRole;
 }

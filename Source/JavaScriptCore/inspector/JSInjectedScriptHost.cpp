@@ -27,6 +27,7 @@
 #include "JSInjectedScriptHost.h"
 
 #include "DateInstance.h"
+#include "DirectArguments.h"
 #include "Error.h"
 #include "InjectedScriptHost.h"
 #include "IteratorOperations.h"
@@ -38,6 +39,7 @@
 #include "JSInjectedScriptHostPrototype.h"
 #include "JSMap.h"
 #include "JSMapIterator.h"
+#include "JSPromise.h"
 #include "JSSet.h"
 #include "JSSetIterator.h"
 #include "JSStringIterator.h"
@@ -46,13 +48,10 @@
 #include "JSWeakSet.h"
 #include "ObjectConstructor.h"
 #include "RegExpObject.h"
+#include "ScopedArguments.h"
 #include "SourceCode.h"
 #include "TypedArrayInlines.h"
 #include "WeakMapData.h"
-
-#if ENABLE(PROMISES)
-#include "JSPromise.h"
-#endif
 
 using namespace JSC;
 
@@ -85,10 +84,8 @@ void JSInjectedScriptHost::destroy(JSC::JSCell* cell)
 
 void JSInjectedScriptHost::releaseImpl()
 {
-    if (m_impl) {
-        m_impl->deref();
-        m_impl = nullptr;
-    }
+    if (auto impl = std::exchange(m_impl, nullptr))
+        impl->deref();
 }
 
 JSInjectedScriptHost::~JSInjectedScriptHost()
@@ -148,6 +145,9 @@ JSValue JSInjectedScriptHost::subtype(ExecState* exec)
 
     if (value.inherits(JSArray::info()))
         return jsNontrivialString(exec, ASCIILiteral("array"));
+    if (value.inherits(DirectArguments::info()) || value.inherits(ScopedArguments::info()))
+        return jsNontrivialString(exec, ASCIILiteral("array"));
+
     if (value.inherits(DateInstance::info()))
         return jsNontrivialString(exec, ASCIILiteral("date"));
     if (value.inherits(RegExpObject::info()))
@@ -240,27 +240,25 @@ JSValue JSInjectedScriptHost::getInternalProperties(ExecState* exec)
 
     JSValue value = exec->uncheckedArgument(0);
 
-#if ENABLE(PROMISES)
     if (JSPromise* promise = jsDynamicCast<JSPromise*>(value)) {
         unsigned index = 0;
         JSArray* array = constructEmptyArray(exec, nullptr);
-        switch (promise->status()) {
-        case JSPromise::Status::Unresolved:
+        switch (promise->status(exec->vm())) {
+        case JSPromise::Status::Pending:
             array->putDirectIndex(exec, index++, constructInternalProperty(exec, ASCIILiteral("status"), jsNontrivialString(exec, ASCIILiteral("pending"))));
             break;
-        case JSPromise::Status::HasResolution:
+        case JSPromise::Status::Fulfilled:
             array->putDirectIndex(exec, index++, constructInternalProperty(exec, ASCIILiteral("status"), jsNontrivialString(exec, ASCIILiteral("resolved"))));
-            array->putDirectIndex(exec, index++, constructInternalProperty(exec, ASCIILiteral("result"), promise->result()));
+            array->putDirectIndex(exec, index++, constructInternalProperty(exec, ASCIILiteral("result"), promise->result(exec->vm())));
             break;
-        case JSPromise::Status::HasRejection:
+        case JSPromise::Status::Rejected:
             array->putDirectIndex(exec, index++, constructInternalProperty(exec, ASCIILiteral("status"), jsNontrivialString(exec, ASCIILiteral("rejected"))));
-            array->putDirectIndex(exec, index++, constructInternalProperty(exec, ASCIILiteral("result"), promise->result()));
+            array->putDirectIndex(exec, index++, constructInternalProperty(exec, ASCIILiteral("result"), promise->result(exec->vm())));
             break;
         }
         // FIXME: <https://webkit.org/b/141664> Web Inspector: ES6: Improved Support for Promises - Promise Reactions
         return array;
     }
-#endif
 
     if (JSBoundFunction* boundFunction = jsDynamicCast<JSBoundFunction*>(value)) {
         unsigned index = 0;

@@ -41,42 +41,28 @@
 
 namespace WebCore {
 
-// ReadableStreamReader implements the core of the streams API ReadableStreamReader functionality.
-// It handles in particular access to the chunks and state of a ReadableStream.
+typedef int ExceptionCode;
+
+// ReadableStreamReader implements access to ReadableStream from JavaScript.
+// It basically allows access to the ReadableStream iff the ReadableStreamReader instance is the active reader
+// of the ReadableStream.
+// Most of this handling is happening in the custom JS binding of ReadableStreamReader.
 // See https://streams.spec.whatwg.org/#reader-class for more information.
-class ReadableStreamReader : public ActiveDOMObject, public ScriptWrappable, public RefCounted<ReadableStreamReader> {
+class ReadableStreamReader {
 public:
-    enum class State {
-        Readable,
-        Closed,
-        Errored
-    };
+    ReadableStreamReader(ReadableStream& stream)
+        : m_stream(stream) { }
 
-    virtual ~ReadableStreamReader();
+    void cancel(JSC::JSValue, ReadableStream::CancelPromise&&);
+    void closed(ReadableStream::ClosedPromise&&);
+    void read(ReadableStream::ReadPromise&&);
+    void releaseLock(ExceptionCode&);
 
-    ReadableStream* stream() { return m_stream.get(); }
-
-    typedef std::function<void()> ClosedSuccessCallback;
-    typedef std::function<void()> ClosedErrorCallback;
-    void closed(ClosedSuccessCallback, ClosedErrorCallback);
-
-    void changeStateToClosed();
-
-protected:
-    ReadableStreamReader(ReadableStream&);
-
-    void releaseStream();
+    void ref() { m_stream.ref(); }
+    void deref() { m_stream.deref(); }
 
 private:
-    // ActiveDOMObject API.
-    const char* activeDOMObjectName() const override;
-    bool canSuspendForPageCache() const override;
-    void initialize();
-
-    RefPtr<ReadableStream> m_stream;
-    State m_state { State::Readable };
-
-    ClosedSuccessCallback m_closedSuccessCallback;
+    ReadableStream& m_stream;
 };
 
 }

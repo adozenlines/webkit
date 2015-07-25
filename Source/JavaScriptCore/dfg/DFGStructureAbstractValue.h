@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012, 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,13 +34,17 @@
 #include "DumpContext.h"
 #include "StructureSet.h"
 
-namespace JSC { namespace DFG {
+namespace JSC {
+
+class TrackedReferences;
+
+namespace DFG {
 
 class StructureAbstractValue {
 public:
     StructureAbstractValue() { }
     StructureAbstractValue(Structure* structure)
-        : m_set(structure)
+        : m_set(StructureSet(structure))
     {
         setClobbered(false);
     }
@@ -57,7 +61,7 @@ public:
     
     ALWAYS_INLINE StructureAbstractValue& operator=(Structure* structure)
     {
-        m_set = structure;
+        m_set = StructureSet(structure);
         setClobbered(false);
         return *this;
     }
@@ -82,7 +86,7 @@ public:
     
     void makeTop()
     {
-        m_set.deleteStructureListIfNecessary();
+        m_set.deleteListIfNecessary();
         m_set.m_pointer = topValue;
     }
     
@@ -213,6 +217,8 @@ public:
     
     bool overlaps(const StructureSet& other) const;
     bool overlaps(const StructureAbstractValue& other) const;
+    
+    void validateReferences(const TrackedReferences&) const;
     
 private:
     static const uintptr_t clobberedFlag = StructureSet::reservedFlag;

@@ -47,6 +47,8 @@ static void* keyValueObservingContext = &keyValueObservingContext;
     WKWebView *_webView;
     BOOL _zoomTextOnly;
     BOOL _isPrivateBrowsingWindow;
+
+    BOOL _useShrinkToFit;
 }
 
 - (void)awakeFromNib
@@ -69,6 +71,12 @@ static void* keyValueObservingContext = &keyValueObservingContext;
     _webView.navigationDelegate = self;
     _webView.UIDelegate = self;
     
+    _webView._observedRenderingProgressEvents = _WKRenderingProgressEventFirstLayout
+        | _WKRenderingProgressEventFirstVisuallyNonEmptyLayout
+        | _WKRenderingProgressEventFirstPaintWithSignificantArea
+        | _WKRenderingProgressEventFirstLayoutAfterSuppressedIncrementalRendering
+        | _WKRenderingProgressEventFirstPaintAfterSuppressedIncrementalRendering;
+
     _zoomTextOnly = NO;
 }
 
@@ -235,8 +243,20 @@ static CGFloat viewScaleForMenuItemTag(NSInteger tag)
     return _zoomTextOnly ? (_webView._textZoomFactor != 1) : (_webView._pageZoomFactor != 1);
 }
 
+- (IBAction)toggleShrinkToFit:(id)sender
+{
+    _useShrinkToFit = !_useShrinkToFit;
+    toggleUseShrinkToFitButton.image = _useShrinkToFit ? [NSImage imageNamed:@"NSExitFullScreenTemplate"] : [NSImage imageNamed:@"NSEnterFullScreenTemplate"];
+    [_webView _setLayoutMode:_useShrinkToFit ? _WKLayoutModeDynamicSizeComputedFromMinimumDocumentSize : _WKLayoutModeViewSize];
+}
+
 - (IBAction)dumpSourceToConsole:(id)sender
 {
+}
+
+- (NSURL *)currentURL
+{
+    return _webView.URL;
 }
 
 - (BOOL)validateUserInterfaceItem:(id <NSValidatedUserInterfaceItem>)item
@@ -351,13 +371,21 @@ static CGFloat viewScaleForMenuItemTag(NSInteger tag)
     preferences._visibleDebugOverlayRegions = visibleOverlayRegions;
 }
 
+- (void)updateTitle:(NSString *)title
+{
+    if (!title)
+        title = _webView.URL.lastPathComponent;
+    
+    self.window.title = [NSString stringWithFormat:@"%@%@ [WK2 %d]", _isPrivateBrowsingWindow ? @"🙈 " : @"", title, _webView._webProcessIdentifier];
+}
+
 - (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
 {
     if (context != keyValueObservingContext || object != _webView)
         return;
 
     if ([keyPath isEqualToString:@"title"])
-        self.window.title = [NSString stringWithFormat:@"%@%@ [WK2 %d]", _isPrivateBrowsingWindow ? @"🙈 " : @"", _webView.title, _webView._webProcessIdentifier];
+        [self updateTitle:_webView.title];
     else if ([keyPath isEqualToString:@"URL"])
         [self updateTextFieldFromURL:_webView.URL];
 }
@@ -496,6 +524,7 @@ static NSSet *dataTypes()
 - (void)webView:(WKWebView *)webView didCommitNavigation:(WKNavigation *)navigation
 {
     LOG(@"didCommitNavigation: %@", navigation);
+    [self updateTitle:nil];
 }
 
 - (void)webView:(WKWebView *)webView didFinishLoadingNavigation:(WKNavigation *)navigation
@@ -512,6 +541,24 @@ static NSSet *dataTypes()
 {
     NSLog(@"WebContent process crashed; reloading");
     [self reload:nil];
+}
+
+- (void)_webView:(WKWebView *)webView renderingProgressDidChange:(_WKRenderingProgressEvents)progressEvents
+{
+    if (progressEvents & _WKRenderingProgressEventFirstLayout)
+        LOG(@"renderingProgressDidChange: %@", @"first layout");
+
+    if (progressEvents & _WKRenderingProgressEventFirstVisuallyNonEmptyLayout)
+        LOG(@"renderingProgressDidChange: %@", @"first visually non-empty layout");
+
+    if (progressEvents & _WKRenderingProgressEventFirstPaintWithSignificantArea)
+        LOG(@"renderingProgressDidChange: %@", @"first paint with significant area");
+
+    if (progressEvents & _WKRenderingProgressEventFirstLayoutAfterSuppressedIncrementalRendering)
+        LOG(@"renderingProgressDidChange: %@", @"first layout after suppressed incremental rendering");
+
+    if (progressEvents & _WKRenderingProgressEventFirstPaintAfterSuppressedIncrementalRendering)
+        LOG(@"renderingProgressDidChange: %@", @"first paint after suppressed incremental rendering");
 }
 
 @end

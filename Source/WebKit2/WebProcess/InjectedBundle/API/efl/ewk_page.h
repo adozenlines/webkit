@@ -34,7 +34,11 @@
 #include <Eina.h>
 #include <JavaScriptCore/JSBase.h>
 
+#ifdef __cplusplus
+typedef class EwkPage Ewk_Page;
+#else
 typedef struct EwkPage Ewk_Page;
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,6 +47,22 @@ extern "C" {
 struct EwkPageClient {
     int version;
     void *data;
+
+    /**
+     * Callbacks to report load started.
+     *
+     * @param page page to be started
+     * @param data data of a page client
+     */
+    void (*load_started)(EwkPage *page, void *data);
+
+    /**
+     * Callbacks to report window object cleared. 
+     *
+     * @param page page that the JavaScript window object has been cleared
+     * @param data data of a page client 
+     */
+    void (*window_object_cleared)(EwkPage *page, void *data);
 
     /**
      * Callbacks to report load finished.

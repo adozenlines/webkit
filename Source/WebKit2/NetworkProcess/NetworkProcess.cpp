@@ -31,6 +31,7 @@
 #include "ArgumentCoders.h"
 #include "Attachment.h"
 #include "AuthenticationManager.h"
+#include "ChildProcessMessages.h"
 #include "CustomProtocolManager.h"
 #include "Logging.h"
 #include "NetworkConnectionToWebProcess.h"
@@ -44,10 +45,9 @@
 #include "StatisticsData.h"
 #include "WebCookieManager.h"
 #include "WebProcessPoolMessages.h"
-#include "WebResourceCacheManager.h"
 #include "WebsiteData.h"
+#include <WebCore/DiagnosticLoggingClient.h>
 #include <WebCore/Logging.h>
-#include <WebCore/MemoryPressureHandler.h>
 #include <WebCore/PlatformCookieJar.h>
 #include <WebCore/ResourceRequest.h>
 #include <WebCore/SecurityOriginHash.h>
@@ -127,12 +127,20 @@ void NetworkProcess::didReceiveMessage(IPC::Connection& connection, IPC::Message
     if (messageReceiverMap().dispatchMessage(connection, decoder))
         return;
 
+    if (decoder.messageReceiverName() == Messages::ChildProcess::messageReceiverName()) {
+        ChildProcess::didReceiveMessage(connection, decoder);
+        return;
+    }
+
     didReceiveNetworkProcessMessage(connection, decoder);
 }
 
 void NetworkProcess::didReceiveSyncMessage(IPC::Connection& connection, IPC::MessageDecoder& decoder, std::unique_ptr<IPC::MessageEncoder>& replyEncoder)
 {
-    messageReceiverMap().dispatchSyncMessage(connection, decoder, replyEncoder);
+    if (messageReceiverMap().dispatchSyncMessage(connection, decoder, replyEncoder))
+        return;
+
+    didReceiveSyncNetworkProcessMessage(connection, decoder, replyEncoder);
 }
 
 void NetworkProcess::didClose(IPC::Connection&)
@@ -166,7 +174,7 @@ AuthenticationManager& NetworkProcess::downloadsAuthenticationManager()
     return authenticationManager();
 }
 
-void NetworkProcess::lowMemoryHandler(bool critical)
+void NetworkProcess::lowMemoryHandler(Critical critical)
 {
     platformLowMemoryHandler(critical);
     WTF::releaseFastMallocFreeMemory();
@@ -179,7 +187,7 @@ void NetworkProcess::initializeNetworkProcess(const NetworkProcessCreationParame
     WTF::setCurrentThreadIsUserInitiated();
 
     auto& memoryPressureHandler = MemoryPressureHandler::singleton();
-    memoryPressureHandler.setLowMemoryHandler([this] (bool critical) {
+    memoryPressureHandler.setLowMemoryHandler([this] (Critical critical, Synchronous) {
         lowMemoryHandler(critical);
     });
     memoryPressureHandler.install();
@@ -258,23 +266,6 @@ void NetworkProcess::destroyPrivateBrowsingSession(SessionID sessionID)
     SessionTracker::destroySession(sessionID);
 }
 
-#if USE(CFURLCACHE)
-static Vector<RefPtr<SecurityOrigin>> cfURLCacheOrigins()
-{
-    Vector<RefPtr<SecurityOrigin>> result;
-
-    WebResourceCacheManager::cfURLCacheHostNamesWithCallback([&result](RetainPtr<CFArrayRef> cfURLHosts) {
-        for (CFIndex i = 0, size = CFArrayGetCount(cfURLHosts.get()); i < size; ++i) {
-            CFStringRef host = static_cast<CFStringRef>(CFArrayGetValueAtIndex(cfURLHosts.get(), i));
-
-            result.append(SecurityOrigin::create("http", host, 0));
-        }
-    });
-
-    return result;
-}
-#endif
-
 static void fetchDiskCacheEntries(SessionID sessionID, std::function<void (Vector<WebsiteData::Entry>)> completionHandler)
 {
 #if ENABLE(NETWORK_CACHE)
@@ -307,7 +298,7 @@ static void fetchDiskCacheEntries(SessionID sessionID, std::function<void (Vecto
     Vector<WebsiteData::Entry> entries;
 
 #if USE(CFURLCACHE)
-    for (auto& origin : cfURLCacheOrigins())
+    for (auto& origin : NetworkProcess::cfURLCacheOrigins())
         entries.append(WebsiteData::Entry { WTF::move(origin), WebsiteDataTypeDiskCache });
 #endif
 
@@ -358,6 +349,13 @@ void NetworkProcess::fetchWebsiteData(SessionID sessionID, uint64_t websiteDataT
 
 void NetworkProcess::deleteWebsiteData(SessionID sessionID, uint64_t websiteDataTypes, std::chrono::system_clock::time_point modifiedSince, uint64_t callbackID)
 {
+#if PLATFORM(COCOA)
+    if (websiteDataTypes & WebsiteDataTypeHSTSCache) {
+        if (auto* networkStorageSession = SessionTracker::session(sessionID))
+            clearHSTSCache(*networkStorageSession, modifiedSince);
+    }
+#endif
+
     if (websiteDataTypes & WebsiteDataTypeCookies) {
         if (auto* networkStorageSession = SessionTracker::session(sessionID))
             deleteAllCookiesModifiedSince(*networkStorageSession, modifiedSince);
@@ -410,12 +408,7 @@ static void clearDiskCacheEntries(const Vector<SecurityOriginData>& origins, std
 #endif
 
 #if USE(CFURLCACHE)
-    auto hostNames = adoptCF(CFArrayCreateMutable(kCFAllocatorDefault, 0, &kCFTypeArrayCallBacks));
-    for (auto& origin : origins)
-        CFArrayAppendValue(hostNames.get(), origin.host.createCFString().get());
-
-    CFShow(hostNames.get());
-    WebResourceCacheManager::clearCFURLCacheForHostNames(hostNames.get());
+    NetworkProcess::clearCFURLCacheForOrigins(origins);
 #endif
 
     RunLoop::main().dispatch(WTF::move(completionHandler));
@@ -424,10 +417,8 @@ static void clearDiskCacheEntries(const Vector<SecurityOriginData>& origins, std
 void NetworkProcess::deleteWebsiteDataForOrigins(SessionID sessionID, uint64_t websiteDataTypes, const Vector<SecurityOriginData>& origins, const Vector<String>& cookieHostNames, uint64_t callbackID)
 {
     if (websiteDataTypes & WebsiteDataTypeCookies) {
-        if (auto* networkStorageSession = SessionTracker::session(sessionID)) {
-            for (const auto& cookieHostName : cookieHostNames)
-                deleteCookiesForHostname(*networkStorageSession, cookieHostName);
-        }
+        if (auto* networkStorageSession = SessionTracker::session(sessionID))
+            deleteCookiesForHostnames(*networkStorageSession, cookieHostNames);
     }
 
     auto completionHandler = [this, callbackID] {
@@ -475,13 +466,9 @@ void NetworkProcess::setCanHandleHTTPSServerTrustEvaluation(bool value)
 
 void NetworkProcess::getNetworkProcessStatistics(uint64_t callbackID)
 {
-    NetworkResourceLoadScheduler& scheduler = NetworkProcess::singleton().networkResourceLoadScheduler();
-
     StatisticsData data;
 
     auto& networkProcess = NetworkProcess::singleton();
-    data.statisticsNumbers.set("LoadsPendingCount", scheduler.loadsPendingCount());
-    data.statisticsNumbers.set("LoadsActiveCount", scheduler.loadsActiveCount());
     data.statisticsNumbers.set("DownloadsActiveCount", networkProcess.downloadManager().activeDownloadCount());
     data.statisticsNumbers.set("OutstandingAuthenticationChallengesCount", networkProcess.authenticationManager().outstandingAuthenticationChallengeCount());
 
@@ -490,17 +477,26 @@ void NetworkProcess::getNetworkProcessStatistics(uint64_t callbackID)
 
 void NetworkProcess::logDiagnosticMessage(uint64_t webPageID, const String& message, const String& description, WebCore::ShouldSample shouldSample)
 {
-    parentProcessConnection()->send(Messages::NetworkProcessProxy::LogDiagnosticMessage(webPageID, message, description, shouldSample == ShouldSample::Yes), 0);
+    if (!DiagnosticLoggingClient::shouldLogAfterSampling(shouldSample))
+        return;
+
+    parentProcessConnection()->send(Messages::NetworkProcessProxy::LogSampledDiagnosticMessage(webPageID, message, description), 0);
 }
 
 void NetworkProcess::logDiagnosticMessageWithResult(uint64_t webPageID, const String& message, const String& description, WebCore::DiagnosticLoggingResultType result, WebCore::ShouldSample shouldSample)
 {
-    parentProcessConnection()->send(Messages::NetworkProcessProxy::LogDiagnosticMessageWithResult(webPageID, message, description, result, shouldSample == ShouldSample::Yes), 0);
+    if (!DiagnosticLoggingClient::shouldLogAfterSampling(shouldSample))
+        return;
+
+    parentProcessConnection()->send(Messages::NetworkProcessProxy::LogSampledDiagnosticMessageWithResult(webPageID, message, description, result), 0);
 }
 
 void NetworkProcess::logDiagnosticMessageWithValue(uint64_t webPageID, const String& message, const String& description, const String& value, WebCore::ShouldSample shouldSample)
 {
-    parentProcessConnection()->send(Messages::NetworkProcessProxy::LogDiagnosticMessageWithValue(webPageID, message, description, value, shouldSample == ShouldSample::Yes), 0);
+    if (!DiagnosticLoggingClient::shouldLogAfterSampling(shouldSample))
+        return;
+
+    parentProcessConnection()->send(Messages::NetworkProcessProxy::LogSampledDiagnosticMessageWithValue(webPageID, message, description, value), 0);
 }
 
 void NetworkProcess::terminate()
@@ -509,15 +505,24 @@ void NetworkProcess::terminate()
     ChildProcess::terminate();
 }
 
-void NetworkProcess::processWillSuspend()
+void NetworkProcess::processWillSuspendImminently(bool& handled)
 {
-    lowMemoryHandler(true);
+    lowMemoryHandler(Critical::Yes);
+    handled = true;
+}
+
+void NetworkProcess::prepareToSuspend()
+{
+    lowMemoryHandler(Critical::Yes);
     parentProcessConnection()->send(Messages::NetworkProcessProxy::ProcessReadyToSuspend(), 0);
 }
 
-void NetworkProcess::cancelProcessWillSuspend()
+void NetworkProcess::cancelPrepareToSuspend()
 {
-    parentProcessConnection()->send(Messages::NetworkProcessProxy::DidCancelProcessSuspension(), 0);
+    // Although it is tempting to send a NetworkProcessProxy::DidCancelProcessSuspension message from here
+    // we do not because prepareToSuspend() already replied with a NetworkProcessProxy::ProcessReadyToSuspend
+    // message. And NetworkProcessProxy expects to receive either a NetworkProcessProxy::ProcessReadyToSuspend-
+    // or NetworkProcessProxy::DidCancelProcessSuspension- message, but not both.
 }
 
 void NetworkProcess::processDidResume()
@@ -537,7 +542,7 @@ void NetworkProcess::initializeSandbox(const ChildProcessInitializationParameter
 {
 }
 
-void NetworkProcess::platformLowMemoryHandler(bool)
+void NetworkProcess::platformLowMemoryHandler(Critical)
 {
 }
 #endif

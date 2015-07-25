@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.8)
+cmake_minimum_required(VERSION 2.8.12)
 project(WebKit)
 
 # -----------------------------------------------------------------------------
@@ -18,6 +18,7 @@ set(DERIVED_SOURCES_DIR "${CMAKE_BINARY_DIR}/DerivedSources")
 set(DERIVED_SOURCES_JAVASCRIPTCORE_DIR "${CMAKE_BINARY_DIR}/DerivedSources/JavaScriptCore")
 set(DERIVED_SOURCES_WEBCORE_DIR "${CMAKE_BINARY_DIR}/DerivedSources/WebCore")
 set(DERIVED_SOURCES_WEBKITLEGACY_DIR "${CMAKE_BINARY_DIR}/DerivedSources/WebKitLegacy")
+set(DERIVED_SOURCES_WEBKIT_DIR "${CMAKE_BINARY_DIR}/DerivedSources/WebKit")
 set(DERIVED_SOURCES_WEBKIT2_DIR "${CMAKE_BINARY_DIR}/DerivedSources/WebKit2")
 set(DERIVED_SOURCES_WEBINSPECTORUI_DIR "${CMAKE_BINARY_DIR}/DerivedSources/WebInspectorUI")
 set(DERIVED_SOURCES_WTF_DIR "${CMAKE_BINARY_DIR}/DerivedSources/WTF")
@@ -65,7 +66,14 @@ find_package(Gperf 3.0.1 REQUIRED)
 find_package(Perl 5.10.0 REQUIRED)
 
 find_package(PythonInterp 2.7.0 REQUIRED)
+
+# We cannot check for RUBY_FOUND because it is set only when the full package is installed and
+# the only thing we need is the interpreter. Unlike Python, cmake does not provide a macro
+# for finding only the Ruby interpreter.
 find_package(Ruby 1.8.7)
+if (NOT RUBY_EXECUTABLE OR RUBY_VERSION VERSION_LESS 1.8.7)
+    message(FATAL_ERROR "Ruby 1.8.7 or higher is required.")
+endif ()
 
 # -----------------------------------------------------------------------------
 # Determine the target processor

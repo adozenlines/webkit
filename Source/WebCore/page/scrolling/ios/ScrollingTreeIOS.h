@@ -39,7 +39,7 @@ class AsyncScrollingCoordinator;
 
 class ScrollingTreeIOS : public ScrollingTree {
 public:
-    static RefPtr<ScrollingTreeIOS> create(AsyncScrollingCoordinator*);
+    static Ref<ScrollingTreeIOS> create(AsyncScrollingCoordinator*);
     virtual ~ScrollingTreeIOS();
 
     virtual void commitNewTreeState(std::unique_ptr<ScrollingStateTree>) override;
@@ -57,6 +57,8 @@ private:
     virtual PassRefPtr<ScrollingTreeNode> createScrollingTreeNode(ScrollingNodeType, ScrollingNodeID) override;
 
     virtual void scrollingTreeNodeDidScroll(ScrollingNodeID, const FloatPoint& scrollPosition, SetOrSyncScrollingLayerPosition = SyncScrollingLayerPosition) override;
+
+    void currentSnapPointIndicesDidChange(WebCore::ScrollingNodeID, unsigned horizontal, unsigned vertical) override;
 
     virtual FloatRect fixedPositionRect() override;
 

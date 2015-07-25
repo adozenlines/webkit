@@ -97,9 +97,7 @@ public:
 
     GraphicsLayer* contentsContainmentLayer() const { return m_contentsContainmentLayer.get(); }
 
-    bool hasContentsLayer() const { return m_foregroundLayer != nullptr; }
     GraphicsLayer* foregroundLayer() const { return m_foregroundLayer.get(); }
-
     GraphicsLayer* backgroundLayer() const { return m_backgroundLayer.get(); }
     bool backgroundLayerPaintsFixedRootBackground() const { return m_backgroundLayerPaintsFixedRootBackground; }
     
@@ -128,11 +126,14 @@ public:
             break;
         case ViewportConstrained:
             m_viewportConstrainedNodeID = nodeID;
+            setIsScrollCoordinatedWithViewportConstrainedRole(nodeID);
             break;
         }
     }
     
     ScrollingNodeID scrollingNodeIDForChildren() const { return m_scrollingNodeID ? m_scrollingNodeID : m_viewportConstrainedNodeID; }
+
+    void setIsScrollCoordinatedWithViewportConstrainedRole(bool);
 
     bool hasMaskLayer() const { return m_maskLayer != 0; }
     bool hasChildClippingMaskLayer() const { return m_childClippingMaskLayer != nullptr; }
@@ -287,6 +288,7 @@ private:
     void updateFilters(const RenderStyle&);
 #if ENABLE(FILTERS_LEVEL_2)
     void updateBackdropFilters(const RenderStyle&);
+    void updateBackdropFiltersGeometry();
 #endif
 #if ENABLE(CSS_COMPOSITING)
     void updateBlendMode(const RenderStyle&);
@@ -330,6 +332,8 @@ private:
 
     static CSSPropertyID graphicsLayerToCSSProperty(AnimatedPropertyID);
     static AnimatedPropertyID cssToGraphicsLayerProperty(CSSPropertyID);
+
+    bool canIssueSetNeedsDisplay() const { return !paintsIntoWindow() && !paintsIntoCompositedAncestor(); }
 
     RenderLayer& m_owningLayer;
 

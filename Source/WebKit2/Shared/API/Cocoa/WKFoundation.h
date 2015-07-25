@@ -24,7 +24,6 @@
  */
 
 #import <Availability.h>
-#import <CoreFoundation/CoreFoundation.h>
 #import <TargetConditionals.h>
 
 #if !defined(WK_API_ENABLED)
@@ -41,10 +40,6 @@
 #define WK_EXTERN extern __attribute__((visibility ("default")))
 #endif
 
-#ifdef WK_FRAMEWORK_HEADER_POSTPROCESSING_ENABLED
-// Do not remove or change this comment. POSTPROCESSING_INSERTS_DEPLOYMENT_TARGET_AVAILABILITY_DEFINITION_HERE
-#endif
-
 #ifndef WK_FRAMEWORK_HEADER_POSTPROCESSING_ENABLED
 
 #define WK_AVAILABLE(_mac, _ios)
@@ -54,8 +49,19 @@
 #define WK_ENUM_AVAILABLE(_mac, _ios)
 #define WK_ENUM_AVAILABLE_IOS(_ios)
 
+#if __has_feature(objc_generics) && (!defined(__MAC_OS_X_VERSION_MAX_ALLOWED) || __MAC_OS_X_VERSION_MAX_ALLOWED >= 101100)
+
+#define WK_ARRAY(_objectType) NSArray<_objectType>
+#define WK_DICTIONARY(_keyType, _valueType) NSDictionary<_keyType, _valueType>
+#define WK_SET(_objectType) NSSet<_objectType>
+
+#else
+
 #define WK_ARRAY(...) NSArray
+#define WK_DICTIONARY(...) NSDictionary
 #define WK_SET(...) NSSet
+
+#endif
 
 #ifndef __NSi_8_3
 #define __NSi_8_3 introduced=8.3

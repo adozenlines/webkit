@@ -644,9 +644,6 @@ WebInspector.DOMNodeStyles = class DOMNodeStyles extends WebInspector.Object
             properties.push(property);
         }
 
-        if (inherited && !inheritedPropertyCount)
-            return null;
-
         var styleSheetTextRange = this._parseSourceRangePayload(payload.range);
 
         if (styleDeclaration) {
@@ -660,6 +657,9 @@ WebInspector.DOMNodeStyles = class DOMNodeStyles extends WebInspector.Object
                 styleSheet.markAsInlineStyle();
             styleSheet.addEventListener(WebInspector.CSSStyleSheet.Event.ContentDidChange, this._styleSheetContentDidChange, this);
         }
+
+        if (inherited && !inheritedPropertyCount)
+            return null;
 
         styleDeclaration = new WebInspector.CSSStyleDeclaration(this, styleSheet, id, type, node, inherited, text, properties, styleSheetTextRange);
 
@@ -928,7 +928,8 @@ WebInspector.DOMNodeStyles = class DOMNodeStyles extends WebInspector.Object
                         continue;
                     }
 
-                    effectiveProperty.overridden = true;
+                    if (!property.anonymous)
+                        effectiveProperty.overridden = true;
                 }
 
                 property.overridden = false;

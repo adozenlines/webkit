@@ -217,20 +217,14 @@ void JIT::emitSlow_op_get_by_val(Instruction* currentInstruction, Vector<SlowCas
     notString.link(this);
     nonCell.link(this);
     
-    Jump skipProfiling = jump();
-    
     linkSlowCase(iter); // vector length check
     linkSlowCase(iter); // empty value
-    
-    emitArrayProfileOutOfBoundsSpecialCase(profile);
-    
-    skipProfiling.link(this);
     
     Label slowPath = label();
     
     emitGetVirtualRegister(base, regT0);
     emitGetVirtualRegister(property, regT1);
-    Call call = callOperation(operationGetByValDefault, dst, regT0, regT1);
+    Call call = callOperation(operationGetByValDefault, dst, regT0, regT1, profile);
 
     m_byValCompilationInfo[m_byValInstructionIndex].slowPathTarget = slowPath;
     m_byValCompilationInfo[m_byValInstructionIndex].returnAddress = call;
@@ -430,7 +424,7 @@ void JIT::emitSlow_op_put_by_val(Instruction* currentInstruction, Vector<SlowCas
     emitGetVirtualRegister(property, regT1);
     emitGetVirtualRegister(value, regT2);
     bool isDirect = m_interpreter->getOpcodeID(currentInstruction->u.opcode) == op_put_by_val_direct;
-    Call call = callOperation(isDirect ? operationDirectPutByVal : operationPutByVal, regT0, regT1, regT2);
+    Call call = callOperation(isDirect ? operationDirectPutByVal : operationPutByVal, regT0, regT1, regT2, profile);
 
     m_byValCompilationInfo[m_byValInstructionIndex].slowPathTarget = slowPath;
     m_byValCompilationInfo[m_byValInstructionIndex].returnAddress = call;
@@ -442,6 +436,20 @@ void JIT::emit_op_put_by_index(Instruction* currentInstruction)
     emitGetVirtualRegister(currentInstruction[1].u.operand, regT0);
     emitGetVirtualRegister(currentInstruction[3].u.operand, regT1);
     callOperation(operationPutByIndex, regT0, currentInstruction[2].u.operand, regT1);
+}
+
+void JIT::emit_op_put_getter_by_id(Instruction* currentInstruction)
+{
+    emitGetVirtualRegister(currentInstruction[1].u.operand, regT0);
+    emitGetVirtualRegister(currentInstruction[3].u.operand, regT1);
+    callOperation(operationPutGetterById, regT0, &m_codeBlock->identifier(currentInstruction[2].u.operand), regT1);
+}
+
+void JIT::emit_op_put_setter_by_id(Instruction* currentInstruction)
+{
+    emitGetVirtualRegister(currentInstruction[1].u.operand, regT0);
+    emitGetVirtualRegister(currentInstruction[3].u.operand, regT1);
+    callOperation(operationPutSetterById, regT0, &m_codeBlock->identifier(currentInstruction[2].u.operand), regT1);
 }
 
 void JIT::emit_op_put_getter_setter(Instruction* currentInstruction)
@@ -820,14 +828,6 @@ void JIT::emit_op_put_to_arguments(Instruction* currentInstruction)
     store64(regT1, Address(regT0, DirectArguments::storageOffset() + index * sizeof(WriteBarrier<Unknown>)));
 }
 
-void JIT::emit_op_init_global_const(Instruction* currentInstruction)
-{
-    JSGlobalObject* globalObject = m_codeBlock->globalObject();
-    emitWriteBarrier(globalObject, currentInstruction[2].u.operand, ShouldFilterValue);
-    emitGetVirtualRegister(currentInstruction[2].u.operand, regT0);
-    store64(regT0, currentInstruction[1].u.variablePointer);
-}
-
 #endif // USE(JSVALUE64)
 
 #if USE(JSVALUE64)
@@ -1130,7 +1130,7 @@ JIT::JumpList JIT::emitScopedArgumentsGetByVal(Instruction*, PatchableJump& badT
     sub32(property, scratch2);
     neg32(scratch2);
     loadValue(BaseIndex(base, scratch2, TimesEight, ScopedArguments::overflowStorageOffset()), result);
-    slowCases.append(branchIsEmpty(result));
+    slowCases.append(branchIfEmpty(result));
     done.link(this);
     
     return slowCases;

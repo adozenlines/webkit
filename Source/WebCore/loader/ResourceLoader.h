@@ -64,6 +64,8 @@ public:
 
     virtual bool init(const ResourceRequest&);
 
+    void deliverResponseAndData(const ResourceResponse&, RefPtr<SharedBuffer>&&);
+
 #if PLATFORM(IOS)
     virtual bool startLoading()
     {
@@ -178,6 +180,7 @@ private:
     virtual void didCancel(const ResourceError&) = 0;
 
     void addDataOrBuffer(const char*, unsigned, SharedBuffer*, DataPayloadType);
+    virtual bool isPlugInStreamLoader() { return false; }
 
     // ResourceHandleClient
     virtual void willSendRequest(ResourceHandle*, ResourceRequest&, const ResourceResponse& redirectResponse) override;

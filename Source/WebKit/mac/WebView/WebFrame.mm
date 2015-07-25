@@ -121,7 +121,6 @@
 #import <WebCore/RenderLayer.h>
 #import <WebCore/TextResourceDecoder.h>
 #import <WebCore/WAKScrollView.h>
-#import <WebCore/WAKViewPrivate.h>
 #import <WebCore/WKGraphics.h>
 #import <WebCore/WebCoreThreadRun.h>
 #endif
@@ -941,7 +940,7 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
         return;
     // FIXME: We shouldn't have to create a copy here.
     Ref<MutableStyleProperties> properties(core(style)->copyProperties());
-    _private->coreFrame->editor().computeAndSetTypingStyle(properties.ptr(), undoAction);
+    _private->coreFrame->editor().computeAndSetTypingStyle(properties.get(), undoAction);
 }
 
 #if ENABLE(DRAG_SUPPORT)
@@ -2480,7 +2479,7 @@ static bool needsMicrosoftMessengerDOMDocumentWorkaround()
     if (!resourceRequest.url().isValid() && !resourceRequest.url().isEmpty())
         resourceRequest.setURL([NSURL URLWithString:[@"file:" stringByAppendingString:[[request URL] absoluteString]]]);
 
-    coreFrame->loader().load(FrameLoadRequest(coreFrame, resourceRequest));
+    coreFrame->loader().load(FrameLoadRequest(coreFrame, resourceRequest, ShouldOpenExternalURLsPolicy::ShouldNotAllow));
 }
 
 static NSURL *createUniqueWebDataURL()
@@ -2512,7 +2511,7 @@ static NSURL *createUniqueWebDataURL()
     if (shouldUseQuickLookForMIMEType(MIMEType)) {
         NSURL *quickLookURL = responseURL ? responseURL : baseURL;
         if (auto request = registerQLPreviewConverterIfNeeded(quickLookURL, MIMEType, data)) {
-            _private->coreFrame->loader().load(FrameLoadRequest(_private->coreFrame, request.get()));
+            _private->coreFrame->loader().load(FrameLoadRequest(_private->coreFrame, request.get(), ShouldOpenExternalURLsPolicy::ShouldNotAllow));
             return;
         }
     }
@@ -2525,9 +2524,10 @@ static NSURL *createUniqueWebDataURL()
     [NSURLProtocol setProperty:@"" forKey:@"WebDataRequest" inRequest:(NSMutableURLRequest *)request.nsURLRequest(UpdateHTTPBody)];
 #endif
 
-    SubstituteData substituteData(WebCore::SharedBuffer::wrapNSData(data), MIMEType, encodingName, [unreachableURL absoluteURL], responseURL);
+    ResourceResponse response(responseURL, MIMEType, [data length], encodingName);
+    SubstituteData substituteData(WebCore::SharedBuffer::wrapNSData(data), [unreachableURL absoluteURL], response, SubstituteData::SessionHistoryVisibility::Hidden);
 
-    _private->coreFrame->loader().load(FrameLoadRequest(_private->coreFrame, request, substituteData));
+    _private->coreFrame->loader().load(FrameLoadRequest(_private->coreFrame, request, ShouldOpenExternalURLsPolicy::ShouldNotAllow, substituteData));
 }
 
 - (void)loadData:(NSData *)data MIMEType:(NSString *)MIMEType textEncodingName:(NSString *)encodingName baseURL:(NSURL *)baseURL

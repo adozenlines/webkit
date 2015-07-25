@@ -843,10 +843,10 @@ inline void InlineFlowBox::addBorderOutsetVisualOverflow(LayoutRect& logicalVisu
 
     LayoutBoxExtent borderOutsets = lineStyle.borderImageOutsets();
 
-    LayoutUnit borderOutsetLogicalTop = borderOutsets.logicalTop(lineStyle.writingMode());
-    LayoutUnit borderOutsetLogicalBottom = borderOutsets.logicalBottom(lineStyle.writingMode());
-    LayoutUnit borderOutsetLogicalLeft = borderOutsets.logicalLeft(lineStyle.writingMode());
-    LayoutUnit borderOutsetLogicalRight = borderOutsets.logicalRight(lineStyle.writingMode());
+    LayoutUnit borderOutsetLogicalTop = borderOutsets.before(lineStyle.writingMode());
+    LayoutUnit borderOutsetLogicalBottom = borderOutsets.after(lineStyle.writingMode());
+    LayoutUnit borderOutsetLogicalLeft = borderOutsets.start(lineStyle.writingMode());
+    LayoutUnit borderOutsetLogicalRight = borderOutsets.end(lineStyle.writingMode());
 
     // Similar to how glyph overflow works, if our lines are flipped, then it's actually the opposite border that applies, since
     // the line is "upside down" in terms of block coordinates. vertical-rl and horizontal-bt are the flipped line modes.
@@ -954,7 +954,7 @@ void InlineFlowBox::computeOverflow(LayoutUnit lineTop, LayoutUnit lineBottom, G
         return;
 
     if (m_overflow)
-        m_overflow.clear();
+        m_overflow = nullptr;
 
     // Visual overflow just includes overflow for stuff we need to repaint ourselves.  Self-painting layers are ignored.
     // Layout overflow is used to determine scrolling extent, so it still includes child layers and also factors in
@@ -1340,7 +1340,7 @@ void InlineFlowBox::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint&
     GraphicsContext* context = paintInfo.context;
     LayoutRect paintRect = LayoutRect(adjustedPaintoffset, frameRect.size());
     // Shadow comes first and is behind the background and border.
-    if (!renderer().boxShadowShouldBeAppliedToBackground(BackgroundBleedNone, this))
+    if (!renderer().boxShadowShouldBeAppliedToBackground(adjustedPaintoffset, BackgroundBleedNone, this))
         paintBoxShadow(paintInfo, lineStyle, Normal, paintRect);
 
     Color c = lineStyle.visitedDependentColor(CSSPropertyBackgroundColor);

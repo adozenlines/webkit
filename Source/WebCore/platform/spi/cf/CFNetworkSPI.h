@@ -31,6 +31,7 @@
 #if PLATFORM(WIN) || USE(APPLE_INTERNAL_SDK)
 
 #include <CFNetwork/CFHTTPCookies.h>
+#include <CFNetwork/CFHTTPCookiesPriv.h>
 #include <CFNetwork/CFURLCachePriv.h>
 #include <CFNetwork/CFURLProtocolPriv.h>
 #include <CFNetwork/CFURLRequest.h>
@@ -118,6 +119,31 @@ EXTERN_C Boolean _CFNetworkSetATSContext(CFDataRef);
 
 #if PLATFORM(IOS) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000)
 EXTERN_C void _CFNetworkResetHSTSHostsSinceDate(CFURLStorageSessionRef, CFDateRef);
+#endif
+
+#if (TARGET_OS_IPHONE && __IPHONE_OS_VERSION_MIN_REQUIRED >= 90000) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
+EXTERN_C CFDataRef CFHTTPCookieStorageCreateIdentifyingData(CFAllocatorRef inAllocator, CFHTTPCookieStorageRef inStorage);
+EXTERN_C CFHTTPCookieStorageRef CFHTTPCookieStorageCreateFromIdentifyingData(CFAllocatorRef inAllocator, CFDataRef inData);
+EXTERN_C CFArrayRef _CFHTTPParsedCookiesWithResponseHeaderFields(CFAllocatorRef inAllocator, CFDictionaryRef headerFields, CFURLRef inURL);
+#endif
+
+#if defined(__OBJC__)
+
+#if !USE(APPLE_INTERNAL_SDK) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED == 1090)
+@interface NSHTTPCookieStorage (Details)
+- (void)removeCookiesSinceDate:(NSDate *)date;
+- (id)_initWithCFHTTPCookieStorage:(CFHTTPCookieStorageRef)cfStorage;
+- (CFHTTPCookieStorageRef)_cookieStorage;
+- (void)_saveCookies;
+@end
+#endif
+
+// FIXME: Move +_setSharedHTTPCookieStorage: into the above section under !USE(APPLE_INTERNAL_SDK) when possible (soon).
+#if (TARGET_OS_IPHONE && __IPHONE_OS_VERSION_MIN_REQUIRED >= 90000) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
+@interface NSHTTPCookieStorage (Details)
++ (void)_setSharedHTTPCookieStorage:(NSHTTPCookieStorage *)storage;
+@end
+#endif
 #endif
 
 #endif // CFNetworkSPI_h

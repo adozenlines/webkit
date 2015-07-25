@@ -1,5 +1,3 @@
-var standardTimeout = 100;
-
 function RandomPushSource(toPush) {
     this.pushed = 0;
     this.toPush = toPush;
@@ -27,24 +25,23 @@ RandomPushSource.prototype = {
             this.paused = false;
         }
 
-        var stream = this;
+        var source = this;
         function writeChunk() {
-            if (stream.paused) {
+            if (source.paused) {
                 return;
             }
 
-            stream.pushed++;
+            source.pushed++;
 
-            if (stream.toPush > 0 && stream.pushed > stream.toPush) {
-                if (stream._intervalHandle) {
-                    clearInterval(stream._intervalHandle);
-                    stream._intervalHandle = undefined;
+            if (source.toPush > 0 && source.pushed > source.toPush) {
+                if (source._intervalHandle) {
+                    clearInterval(source._intervalHandle);
+                    source._intervalHandle = undefined;
                 }
-                stream.closed = true;
-                stream.onend();
-            }
-            else {
-                stream.ondata(randomChunk(128));
+                source.closed = true;
+                source.onend();
+            } else {
+                source.ondata(randomChunk(128));
             }
         }
     },
@@ -156,20 +153,24 @@ function sequentialReadableStream(limit, options) {
             });
         },
 
-        pull: function(enqueue, finish, error) {
-            sequentialSource.read(function(err, done, chunk) {
-                if (err) {
-                    error(err);
-                } else if (done) {
-                    sequentialSource.close(function(err) {
-                        if (err) {
-                            error(err);
-                        }
-                        finish();
-                    });
-                } else {
-                    enqueue(chunk);
-                }
+        pull: function(c) {
+            return new Promise(function(resolve, reject) {
+                sequentialSource.read(function(err, done, chunk) {
+                    if (err) {
+                        reject(err);
+                    } else if (done) {
+                        sequentialSource.close(function(err) {
+                            if (err) {
+                                reject(err);
+                            }
+                            c.close();
+                            resolve();
+                        });
+                    } else {
+                        c.enqueue(chunk);
+                        resolve();
+                    }
+                });
             });
         },
     });
@@ -178,3 +179,15 @@ function sequentialReadableStream(limit, options) {
 
     return stream;
 };
+
+function typeIsObject(x) {
+    return (typeof x === 'object' && x !== null) || typeof x === 'function';
+}
+
+function createDataProperty(o, p, v) {
+    if (!typeIsObject(o)) {
+        throw new TypeError('Parameter must be an object.');
+        return
+    }
+    Object.defineProperty(o, p, { value: v, writable: true, enumerable: true, configurable: true });
+}

@@ -42,6 +42,10 @@
 #include "WebHitTestResult.h"
 #endif
 
+#if PLUGIN_ARCHITECTURE(X11)
+#include <WebCore/XUniqueResource.h>
+#endif
+
 namespace WebCore {
 class MachSendRight;
 class HTTPHeaderMap;
@@ -57,10 +61,10 @@ class NetscapePluginStream;
     
 class NetscapePlugin : public Plugin {
 public:
-    static PassRefPtr<NetscapePlugin> create(PassRefPtr<NetscapePluginModule> pluginModule);
+    static RefPtr<NetscapePlugin> create(PassRefPtr<NetscapePluginModule>);
     virtual ~NetscapePlugin();
 
-    static PassRefPtr<NetscapePlugin> fromNPP(NPP);
+    static RefPtr<NetscapePlugin> fromNPP(NPP);
 
     // In-process NetscapePlugins don't support asynchronous initialization.
     virtual bool isBeingAsynchronouslyInitialized() const override { return false; }
@@ -184,7 +188,7 @@ private:
     virtual bool initialize(const Parameters&) override;
     virtual void destroy() override;
     virtual void paint(WebCore::GraphicsContext*, const WebCore::IntRect& dirtyRect) override;
-    virtual PassRefPtr<ShareableBitmap> snapshot() override;
+    virtual RefPtr<ShareableBitmap> snapshot() override;
 #if PLATFORM(COCOA)
     virtual PlatformLayer* pluginLayer() override;
 #endif
@@ -260,7 +264,7 @@ private:
     // converted (if the transformation matrix isn't invertible).
     bool convertFromRootView(const WebCore::IntPoint& pointInRootViewCoordinates, WebCore::IntPoint& pointInPluginCoordinates);
 
-    virtual PassRefPtr<WebCore::SharedBuffer> liveResourceData() const override;
+    virtual RefPtr<WebCore::SharedBuffer> liveResourceData() const override;
 
     virtual bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&) override { return false; }
 
@@ -297,8 +301,9 @@ private:
     // A transform that can be used to convert from root view coordinates to plug-in coordinates.
     WebCore::AffineTransform m_pluginToRootViewTransform;
 
-    // FIXME: Get rid of these.
+#if PLUGIN_ARCHITECTURE(X11)
     WebCore::IntRect m_frameRectInWindowCoordinates;
+#endif
 
     CString m_userAgent;
 
@@ -387,7 +392,7 @@ private:
     NP_CGContext m_npCGContext;
 #endif
 #elif PLUGIN_ARCHITECTURE(X11)
-    Pixmap m_drawable;
+    WebCore::XUniquePixmap m_drawable;
     Display* m_pluginDisplay;
 #if PLATFORM(GTK)
     GtkWidget* m_platformPluginWidget;

@@ -92,6 +92,8 @@ public:
     const IntSize& internalSize() const { return m_size; }
     const IntSize& logicalSize() const { return m_logicalSize; }
 
+    float resolutionScale() const { return m_resolutionScale; }
+
     WEBCORE_EXPORT GraphicsContext* context() const;
 
     WEBCORE_EXPORT RefPtr<Image> copyImage(BackingStoreCopy = CopyBackingStore, ScaleBehavior = Scaled) const;
@@ -123,10 +125,14 @@ public:
     bool copyToPlatformTexture(GraphicsContext3D&, Platform3DObject, GC3Denum, bool, bool);
 
     FloatSize spaceSize() const { return m_space; }
-    void setSpaceSize(const FloatSize& space)
-    {
-        m_space = space;
-    }
+    void setSpaceSize(const FloatSize& space) { m_space = space; }
+
+    // These functions are used when clamping the ImageBuffer which is created for filter, masker or clipper.
+    static bool sizeNeedsClamping(const FloatSize&);
+    static bool sizeNeedsClamping(const FloatSize&, FloatSize& scale);
+    static FloatSize clampedSize(const FloatSize&);
+    static FloatSize clampedSize(const FloatSize&, FloatSize& scale);
+    static FloatRect clampedRect(const FloatRect&);
 
 private:
 #if USE(CG)
@@ -145,6 +151,7 @@ private:
     friend class GraphicsContext;
     friend class GeneratedImage;
     friend class CrossfadeGeneratedImage;
+    friend class NamedImageGeneratedImage;
     friend class GradientImage;
 
 private:

@@ -42,6 +42,7 @@ aria-pressed
 aria-readonly
 aria-relevant
 aria-required
+aria-roledescription
 aria-selected
 aria-setsize
 aria-sort
@@ -361,7 +362,6 @@ wrap
 
 autocorrect
 autocapitalize
-data-youtube-id
 onwebkitcurrentplaybacktargetiswirelesschanged
 onwebkitplaybacktargetavailabilitychanged
 onwebkitpresentationmodechanged

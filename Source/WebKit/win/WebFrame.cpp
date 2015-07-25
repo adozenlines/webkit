@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2009, 2011, 2013-2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2006-2009, 2011, 2013-2015 Apple Inc. All rights reserved.
  * Copyright (C) Research In Motion Limited 2009. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -336,6 +336,8 @@ HRESULT WebFrame::paintDocumentRectToContext(RECT rect, HDC deviceContext)
     dirtyRect.setHeight(height);
     gc.clip(dirtyRect);
     gc.translate(-rect.left, -rect.top);
+    float scaleFactor = webView()->deviceScaleFactor();
+    gc.scale(WebCore::FloatSize(scaleFactor, scaleFactor));
     view->paintContents(&gc, rect);
     gc.restore();
 
@@ -360,6 +362,8 @@ HRESULT WebFrame::paintScrollViewRectToContextAtPoint(RECT rect, POINT pt, HDC d
     gc.save();
     IntRect dirtyRect(rect);
     dirtyRect.move(-pt.x, -pt.y);
+    float scaleFactor = webView()->deviceScaleFactor();
+    gc.scale(WebCore::FloatSize(scaleFactor, scaleFactor));
     view->paint(&gc, dirtyRect);
     gc.restore();
 
@@ -546,7 +550,7 @@ HRESULT STDMETHODCALLTYPE WebFrame::loadRequest(
     if (!coreFrame)
         return E_FAIL;
 
-    coreFrame->loader().load(FrameLoadRequest(coreFrame, requestImpl->resourceRequest()));
+    coreFrame->loader().load(FrameLoadRequest(coreFrame, requestImpl->resourceRequest(), ShouldOpenExternalURLsPolicy::ShouldNotAllow));
     return S_OK;
 }
 
@@ -561,16 +565,17 @@ void WebFrame::loadData(PassRefPtr<WebCore::SharedBuffer> data, BSTR mimeType, B
     // FIXME: We should really be using MarshallingHelpers::BSTRToKURL here,
     // but that would turn a null BSTR into a null URL, and we crash inside of
     // WebCore if we use a null URL in constructing the ResourceRequest.
-    URL baseKURL = URL(URL(), String(baseURL ? baseURL : L"", SysStringLen(baseURL)));
+    URL baseCoreURL = URL(URL(), String(baseURL ? baseURL : L"", SysStringLen(baseURL)));
 
-    URL failingKURL = MarshallingHelpers::BSTRToKURL(failingURL);
+    URL failingCoreURL = MarshallingHelpers::BSTRToKURL(failingURL);
 
-    ResourceRequest request(baseKURL);
-    SubstituteData substituteData(data, mimeTypeString, encodingString, failingKURL);
+    ResourceRequest request(baseCoreURL);
+    ResourceResponse response(URL(), mimeTypeString, data->size(), encodingString);
+    SubstituteData substituteData(data, failingCoreURL, response, SubstituteData::SessionHistoryVisibility::Hidden);
 
     // This method is only called from IWebFrame methods, so don't ASSERT that the Frame pointer isn't null.
     if (Frame* coreFrame = core(this))
-        coreFrame->loader().load(FrameLoadRequest(coreFrame, request, substituteData));
+        coreFrame->loader().load(FrameLoadRequest(coreFrame, request, ShouldOpenExternalURLsPolicy::ShouldNotAllow, substituteData));
 }
 
 
@@ -2096,6 +2101,7 @@ void WebFrame::updateBackground()
     coreFrame->view()->updateBackgroundRecursively(backgroundColor, webView()->transparent());
 }
 
+// IWebFrame2
 HRESULT WebFrame::isMainFrame(BOOL* value)
 {
     if (!value)

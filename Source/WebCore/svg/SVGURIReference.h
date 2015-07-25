@@ -35,7 +35,7 @@ public:
     static void addSupportedAttributes(HashSet<QualifiedName>&);
 
     static String fragmentIdentifierFromIRIString(const String&, Document&);
-    static Element* targetElementFromIRIString(const String&, Document&, String* = 0, Document* = 0);
+    static Element* targetElementFromIRIString(const String&, Document&, String* = nullptr, Document* = nullptr);
 
     static bool isExternalURIReference(const String& uri, Document& document)
     {
@@ -50,6 +50,7 @@ public:
     }
 
 protected:
+    virtual String& hrefBaseValue() const = 0;
     virtual void setHrefBaseValue(const String&, const bool validValue = true) = 0;
 };
 

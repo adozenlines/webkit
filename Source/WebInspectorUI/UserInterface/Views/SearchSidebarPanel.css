@@ -27,10 +27,6 @@
     top: 28px;
 }
 
-body.mac-platform.legacy .sidebar > .panel.navigation.search > :matches(.content, .empty-content-placeholder) {
-    top: 21px;
-}
-
 .sidebar > .panel.navigation.search > .search-bar {
     position: absolute;
     top: 0;
@@ -39,16 +35,12 @@ body.mac-platform.legacy .sidebar > .panel.navigation.search > :matches(.content
 
     display: flex;
 
-    box-shadow: inset rgba(255, 255, 255, 0.2) 0 1px 0;
+    box-shadow: inset hsla(0, 0%, 100%, 0.2) 0 1px 0;
 
     height: 28px;
 
     white-space: nowrap;
     overflow: hidden;
-}
-
-body.mac-platform.legacy .sidebar > .panel.navigation.search > .search-bar {
-    height: 21px;
 }
 
 .sidebar > .panel.navigation.search > .search-bar > input[type="search"] {
@@ -57,9 +49,4 @@ body.mac-platform.legacy .sidebar > .panel.navigation.search > .search-bar {
 
     margin: 3px 6px;
     padding-left: 4px;
-}
-
-body.mac-platform.legacy .sidebar > .panel.navigation.search > .search-bar > input[type="search"] {
-    margin: 1px 6px;
-    padding-left: 0;
 }

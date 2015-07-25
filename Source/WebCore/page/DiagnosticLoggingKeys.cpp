@@ -53,6 +53,11 @@ String DiagnosticLoggingKeys::pluginLoadingFailedKey()
     return ASCIILiteral("pluginFailedLoading");
 }
 
+String DiagnosticLoggingKeys::provisionalLoadKey()
+{
+    return ASCIILiteral("provisionalLoad");
+}
+
 String DiagnosticLoggingKeys::pageContainsPluginKey()
 {
     return ASCIILiteral("pageContainsPlugin");
@@ -248,9 +253,9 @@ String DiagnosticLoggingKeys::reasonKey()
     return ASCIILiteral("reason");
 }
 
-String DiagnosticLoggingKeys::loadingAPISenseKey()
+String DiagnosticLoggingKeys::isLoadingKey()
 {
-    return ASCIILiteral("loadingAPISense");
+    return ASCIILiteral("isLoading");
 }
 
 String DiagnosticLoggingKeys::documentLoaderStoppingKey()
@@ -263,6 +268,11 @@ String DiagnosticLoggingKeys::cannotSuspendActiveDOMObjectsKey()
     return ASCIILiteral("cannotSuspendActiveDOMObjects");
 }
 
+String DiagnosticLoggingKeys::deltaKey()
+{
+    return ASCIILiteral("delta");
+}
+
 String DiagnosticLoggingKeys::applicationCacheKey()
 {
     return ASCIILiteral("applicationCache");
@@ -271,6 +281,11 @@ String DiagnosticLoggingKeys::applicationCacheKey()
 String DiagnosticLoggingKeys::audioKey()
 {
     return ASCIILiteral("audio");
+}
+
+String DiagnosticLoggingKeys::backNavigationKey()
+{
+    return ASCIILiteral("backNavigation");
 }
 
 String DiagnosticLoggingKeys::cacheControlNoStoreKey()

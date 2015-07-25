@@ -303,7 +303,7 @@ App.Pane = Ember.Object.extend({
     searchCommit: function (repository, keyword) {
         var self = this;
         var repositoryId = repository.get('id');
-        CommitLogs.fetchForTimeRange(repositoryId, null, null, keyword).then(function (commits) {
+        CommitLogs.fetchCommits(repositoryId, null, null, keyword).then(function (commits) {
             if (self.isDestroyed || !self.get('chartData') || !commits.length)
                 return;
             var currentRuns = self.get('chartData').current.series();
@@ -586,8 +586,10 @@ App.Pane = Ember.Object.extend({
 
         var rawValues = chartData.current.rawValues();
         var movingAverageIsSetByUser = movingAverageStrategy && movingAverageStrategy.execute;
-        var movingAverageValues = Statistics.executeStrategy(
-            movingAverageIsSetByUser ? movingAverageStrategy : Statistics.MovingAverageStrategies[0], rawValues);
+        if (!movingAverageIsSetByUser)
+            return null;
+
+        var movingAverageValues = Statistics.executeStrategy(movingAverageStrategy, rawValues);
         if (!movingAverageValues)
             return null;
 
@@ -595,33 +597,23 @@ App.Pane = Ember.Object.extend({
         if (movingAverageStrategy && movingAverageStrategy.isSegmentation && testRangeSelectionStrategy && testRangeSelectionStrategy.execute)
             testRangeCandidates = Statistics.executeStrategy(testRangeSelectionStrategy, rawValues, [movingAverageValues]);
 
-        var envelopeIsSetByUser = envelopingStrategy && envelopingStrategy.execute;
-        var envelopeDelta = Statistics.executeStrategy(envelopeIsSetByUser ? envelopingStrategy : Statistics.EnvelopingStrategies[0],
-            rawValues, [movingAverageValues]);
-
-        for (var i = 0; i < currentTimeSeriesData.length; i++) {
-            var currentValue = currentTimeSeriesData[i].value;
-            var movingAverageValue = movingAverageValues[i];
-            if (currentValue < movingAverageValue - envelopeDelta || movingAverageValue + envelopeDelta < currentValue)
-                currentTimeSeriesData[i].isOutlier = true;
-        }
-        if (!envelopeIsSetByUser)
-            envelopeDelta = null;
-
-        var anomalies = {};
-        if (anomalyDetectionStrategies.length) {
-            var isAnomalyArray = new Array(currentTimeSeriesData.length);
-            for (var strategy of anomalyDetectionStrategies) {
-                var anomalyLengths = Statistics.executeStrategy(strategy, rawValues, [movingAverageValues, envelopeDelta]);
-                for (var i = 0; i < currentTimeSeriesData.length; i++)
-                    isAnomalyArray[i] = isAnomalyArray[i] || anomalyLengths[i];
-            }
-            for (var i = 0; i < isAnomalyArray.length; i++) {
-                if (!isAnomalyArray[i])
-                    continue;
-                anomalies[currentTimeSeriesData[i].measurement.id()] = true;
-                while (isAnomalyArray[i] && i < isAnomalyArray.length)
-                    ++i;
+        if (envelopingStrategy && envelopingStrategy.execute) {
+            var envelopeDelta = Statistics.executeStrategy(envelopingStrategy, rawValues, [movingAverageValues]);
+            var anomalies = {};
+            if (anomalyDetectionStrategies.length) {
+                var isAnomalyArray = new Array(currentTimeSeriesData.length);
+                for (var strategy of anomalyDetectionStrategies) {
+                    var anomalyLengths = Statistics.executeStrategy(strategy, rawValues, [movingAverageValues, envelopeDelta]);
+                    for (var i = 0; i < currentTimeSeriesData.length; i++)
+                        isAnomalyArray[i] = isAnomalyArray[i] || anomalyLengths[i];
+                }
+                for (var i = 0; i < isAnomalyArray.length; i++) {
+                    if (!isAnomalyArray[i])
+                        continue;
+                    anomalies[currentTimeSeriesData[i].measurement.id()] = true;
+                    while (isAnomalyArray[i] && i < isAnomalyArray.length)
+                        ++i;
+                }
             }
         }
 
@@ -889,6 +881,20 @@ App.ChartsController = Ember.Controller.extend({
                 showingDetails: false
             }));
         },
+        addAlternativePanes: function (pane, platform, metrics)
+        {
+            var panes = this.panes;
+            var store = this.store;
+            var startingIndex = panes.indexOf(pane) + 1;
+            metrics.forEach(function (metric, index) {
+                panes.insertAt(startingIndex + index, App.Pane.create({
+                    store: store,
+                    platformId: platform.get('id'),
+                    metricId: metric.get('id'),
+                    showingDetails: false
+                }));
+            })
+        }
     },
 
     init: function ()
@@ -930,6 +936,21 @@ App.TestProxyForPopup = Ember.ObjectProxy.extend({
     platform: null,
     children: function ()
     {
+        this._updateChildren();
+        return this._children;
+    }.property('childTests', 'metrics'),
+    actionName: function ()
+    {
+        this._updateChildren();
+        return this._actionName;
+    }.property('childTests', 'metrics'),
+    actionArgument: function ()
+    {
+        this._updateChildren();
+        return this._actionArgument;
+    }.property('childTests', 'metrics'),
+    _updateChildren: function ()
+    {
         var platform = this.get('platform');
         var action = this.get('action');
         var position = this.get('position');
@@ -953,9 +974,16 @@ App.TestProxyForPopup = Ember.ObjectProxy.extend({
 
         if (childTests.length && metrics.length)
             metrics.push({isSeparator: true});
+        else if (metrics.length == 1) {
+            this._actionName = action;
+            this._actionArgument = metrics[0].actionArgument;
+            return;
+        }
 
-        return metrics.concat(childTests);
-    }.property('childTests', 'metrics'),
+        this._actionName = null;
+        this._actionArgument = null;
+        this._children = metrics.concat(childTests);
+    },
 });
 
 App.domainsAreEqual = function (domain1, domain2) {
@@ -1114,12 +1142,54 @@ App.PaneController = Ember.ObjectController.extend({
             alert('Failed to update the status:' + error);
         });
     }.observes('selectedItemIsMarkedOutlier'),
+    alternativePanes: function ()
+    {
+        var pane = this.get('model');
+        var metric = pane.get('metric');
+        var currentPlatform = pane.get('platform');
+        var platforms = App.Manifest.get('platforms');
+        if (!platforms || !metric)
+            return;
+
+        var exitingPlatforms = {};
+        this.get('parentController').get('panes').forEach(function (pane) {
+            if (pane.get('metricId') == metric.get('id'))
+                exitingPlatforms[pane.get('platformId')] = true;
+        });
+
+        var alternativePanes = platforms.filter(function (platform) {
+            return !exitingPlatforms[platform.get('id')] && platform.containsMetric(metric);
+        }).map(function (platform) {
+            return {
+                pane: pane,
+                platform: platform,
+                metrics: [metric],
+                label: platform.get('label')
+            };
+        });
+
+        var childMetrics = metric.get('childMetrics');
+        if (childMetrics && childMetrics.length) {
+            alternativePanes.push({
+                pane: pane,
+                platform: currentPlatform,
+                metrics: childMetrics,
+                label: 'Breakdown',
+            });
+        }
+
+        return alternativePanes;
+    }.property('model.metric', 'model.platform', 'App.Manifest.platforms',
+        'parentController.panes.@each.platformId', 'parentController.panes.@each.metricId'),
 });
 
 App.AnalysisRoute = Ember.Route.extend({
     model: function () {
-        return this.store.findAll('analysisTask').then(function (tasks) {
-            return Ember.Object.create({'tasks': tasks.sortBy('createdAt').toArray().reverse()});
+        var store = this.store;
+        return App.Manifest.fetch(store).then(function () {
+            return store.findAll('analysisTask').then(function (tasks) {
+                return Ember.Object.create({'tasks': tasks.sortBy('createdAt').toArray().reverse()});
+            });
         });
     },
 });
@@ -1127,7 +1197,10 @@ App.AnalysisRoute = Ember.Route.extend({
 App.AnalysisTaskRoute = Ember.Route.extend({
     model: function (param)
     {
-        return this.store.find('analysisTask', param.taskId);
+        var store = this.store;
+        return App.Manifest.fetch(store).then(function () {
+            return store.find('analysisTask', param.taskId);
+        });
     },
 });
 
@@ -1196,6 +1269,7 @@ App.AnalysisTaskController = Ember.Controller.extend({
                 elementId: 'bug-' + bugTracker.get('id'),
                 content: bugTracker,
                 bugNumber: bugNumber,
+                bugUrl: bugTracker.urlFromBugNumber(bugNumber),
                 editedBugNumber: bugNumber,
             });
         }));
@@ -1228,7 +1302,7 @@ App.AnalysisTaskController = Ember.Controller.extend({
                 id: point.measurement.id(),
                 measurement: point.measurement,
                 label: 'Point ' + (index + 1),
-                value: chartData.formatWithUnit(point.value),
+                value: chartData.formatter(point.value),
             };
         });
 
@@ -1257,53 +1331,108 @@ App.AnalysisTaskController = Ember.Controller.extend({
             var revisions = point.measurement.formattedRevisions();
             for (var repositoryId in revisions) {
                 if (!repositoryToRevisions[repositoryId])
-                    repositoryToRevisions[repositoryId] = new Array(analysisPoints.length);
+                    repositoryToRevisions[repositoryId] = new Array();
                 var revision = revisions[repositoryId];
-                repositoryToRevisions[repositoryId][pointIndex] = {
-                    label: point.label + ': ' + revision.label,
-                    value: revision.currentRevision,
-                };
+                repositoryToRevisions[repositoryId].push({time: point.measurement.latestCommitTime(), value: revision.currentRevision});
             }
         });
+
+        var commitsPromises = [];
+        var repositoryToIndex = {};
+        for (var repositoryId in repositoryToRevisions) {
+            var revisions = repositoryToRevisions[repositoryId].sort(function (a, b) { return a.time - b.time; });
+            repositoryToIndex[repositoryId] = commitsPromises.length;
+            commitsPromises.push(CommitLogs.fetchCommits(repositoryId, revisions[0].value, revisions[revisions.length - 1].value));
+        }
 
         var self = this;
         this.get('model').get('triggerable').then(function (triggerable) {
             if (!triggerable)
                 return;
-
-            self.set('configurations', ['A', 'B']);
-            self.set('rootConfigurations', triggerable.get('acceptedRepositories').map(function (repository) {
-                var repositoryId = repository.get('id');
-                var options = [{label: 'None'}].concat((repositoryToRevisions[repositoryId] || []).map(function (option, index) {
-                    if (!option || !option['value'])
-                        return {value: '', label: analysisPoints[index].label + ': None'}; 
-                    return option;
+            Ember.RSVP.Promise.all(commitsPromises).then(function (commitsList) {
+                self.set('configurations', ['A', 'B']);
+                self.set('rootConfigurations', triggerable.get('acceptedRepositories').map(function (repository) {
+                    return self._createConfiguration(repository, commitsList[repositoryToIndex[repository.get('id')]], analysisPoints);
                 }));
-                return Ember.Object.create({
-                    repository: repository,
-                    name: repository.get('name'),
-                    sets: [
-                        Ember.Object.create({name: 'A[' + repositoryId + ']',
-                            options: options,
-                            selection: options[1]}),
-                        Ember.Object.create({name: 'B[' + repositoryId + ']',
-                            options: options,
-                            selection: options[options.length - 1]}),
-                    ],
-                });
-            }));
+            });
         });
     }.observes('analysisPoints'),
+    _createConfiguration: function(repository, commits, analysisPoints) {
+        var repositoryId = repository.get('id');
+
+        var options = [{label: 'None'}];
+        var revisionToPoints = {};
+        analysisPoints.forEach(function (point, pointIndex) {
+            var revision = point.measurement.revisionForRepository(repositoryId);
+            if (!revision)
+                return;
+            if (!revisionToPoints[revision])
+                revisionToPoints[revision] = [];
+            revisionToPoints[revision].push(pointIndex);
+        });
+
+        if (!commits || !commits.length) {
+            commits = [];
+            for (var revision in revisionToPoints)
+                commits.push({revision: revision});
+        }
+
+        for (var commit of commits) {
+            var revision = commit.revision;
+            var label = Measurement.formatRevisionRange(revision).label;
+            var points = revisionToPoints[revision];
+            if (points) {
+                var serializedPoints = this._serializeNumbersSkippingConsecutiveEntries(revisionToPoints[revision]);
+                label += ' ' + ['(', points.length > 1 ? 'points' : 'point', serializedPoints, ')'].join(' ');
+            }
+            options.push({value: revision, label: label});
+        }
+
+        return Ember.Object.create({
+            repository: repository,
+            name: repository.get('name'),
+            sets: [
+                Ember.Object.create({name: 'A[' + repositoryId + ']',
+                    options: options,
+                    selection: options[1]}),
+                Ember.Object.create({name: 'B[' + repositoryId + ']',
+                    options: options,
+                    selection: options[options.length - 1]}),
+            ]});
+    },
+    _serializeNumbersSkippingConsecutiveEntries: function (numbers) {
+        var result = numbers[0];
+        for (var i = 1; i < numbers.length; i++) {
+            if (numbers[i - 1] + 1 == numbers[i]) {
+                while (numbers[i] + 1 == numbers[i + 1])
+                    i++;
+                result += '-' + numbers[i];
+                continue;
+            }
+            result += ', ' + numbers[i]
+        }
+        return result;
+    },
     actions: {
-        associateBug: function (bugTracker, bugNumber)
+        addBug: function (bugTracker, bugNumber)
         {
             var model = this.get('model');
-            this.store.createRecord('bug',
-                {task: this.get('model'), bugTracker: bugTracker.get('content'), number: bugNumber}).save().then(function () {
-                    // FIXME: Should we notify the user?
-                }, function (error) {
-                    alert('Failed to associate the bug: ' + error);
-                });
+            if (!bugTracker)
+                bugTracker = this.get('bugTrackers').objectAt(0);
+            var bug = {task: this.get('model'), bugTracker: bugTracker.get('content'), number: bugNumber};
+            this.store.createRecord('bug', bug).save().then(function () {
+                alert('Associated the ' + bugTracker.get('name') + ' ' + bugNumber + ' with this analysis.');
+            }, function (error) {
+                alert('Failed to associate the bug: ' + error);
+            });
+        },
+        deleteBug: function (bug)
+        {
+            bug.destroyRecord().then(function () {
+                alert('Successfully deassociated the bug.');
+            }, function (error) {
+                alert('Failed to disassociate the bug: ' + error);
+            });
         },
         saveStatus: function ()
         {
@@ -1413,14 +1542,21 @@ App.TestGroupPane = Ember.ObjectProxy.extend({
 
         this.set('configurations', configurations);
 
+        var probabilityFormatter = d3.format('.2p');
         var comparisons = [];
         for (var i = 0; i < configurations.length - 1; i++) {
             var summary1 = configurations[i].summary;
             for (var j = i + 1; j < configurations.length; j++) {
                 var summary2 = configurations[j].summary;
+
+                var valueDelta = testResults.deltaFormatter(summary2.value - summary1.value);
+                var relativeDelta = d3.format('+.2p')((summary2.value - summary1.value) / summary1.value);
+
+                var stat = this._computeStatisticalSignificance(summary1.measuredValues, summary2.measuredValues);
                 comparisons.push({
                     label: summary1.configLetter + ' / ' + summary2.configLetter,
-                    result: this._computeStatisticalSignificance(summary1.measuredValues, summary2.measuredValues)
+                    difference: isNaN(summary1.value) || isNaN(summary2.value) ? 'N/A' : valueDelta + ' (' + relativeDelta + ') ',
+                    result: stat,
                 });
             }
         }
@@ -1437,13 +1573,13 @@ App.TestGroupPane = Ember.ObjectProxy.extend({
         var details = ' (t=' + tFormatter(statistics.t) + ' df=' + tFormatter(statistics.degreesOfFreedom) + ')';
 
         if (!statistics.range[0])
-            return 'Not statistically significant' + details;
+            return 'Not significant' + details;
 
         var lowerLimit = probabilityFormatter(statistics.range[0]);
         if (!statistics.range[1])
-            return 'Statistical significance > ' + lowerLimit + details;
+            return 'Significance > ' + lowerLimit + details;
 
-        return lowerLimit + ' < Statistical significance < ' + probabilityFormatter(statistics.range[1]) + details;
+        return lowerLimit + ' < Significance < ' + probabilityFormatter(statistics.range[1]) + details;
     },
     _updateReferenceChart: function ()
     {
@@ -1529,7 +1665,7 @@ App.TestGroupPane = Ember.ObjectProxy.extend({
                 }),
                 value: point ? point.value : null,
                 valueRange: range,
-                formattedValue: point ? testResults.formatWithUnit(point.value) : null,
+                formattedValue: point ? testResults.formatter(point.value) : null,
                 buildLabel: point ? 'Build ' + point.measurement.buildNumber() : null,
             });
         });

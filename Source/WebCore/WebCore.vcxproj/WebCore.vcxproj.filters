@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="DerivedSources">
@@ -1113,9 +1113,6 @@
     <ClCompile Include="..\platform\Length.cpp">
       <Filter>platform</Filter>
     </ClCompile>
-    <ClCompile Include="..\platform\LengthBox.cpp">
-      <Filter>platform</Filter>
-    </ClCompile>
     <ClCompile Include="..\platform\LinkHash.cpp">
       <Filter>platform</Filter>
     </ClCompile>
@@ -1186,6 +1183,9 @@
       <Filter>platform</Filter>
     </ClCompile>
     <ClCompile Include="..\platform\UUID.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\VNodeTracker.cpp">
       <Filter>platform</Filter>
     </ClCompile>
     <ClCompile Include="..\platform\Widget.cpp">
@@ -1371,13 +1371,13 @@
     <ClCompile Include="..\platform\graphics\IntSize.cpp">
       <Filter>platform\graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\platform\graphics\LayoutBoxExtent.cpp">
-      <Filter>platform\graphics</Filter>
-    </ClCompile>
     <ClCompile Include="..\platform\graphics\LayoutRect.cpp">
       <Filter>platform\graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\platform\graphics\MediaPlayer.cpp">
+      <Filter>platform\graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\graphics\NamedImageGeneratedImage.cpp">
       <Filter>platform\graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\platform\graphics\Path.cpp">
@@ -2149,6 +2149,9 @@
       <Filter>css</Filter>
     </ClCompile>
     <ClCompile Include="..\css\CSSMediaRule.cpp">
+      <Filter>css</Filter>
+    </ClCompile>
+    <ClCompile Include="..\css\CSSNamedImageValue.cpp">
       <Filter>css</Filter>
     </ClCompile>
     <ClCompile Include="..\css\CSSOMUtils.cpp">
@@ -3178,9 +3181,6 @@
       <Filter>dom</Filter>
     </ClCompile>
     <ClCompile Include="..\dom\GenericEventQueue.cpp">
-      <Filter>dom</Filter>
-    </ClCompile>
-    <ClCompile Include="..\dom\GenericTaskQueue.cpp">
       <Filter>dom</Filter>
     </ClCompile>
     <ClCompile Include="..\dom\IdTargetObserver.cpp">
@@ -4428,7 +4428,7 @@
     <ClCompile Include="..\bindings\js\JSReadableStreamReaderCustom.cpp">
       <Filter>bindings\js</Filter>
     </ClCompile>
-    <ClCompile Include="..\bindings\js\ReadableStreamJSSource.cpp">
+    <ClCompile Include="..\bindings\js\ReadableJSStream.cpp">
       <Filter>bindings\js</Filter>
     </ClCompile>
     <ClCompile Include="..\bindings\js\JSRequestAnimationFrameCallbackCustom.cpp">
@@ -4531,9 +4531,6 @@
       <Filter>plugins</Filter>
     </ClCompile>
     <ClCompile Include="..\plugins\PluginData.cpp">
-      <Filter>plugins</Filter>
-    </ClCompile>
-    <ClCompile Include="..\plugins\PluginMainThreadScheduler.cpp">
       <Filter>plugins</Filter>
     </ClCompile>
     <ClCompile Include="..\svg\animation\SMILTime.cpp">
@@ -5725,6 +5722,9 @@
     <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSScreen.cpp">
       <Filter>DerivedSources</Filter>
     </ClCompile>
+    <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSSecurityPolicyViolationEvent.cpp">
+      <Filter>DerivedSources</Filter>
+    </ClCompile>
     <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSSQLError.cpp">
       <Filter>DerivedSources</Filter>
     </ClCompile>
@@ -6535,17 +6535,11 @@
     <ClCompile Include="..\platform\graphics\GraphicsContext3D.cpp">
       <Filter>platform\graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\platform\graphics\OpenGLShims.cpp">
-      <Filter>platform\graphics</Filter>
-    </ClCompile>
     <ClCompile Include="..\platform\graphics\gpu\Texture.cpp">
       <Filter>platform\graphics\gpu</Filter>
     </ClCompile>
     <ClCompile Include="..\platform\graphics\gpu\TilingData.cpp">
       <Filter>platform\graphics\gpu</Filter>
-    </ClCompile>
-    <ClCompile Include="..\platform\graphics\opengl\Extensions3DOpenGL.cpp">
-      <Filter>platform\graphics\opengl</Filter>
     </ClCompile>
     <ClCompile Include="..\platform\graphics\opengl\Extensions3DOpenGLCommon.cpp">
       <Filter>platform\graphics\opengl</Filter>
@@ -6615,9 +6609,6 @@
     </ClCompile>
     <ClCompile Include="..\rendering\ImageQualityController.cpp">
       <Filter>rendering</Filter>
-    </ClCompile>
-    <ClCompile Include="..\accessibility\AccessibilitySearchFieldButtons.cpp">
-      <Filter>accessibility</Filter>
     </ClCompile>
     <ClCompile Include="..\dom\ElementData.cpp">
       <Filter>dom</Filter>
@@ -6718,9 +6709,6 @@
     <ClCompile Include="..\platform\graphics\texmap\TextureMapperGL.cpp">
       <Filter>platform\graphics\texmap</Filter>
     </ClCompile>
-    <ClCompile Include="..\platform\graphics\texmap\TextureMapperImageBuffer.cpp">
-      <Filter>platform\graphics\texmap</Filter>
-    </ClCompile>
     <ClCompile Include="..\platform\graphics\texmap\TextureMapperLayer.cpp">
       <Filter>platform\graphics\texmap</Filter>
     </ClCompile>
@@ -6751,7 +6739,7 @@
     <ClCompile Include="..\platform\graphics\texmap\coordinated\CoordinatedSurface.cpp">
       <Filter>platform\graphics\texmap\coordinated</Filter>
     </ClCompile>
-    <ClCompile Include="..\platform\graphics\texmap\coordinated\CoordinatedTile.cpp">
+    <ClCompile Include="..\platform\graphics\texmap\coordinated\Tile.cpp">
       <Filter>platform\graphics\texmap\coordinated</Filter>
     </ClCompile>
     <ClCompile Include="..\platform\graphics\texmap\coordinated\UpdateAtlas.cpp">
@@ -6893,9 +6881,6 @@
       <Filter>platform\network\soup</Filter>
     </ClCompile>
     <ClCompile Include="..\platform\network\soup\NetworkStorageSessionSoup.cpp">
-      <Filter>platform\network\soup</Filter>
-    </ClCompile>
-    <ClCompile Include="..\platform\network\soup\ProxyResolverSoup.cpp">
       <Filter>platform\network\soup</Filter>
     </ClCompile>
     <ClCompile Include="..\platform\network\soup\ProxyServerSoup.cpp">
@@ -7045,7 +7030,7 @@
     <ClCompile Include="..\Modules\gamepad\GamepadEvent.cpp">
       <Filter>Modules\gamepad</Filter>
     </ClCompile>
-    <ClCompile Include="..\html\HTMLMediaSession.cpp">
+    <ClCompile Include="..\html\MediaElementSession.cpp">
       <Filter>html</Filter>
     </ClCompile>
     <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\HTTPHeaderNames.cpp">
@@ -7066,10 +7051,10 @@
     <ClCompile Include="..\rendering\line\LineInfo.cpp">
       <Filter>rendering\line</Filter>
     </ClCompile>
-    <ClCompile Include="..\platform\audio\MediaSession.cpp">
+    <ClCompile Include="..\platform\audio\PlatformMediaSession.cpp">
       <Filter>platform\audio</Filter>
     </ClCompile>
-    <ClCompile Include="..\platform\audio\MediaSessionManager.cpp">
+    <ClCompile Include="..\platform\audio\PlatformMediaSessionManager.cpp">
       <Filter>platform\audio</Filter>
     </ClCompile>
     <ClCompile Include="..\Modules\gamepad\NavigatorGamepad.cpp">
@@ -7122,15 +7107,6 @@
     </ClCompile>
     <ClCompile Include="..\editing\win\EditorWin.cpp">
       <Filter>editing</Filter>
-    </ClCompile>
-    <ClCompile Include="..\platform\graphics\MaskImageOperation.cpp">
-      <Filter>platform\graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\rendering\RenderLayerMaskImageInfo.cpp">
-      <Filter>rendering</Filter>
-    </ClCompile>
-    <ClCompile Include="..\css\WebKitCSSResourceValue.cpp">
-      <Filter>css</Filter>
     </ClCompile>
     <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\WebCore\DerivedSources\JSEXTsRGB.cpp">
       <Filter>DerivedSources</Filter>
@@ -7270,9 +7246,6 @@
     <ClCompile Include="..\platform\graphics\texmap\BitmapTextureGL.cpp">
       <Filter>platform\graphics\texmap</Filter>
     </ClCompile>
-    <ClCompile Include="..\platform\graphics\texmap\BitmapTextureImageBuffer.cpp">
-      <Filter>platform\graphics\texmap</Filter>
-    </ClCompile>
     <ClCompile Include="..\platform\graphics\texmap\BitmapTexturePool.cpp">
       <Filter>platform\graphics\texmap</Filter>
     </ClCompile>
@@ -7281,6 +7254,29 @@
     </ClCompile>
     <ClCompile Include="..\platform\network\CacheValidation.cpp">
       <Filter>platform\network</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\graphics\PlatformDisplay.cpp">
+      <Filter>platform\graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\win\MemoryPressureHandlerWin.cpp">
+      <Filter>platform\win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\dom\NodeOrString.cpp" />
+    <ClCompile Include="..\bindings\js\JSCharacterDataCustom.cpp" />
+    <ClCompile Include="..\bindings\js\JSDocumentFragmentCustom.cpp" />
+    <ClCompile Include="..\bindings\js\JSDocumentTypeCustom.cpp" />
+    <ClCompile Include="..\bindings\js\JSNodeOrString.cpp" />
+    <ClCompile Include="..\html\canvas\DOMPath.cpp">
+      <Filter>html\canvas</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\graphics\PathUtilities.cpp">
+      <Filter>platform\graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\win\GDIUtilities.cpp">
+      <Filter>platform\graphics\win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\page\DOMSecurityPolicy.cpp">
+      <Filter>page</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -7678,7 +7674,7 @@
       <Filter>accessibility</Filter>
     </ClInclude>
     <ClInclude Include="..\accessibility\AXTextStateChangeIntent.h">
-        <Filter>accessibility</Filter>
+      <Filter>accessibility</Filter>
     </ClInclude>
     <ClInclude Include="..\accessibility\win\AccessibilityObjectWrapperWin.h">
       <Filter>accessibility\win</Filter>
@@ -8181,6 +8177,9 @@
     <ClInclude Include="..\platform\FloatConversion.h">
       <Filter>platform</Filter>
     </ClInclude>
+    <ClInclude Include="..\platform\GenericTaskQueue.h">
+      <Filter>platform</Filter>
+    </ClInclude>
     <ClInclude Include="..\platform\HostWindow.h">
       <Filter>platform</Filter>
     </ClInclude>
@@ -8287,9 +8286,6 @@
       <Filter>platform</Filter>
     </ClInclude>
     <ClInclude Include="..\platform\ScrollbarTheme.h">
-      <Filter>platform</Filter>
-    </ClInclude>
-    <ClInclude Include="..\platform\ScrollbarThemeClient.h">
       <Filter>platform</Filter>
     </ClInclude>
     <ClInclude Include="..\platform\ScrollbarThemeComposite.h">
@@ -8502,9 +8498,6 @@
     <ClInclude Include="..\platform\graphics\IntSizeHash.h">
       <Filter>platform\graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\platform\graphics\LayoutBoxExtent.h">
-      <Filter>platform\graphics</Filter>
-    </ClInclude>
     <ClInclude Include="..\platform\graphics\LayoutPoint.h">
       <Filter>platform\graphics</Filter>
     </ClInclude>
@@ -8515,6 +8508,9 @@
       <Filter>platform\graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\platform\graphics\MediaPlayer.h">
+      <Filter>platform\graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\graphics\NamedImageGeneratedImage.h">
       <Filter>platform\graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\platform\graphics\NativeImagePtr.h">
@@ -9139,6 +9135,9 @@
       <Filter>css</Filter>
     </ClInclude>
     <ClInclude Include="..\css\CSSMediaRule.h">
+      <Filter>css</Filter>
+    </ClInclude>
+    <ClInclude Include="..\css\CSSNamedImageValue.h">
       <Filter>css</Filter>
     </ClInclude>
     <ClInclude Include="..\css\CSSOMUtils.h">
@@ -10288,9 +10287,6 @@
       <Filter>dom</Filter>
     </ClInclude>
     <ClInclude Include="..\dom\GenericEventQueue.h">
-      <Filter>dom</Filter>
-    </ClInclude>
-    <ClInclude Include="..\dom\GenericTaskQueue.h">
       <Filter>dom</Filter>
     </ClInclude>
     <ClInclude Include="..\dom\HashChangeEvent.h">
@@ -11575,9 +11571,6 @@
       <Filter>plugins</Filter>
     </ClInclude>
     <ClInclude Include="..\plugins\PluginData.h">
-      <Filter>plugins</Filter>
-    </ClInclude>
-    <ClInclude Include="..\plugins\PluginMainThreadScheduler.h">
       <Filter>plugins</Filter>
     </ClInclude>
     <ClInclude Include="..\svg\animation\SMILTime.h">
@@ -13940,17 +13933,11 @@
     <ClInclude Include="..\platform\graphics\GraphicsContext3D.h">
       <Filter>platform\graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\platform\graphics\OpenGLShims.h">
-      <Filter>platform\graphics</Filter>
-    </ClInclude>
     <ClInclude Include="..\platform\graphics\gpu\Texture.h">
       <Filter>platform\graphics\gpu</Filter>
     </ClInclude>
     <ClInclude Include="..\platform\graphics\gpu\TilingData.h">
       <Filter>platform\graphics\gpu</Filter>
-    </ClInclude>
-    <ClInclude Include="..\platform\graphics\opengl\Extensions3DOpenGL.h">
-      <Filter>platform\graphics\opengl</Filter>
     </ClInclude>
     <ClInclude Include="..\platform\graphics\opengl\Extensions3DOpenGLCommon.h">
       <Filter>platform\graphics\opengl</Filter>
@@ -14011,9 +13998,6 @@
     </ClInclude>
     <ClInclude Include="..\rendering\ImageQualityController.h">
       <Filter>rendering</Filter>
-    </ClInclude>
-    <ClInclude Include="..\accessibility\AccessibilitySearchFieldButtons.h">
-      <Filter>accessibility</Filter>
     </ClInclude>
     <ClInclude Include="..\dom\ElementAncestorIterator.h">
       <Filter>dom</Filter>
@@ -14165,10 +14149,10 @@
     <ClInclude Include="..\platform\graphics\texmap\coordinated\CoordinatedSurface.h">
       <Filter>platform\graphics\texmap\coordinated</Filter>
     </ClInclude>
-    <ClInclude Include="..\platform\graphics\texmap\coordinated\CoordinatedTile.h">
+    <ClInclude Include="..\platform\graphics\texmap\coordinated\SurfaceUpdateInfo.h">
       <Filter>platform\graphics\texmap\coordinated</Filter>
     </ClInclude>
-    <ClInclude Include="..\platform\graphics\texmap\coordinated\SurfaceUpdateInfo.h">
+    <ClInclude Include="..\platform\graphics\texmap\coordinated\Tile.h">
       <Filter>platform\graphics\texmap\coordinated</Filter>
     </ClInclude>
     <ClInclude Include="..\platform\graphics\texmap\coordinated\UpdateAtlas.h">
@@ -14322,9 +14306,6 @@
       <Filter>platform\network\soup</Filter>
     </ClInclude>
     <ClInclude Include="..\platform\network\soup\GUniquePtrSoup.h">
-      <Filter>platform\network\soup</Filter>
-    </ClInclude>
-    <ClInclude Include="..\platform\network\soup\ProxyResolverSoup.h">
       <Filter>platform\network\soup</Filter>
     </ClInclude>
     <ClInclude Include="..\platform\network\soup\ResourceError.h">
@@ -14516,7 +14497,7 @@
     <ClInclude Include="..\platform\audio\MediaSessionManager.h">
       <Filter>platform\audio</Filter>
     </ClInclude>
-    <ClInclude Include="..\platform\audio\MediaSession.h">
+    <ClInclude Include="..\platform\audio\PlatformMediaSession.h">
       <Filter>platform\audio</Filter>
     </ClInclude>
     <ClInclude Include="..\Modules\gamepad\NavigatorGamepad.h">
@@ -14575,15 +14556,6 @@
     </ClInclude>
     <ClInclude Include="..\platform\graphics\avfoundation\MediaTimeAVFoundation.h">
       <Filter>platform\graphics\avfoundation</Filter>
-    </ClInclude>
-    <ClInclude Include="..\platform\graphics\MaskImageOperation.h">
-      <Filter>platform\graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\rendering\RenderLayerMaskImageInfo.h">
-      <Filter>rendering</Filter>
-    </ClInclude>
-    <ClInclude Include="..\css\WebKitCSSResourceValue.h">
-      <Filter>css</Filter>
     </ClInclude>
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSEXTsRGB.h">
       <Filter>DerivedSources</Filter>
@@ -15248,9 +15220,6 @@
     <ClInclude Include="..\platform\graphics\FontCascadeFonts.h">
       <Filter>platform\graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\Modules\streams\ReadableStreamSource.h">
-      <Filter>Modules\streams</Filter>
-    </ClInclude>
     <ClInclude Include="..\Modules\streams\ReadableStream.h">
       <Filter>Modules\streams</Filter>
     </ClInclude>
@@ -15280,6 +15249,29 @@
     </ClInclude>
     <ClInclude Include="..\platform\network\CacheValidation.h">
       <Filter>platform\network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\graphics\PlatformDisplay.h">
+      <Filter>platform\graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\graphics\win\PlatformDisplayWin.h">
+      <Filter>platform\graphics\win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\VNodeTracker.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\dom\NodeOrString.h" />
+    <ClInclude Include="..\bindings\js\JSNodeOrString.h" />
+    <ClInclude Include="..\html\canvas\DOMPath.h">
+      <Filter>html\canvas</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\graphics\PathUtilities.h">
+      <Filter>platform\graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\win\GDIUtilities.h">
+      <Filter>platform\graphics\win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\page\DOMSecurityPolicy.h">
+      <Filter>page</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

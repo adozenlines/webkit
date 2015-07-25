@@ -69,6 +69,7 @@ class BackgroundImageGeometry {
 public:
     BackgroundImageGeometry(const LayoutRect& destinationRect, const LayoutSize& tile, const LayoutSize& phase, const LayoutSize& space, bool fixedAttachment)
         : m_destRect(destinationRect)
+        , m_destOrigin(m_destRect.location())
         , m_tileSize(tile)
         , m_phase(phase)
         , m_space(space)
@@ -82,10 +83,18 @@ public:
     LayoutSize spaceSize() const { return m_space; }
     bool hasNonLocalGeometry() const { return m_hasNonLocalGeometry; }
 
+    LayoutSize relativePhase() const
+    {
+        LayoutSize phase = m_phase;
+        phase += m_destRect.location() - m_destOrigin;
+        return phase;
+    }
+
     void clip(const LayoutRect& clipRect) { m_destRect.intersect(clipRect); }
 
 private:
     LayoutRect m_destRect;
+    LayoutPoint m_destOrigin;
     LayoutSize m_tileSize;
     LayoutSize m_phase;
     LayoutSize m_space;
@@ -205,7 +214,7 @@ public:
     void paintBoxShadow(const PaintInfo&, const LayoutRect&, const RenderStyle&, ShadowStyle, bool includeLogicalLeftEdge = true, bool includeLogicalRightEdge = true);
     void paintFillLayerExtended(const PaintInfo&, const Color&, const FillLayer*, const LayoutRect&, BackgroundBleedAvoidance, InlineFlowBox* = nullptr, const LayoutSize& = LayoutSize(), CompositeOperator = CompositeSourceOver, RenderElement* backgroundObject = nullptr, BaseBackgroundColorUsage = BaseBackgroundColorUse);
 
-    virtual bool boxShadowShouldBeAppliedToBackground(BackgroundBleedAvoidance, InlineFlowBox* = nullptr) const;
+    virtual bool boxShadowShouldBeAppliedToBackground(const LayoutPoint& absolutePaintPostion, BackgroundBleedAvoidance, InlineFlowBox* = nullptr) const;
 
     // Overridden by subclasses to determine line height and baseline position.
     virtual LayoutUnit lineHeight(bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const = 0;
@@ -217,7 +226,7 @@ public:
 
     bool canHaveBoxInfoInRegion() const { return !isFloating() && !isReplaced() && !isInline() && !isTableCell() && isRenderBlock() && !isRenderSVGBlock(); }
 
-    void getGeometryForBackgroundImage(const RenderLayerModelObject* paintContainer, FloatRect& destRect, FloatSize& phase, FloatSize& tileSize) const;
+    void getGeometryForBackgroundImage(const RenderLayerModelObject* paintContainer, const LayoutPoint& paintOffset, FloatRect& destRect, FloatSize& phase, FloatSize& tileSize) const;
     void contentChanged(ContentChangeType);
     bool hasAcceleratedCompositing() const;
 
@@ -240,7 +249,8 @@ protected:
     LayoutPoint adjustedPositionRelativeToOffsetParent(const LayoutPoint&) const;
 
     bool hasBoxDecorationStyle() const;
-    BackgroundImageGeometry calculateBackgroundImageGeometry(const RenderLayerModelObject* paintContainer, const FillLayer&, const LayoutRect& paintRect, RenderElement* = nullptr) const;
+    BackgroundImageGeometry calculateBackgroundImageGeometry(const RenderLayerModelObject* paintContainer, const FillLayer&, const LayoutPoint& paintOffset,
+        const LayoutRect& paintRect, RenderElement* = nullptr) const;
     bool borderObscuresBackgroundEdge(const FloatSize& contextScale) const;
     bool borderObscuresBackground() const;
     RoundedRect backgroundRoundedRectAdjustedForBleedAvoidance(const GraphicsContext&, const LayoutRect&, BackgroundBleedAvoidance, InlineFlowBox*, const LayoutSize&, bool includeLogicalLeftEdge, bool includeLogicalRightEdge) const;
@@ -288,7 +298,7 @@ public:
     void moveChildrenTo(RenderBoxModelObject* toBoxModelObject, RenderObject* startChild, RenderObject* endChild, RenderObject* beforeChild, bool fullRemoveInsert = false);
 
     enum ScaleByEffectiveZoomOrNot { ScaleByEffectiveZoom, DoNotScaleByEffectiveZoom };
-    LayoutSize calculateImageIntrinsicDimensions(StyleImage*, const LayoutSize& scaledPositioningAreaSize, ScaleByEffectiveZoomOrNot) const;
+    bool calculateImageIntrinsicDimensions(StyleImage*, const LayoutSize& scaledPositioningAreaSize, ScaleByEffectiveZoomOrNot, LayoutSize& imageSize) const;
 
 private:
     LayoutUnit computedCSSPadding(const Length&) const;

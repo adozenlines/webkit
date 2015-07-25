@@ -47,6 +47,7 @@ WebInspector.NetworkTimelineView = function(timeline, extraArguments)
     }
 
     columns.type.scopeBar = WebInspector.TimelineDataGrid.createColumnScopeBar("network", typeToLabelMap);
+    this._scopeBar = columns.type.scopeBar;
 
     columns.method.title = WebInspector.UIString("Method");
     columns.method.width = "6%";
@@ -125,6 +126,14 @@ WebInspector.NetworkTimelineView.prototype = {
         WebInspector.ContentView.prototype.hidden.call(this);
     },
 
+    closed: function()
+    {
+        console.assert(this.representedObject instanceof WebInspector.Timeline);
+        this.representedObject.removeEventListener(null, null, this);
+
+        this._dataGrid.closed();
+    },
+
     updateLayout: function()
     {
         WebInspector.TimelineView.prototype.updateLayout.call(this);
@@ -148,15 +157,21 @@ WebInspector.NetworkTimelineView.prototype = {
 
     // Protected
 
+    canShowContentViewForTreeElement: function(treeElement)
+    {
+        if (treeElement instanceof WebInspector.ResourceTreeElement || treeElement instanceof WebInspector.ScriptTreeElement)
+            return true;
+        return WebInspector.TimelineView.prototype.canShowContentViewForTreeElement(treeElement);
+    },
+
     showContentViewForTreeElement: function(treeElement)
     {
         if (treeElement instanceof WebInspector.ResourceTreeElement || treeElement instanceof WebInspector.ScriptTreeElement) {
             WebInspector.showSourceCode(treeElement.representedObject);
-            return true;
+            return;
         }
 
         console.error("Unknown tree element selected.", treeElement);
-        return false;
     },
 
     treeElementPathComponentSelected: function(event)
@@ -170,7 +185,7 @@ WebInspector.NetworkTimelineView.prototype = {
     treeElementSelected: function(treeElement, selectedByUser)
     {
         if (this._dataGrid.shouldIgnoreSelectionEvent())
-            return false;
+            return;
 
         WebInspector.TimelineView.prototype.treeElementSelected.call(this, treeElement, selectedByUser);
     },
@@ -215,26 +230,5 @@ WebInspector.NetworkTimelineView.prototype = {
     _dataGridNodeSelected: function(event)
     {
         this.dispatchEventToListeners(WebInspector.ContentView.Event.SelectionPathComponentsDidChange);
-    },
-
-    _updateTreeElementWithCloseButton: function(treeElement)
-    {
-        if (this._closeStatusButton) {
-            treeElement.status = this._closeStatusButton.element;
-            return;
-        }
-
-        wrappedSVGDocument(platformImagePath("Close.svg"), null, WebInspector.UIString("Close resource view"), function(element) {
-            this._closeStatusButton = new WebInspector.TreeElementStatusButton(element);
-            this._closeStatusButton.addEventListener(WebInspector.TreeElementStatusButton.Event.Clicked, this._closeStatusButtonClicked, this);
-            if (treeElement === this.navigationSidebarTreeOutline.selectedTreeElement)
-                this._updateTreeElementWithCloseButton(treeElement);
-        }.bind(this));
-    },
-
-    _closeStatusButtonClicked: function(event)
-    {
-        this.navigationSidebarTreeOutline.selectedTreeElement.deselect();
-        this.timelineSidebarPanel.showTimelineViewForTimeline(this.representedObject);
     }
 };

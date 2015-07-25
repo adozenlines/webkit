@@ -397,9 +397,9 @@ String StyleProperties::getLayeredShorthandValue(const StylePropertyShorthand& s
                     // Color only belongs in the last layer.
                     if (shorthand.properties()[j] == CSSPropertyBackgroundColor) {
                         if (i != numLayers - 1)
-                            value = 0;
+                            value = nullptr;
                     } else if (i) // Other singletons only belong in the first layer.
-                        value = 0;
+                        value = nullptr;
                 }
             }
 
@@ -1074,11 +1074,11 @@ void StyleProperties::addSubresourceStyleURLs(ListHashSet<URL>& urls, StyleSheet
         propertyAt(i).value()->addSubresourceStyleURLs(urls, contextStyleSheet);
 }
 
-bool StyleProperties::hasFailedOrCanceledSubresources() const
+bool StyleProperties::traverseSubresources(const std::function<bool (const CachedResource&)>& handler) const
 {
     unsigned size = propertyCount();
     for (unsigned i = 0; i < size; ++i) {
-        if (propertyAt(i).value()->hasFailedOrCanceledSubresources())
+        if (propertyAt(i).value()->traverseSubresources(handler))
             return true;
     }
     return false;

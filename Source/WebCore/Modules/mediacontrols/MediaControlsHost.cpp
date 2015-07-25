@@ -61,9 +61,9 @@ const AtomicString& MediaControlsHost::alwaysOnKeyword()
     return alwaysOn;
 }
 
-PassRefPtr<MediaControlsHost> MediaControlsHost::create(HTMLMediaElement* mediaElement)
+Ref<MediaControlsHost> MediaControlsHost::create(HTMLMediaElement* mediaElement)
 {
-    return adoptRef(new MediaControlsHost(mediaElement));
+    return adoptRef(*new MediaControlsHost(mediaElement));
 }
 
 MediaControlsHost::MediaControlsHost(HTMLMediaElement* mediaElement)
@@ -188,21 +188,14 @@ void MediaControlsHost::exitedFullscreen()
     if (m_textTrackContainer)
         m_textTrackContainer->exitedFullscreen();
 }
-    
-void MediaControlsHost::enterFullscreenOptimized()
-{
-#if PLATFORM(IOS)
-    m_mediaElement->enterFullscreenOptimized();
-#endif
-}
-    
+
 void MediaControlsHost::updateCaptionDisplaySizes()
 {
     if (m_textTrackContainer)
         m_textTrackContainer->updateSizes(true);
 }
     
-bool MediaControlsHost::mediaPlaybackAllowsInline() const
+bool MediaControlsHost::allowsInlineMediaPlayback() const
 {
     return !m_mediaElement->mediaSession().requiresFullscreenForVideoPlayback(*m_mediaElement);
 }
@@ -276,21 +269,6 @@ bool MediaControlsHost::controlsDependOnPageScaleFactor() const
 void MediaControlsHost::setControlsDependOnPageScaleFactor(bool value)
 {
     m_mediaElement->setMediaControlsDependOnPageScaleFactor(value);
-}
-
-String MediaControlsHost::mediaUIImageData(const String& partID) const
-{
-#if PLATFORM(IOS)
-    if (partID == "optimized-fullscreen-button")
-        return wkGetMediaUIImageData(wkMediaUIPartOptimizedFullscreenButton);
-
-    if (partID == "optimized-fullscreen-placeholder")
-        return wkGetMediaUIImageData(wkMediaUIPartOptimizedFullscreenPlaceholder);
-#else
-    UNUSED_PARAM(partID);
-#endif
-
-    return emptyString();
 }
 
 String MediaControlsHost::generateUUID() const

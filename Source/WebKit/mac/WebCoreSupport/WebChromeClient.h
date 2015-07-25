@@ -89,9 +89,6 @@ public:
     virtual void runJavaScriptAlert(WebCore::Frame*, const WTF::String&) override;
     virtual bool runJavaScriptConfirm(WebCore::Frame*, const WTF::String&) override;
     virtual bool runJavaScriptPrompt(WebCore::Frame*, const WTF::String& message, const WTF::String& defaultValue, WTF::String& result) override;
-    virtual bool shouldInterruptJavaScript() override;
-
-    virtual WebCore::IntRect windowResizerRect() const override;
 
     virtual bool supportsImmediateInvalidation() override;
     virtual void invalidateRootView(const WebCore::IntRect&) override;
@@ -179,7 +176,7 @@ public:
 
 #if ENABLE(VIDEO)
     virtual bool supportsVideoFullscreen() override;
-    virtual void enterVideoFullscreenForVideoElement(WebCore::HTMLVideoElement&, WebCore::HTMLMediaElement::VideoFullscreenMode) override;
+    virtual void enterVideoFullscreenForVideoElement(WebCore::HTMLVideoElement&, WebCore::HTMLMediaElementEnums::VideoFullscreenMode) override;
     virtual void exitVideoFullscreenForVideoElement(WebCore::HTMLVideoElement&) override;
 #endif
     
@@ -192,8 +189,8 @@ public:
     virtual bool selectItemWritingDirectionIsNatural() override;
     virtual bool selectItemAlignmentFollowsMenuWritingDirection() override;
     virtual bool hasOpenedPopup() const override;
-    virtual PassRefPtr<WebCore::PopupMenu> createPopupMenu(WebCore::PopupMenuClient*) const override;
-    virtual PassRefPtr<WebCore::SearchPopupMenu> createSearchPopupMenu(WebCore::PopupMenuClient*) const override;
+    virtual RefPtr<WebCore::PopupMenu> createPopupMenu(WebCore::PopupMenuClient*) const override;
+    virtual RefPtr<WebCore::SearchPopupMenu> createSearchPopupMenu(WebCore::PopupMenuClient*) const override;
 
     virtual void wheelEventHandlersChanged(bool) override { }
 

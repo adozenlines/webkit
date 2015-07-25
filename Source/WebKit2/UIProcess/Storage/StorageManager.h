@@ -27,8 +27,11 @@
 #define StorageManager_h
 
 #include "Connection.h"
+#include "LocalStorageDatabaseTracker.h"
+#include <WebCore/SecurityOriginHash.h>
 #include <chrono>
 #include <wtf/Forward.h>
+#include <wtf/HashSet.h>
 #include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/text/StringHash.h>
 
@@ -38,7 +41,6 @@ class SecurityOrigin;
 
 namespace WebKit {
 
-struct LocalStorageDetails;
 struct SecurityOriginData;
 class LocalStorageDatabaseTracker;
 class WebProcessProxy;
@@ -57,13 +59,17 @@ public:
     void processDidCloseConnection(WebProcessProxy&, IPC::Connection&);
     void applicationWillTerminate();
 
-    void getOrigins(std::function<void (Vector<RefPtr<WebCore::SecurityOrigin>>)> completionHandler);
-    void getStorageDetailsByOrigin(std::function<void (Vector<LocalStorageDetails>)> completionHandler);
-    void deleteEntriesForOrigin(const WebCore::SecurityOrigin&);
-    void deleteAllEntries();
+    void getSessionStorageOrigins(std::function<void (HashSet<RefPtr<WebCore::SecurityOrigin>>&&)> completionHandler);
+    void deleteSessionStorageOrigins(std::function<void ()> completionHandler);
+    void deleteSessionStorageEntriesForOrigins(const Vector<RefPtr<WebCore::SecurityOrigin>>&, std::function<void ()> completionHandler);
+
+    void getLocalStorageOrigins(std::function<void (HashSet<RefPtr<WebCore::SecurityOrigin>>&&)> completionHandler);
+    void deleteLocalStorageEntriesForOrigin(const WebCore::SecurityOrigin&);
 
     void deleteLocalStorageOriginsModifiedSince(std::chrono::system_clock::time_point, std::function<void ()> completionHandler);
-    void deleteEntriesForOrigins(const Vector<RefPtr<WebCore::SecurityOrigin>>&, std::function<void ()> completionHandler);
+    void deleteLocalStorageEntriesForOrigins(const Vector<RefPtr<WebCore::SecurityOrigin>>&, std::function<void ()> completionHandler);
+
+    void getLocalStorageOriginDetails(std::function<void (Vector<LocalStorageDatabaseTracker::OriginDetails>)> completionHandler);
 
 private:
     explicit StorageManager(const String& localStorageDirectory);

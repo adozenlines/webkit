@@ -42,7 +42,8 @@ enum AXTextEditType {
     AXTextEditTypeTyping, // Insert via typing
     AXTextEditTypeDictation, // Insert via dictation
     AXTextEditTypeCut, // Delete via Cut
-    AXTextEditTypePaste // Insert via Paste
+    AXTextEditTypePaste, // Insert via Paste
+    AXTextEditTypeAttributesChange // Change font, style, alignment, color, etc.
 };
 
 enum AXTextSelectionDirection {
@@ -69,6 +70,7 @@ enum AXTextSelectionGranularity {
 struct AXTextSelection {
     AXTextSelectionDirection direction;
     AXTextSelectionGranularity granularity;
+    bool focusChange;
 };
 
 struct AXTextStateChangeIntent {
@@ -77,7 +79,6 @@ struct AXTextStateChangeIntent {
         AXTextSelection selection;
         AXTextEditType change;
     };
-    bool isSynchronizing { false };
 
     AXTextStateChangeIntent(AXTextStateChangeType type = AXTextStateChangeTypeUnknown, AXTextSelection selection = AXTextSelection())
         : type(type)
@@ -88,14 +89,6 @@ struct AXTextStateChangeIntent {
         : type(AXTextStateChangeTypeEdit)
         , change(change)
     { }
-
-    AXTextStateChangeIntent(AXTextStateChangeType type, bool isSynchronizing)
-        : type(type)
-        , selection()
-        , isSynchronizing(isSynchronizing)
-    {
-        ASSERT(type == AXTextStateChangeTypeSelectionMove || type == AXTextStateChangeTypeSelectionExtend);
-    }
 };
 
 }

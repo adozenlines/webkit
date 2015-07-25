@@ -23,7 +23,7 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import "WKWebsiteDataRecord.h"
+#import "WKWebsiteDataRecordPrivate.h"
 
 #if WK_API_ENABLED
 
@@ -52,13 +52,22 @@ static inline WebKit::WebsiteDataTypes toWebsiteDataTypes(NSSet *wkWebsiteDataTy
         websiteDataTypes |= WebsiteDataTypes::WebsiteDataTypeMemoryCache;
     if ([wkWebsiteDataTypes containsObject:WKWebsiteDataTypeOfflineWebApplicationCache])
         websiteDataTypes |= WebsiteDataTypes::WebsiteDataTypeOfflineWebApplicationCache;
+    if ([wkWebsiteDataTypes containsObject:WKWebsiteDataTypeSessionStorage])
+        websiteDataTypes |= WebsiteDataTypes::WebsiteDataTypeSessionStorage;
     if ([wkWebsiteDataTypes containsObject:WKWebsiteDataTypeLocalStorage])
         websiteDataTypes |= WebsiteDataTypes::WebsiteDataTypeLocalStorage;
     if ([wkWebsiteDataTypes containsObject:WKWebsiteDataTypeWebSQLDatabases])
         websiteDataTypes |= WebsiteDataTypes::WebsiteDataTypeWebSQLDatabases;
     if ([wkWebsiteDataTypes containsObject:WKWebsiteDataTypeIndexedDBDatabases])
         websiteDataTypes |= WebsiteDataTypes::WebsiteDataTypeIndexedDBDatabases;
-
+    if ([wkWebsiteDataTypes containsObject:_WKWebsiteDataTypeHSTSCache])
+        websiteDataTypes |= WebsiteDataTypes::WebsiteDataTypeHSTSCache;
+    if ([wkWebsiteDataTypes containsObject:_WKWebsiteDataTypeMediaKeys])
+        websiteDataTypes |= WebsiteDataTypes::WebsiteDataTypeMediaKeys;
+#if ENABLE(NETSCAPE_PLUGIN_API)
+    if ([wkWebsiteDataTypes containsObject:_WKWebsiteDataTypePlugInData])
+        websiteDataTypes |= WebsiteDataTypes::WebsiteDataTypePlugInData;
+#endif
     return static_cast<WebsiteDataTypes>(websiteDataTypes);
 }
 
@@ -76,12 +85,22 @@ static inline RetainPtr<NSSet> toWKWebsiteDataTypes(int websiteDataTypes)
         [wkWebsiteDataTypes addObject:WKWebsiteDataTypeMemoryCache];
     if (websiteDataTypes & WebsiteDataTypes::WebsiteDataTypeOfflineWebApplicationCache)
         [wkWebsiteDataTypes addObject:WKWebsiteDataTypeOfflineWebApplicationCache];
+    if (websiteDataTypes & WebsiteDataTypes::WebsiteDataTypeSessionStorage)
+        [wkWebsiteDataTypes addObject:WKWebsiteDataTypeSessionStorage];
     if (websiteDataTypes & WebsiteDataTypes::WebsiteDataTypeLocalStorage)
         [wkWebsiteDataTypes addObject:WKWebsiteDataTypeLocalStorage];
     if (websiteDataTypes & WebsiteDataTypes::WebsiteDataTypeWebSQLDatabases)
         [wkWebsiteDataTypes addObject:WKWebsiteDataTypeWebSQLDatabases];
     if (websiteDataTypes & WebsiteDataTypes::WebsiteDataTypeIndexedDBDatabases)
         [wkWebsiteDataTypes addObject:WKWebsiteDataTypeIndexedDBDatabases];
+    if (websiteDataTypes & WebsiteDataTypes::WebsiteDataTypeHSTSCache)
+        [wkWebsiteDataTypes addObject:_WKWebsiteDataTypeHSTSCache];
+    if (websiteDataTypes & WebsiteDataTypes::WebsiteDataTypeMediaKeys)
+        [wkWebsiteDataTypes addObject:_WKWebsiteDataTypeMediaKeys];
+#if ENABLE(NETSCAPE_PLUGIN_API)
+    if (websiteDataTypes & WebsiteDataTypes::WebsiteDataTypePlugInData)
+        [wkWebsiteDataTypes addObject:_WKWebsiteDataTypePlugInData];
+#endif
 
     return wkWebsiteDataTypes;
 }

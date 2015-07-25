@@ -55,6 +55,11 @@ InspectorFrontendAPI = {
         }
     },
 
+    setDockingUnavailable: function(unavailable)
+    {
+        WebInspector.updateDockingAvailability(!unavailable);
+    },
+
     setDockSide: function(side)
     {
         WebInspector.updateDockedState(side);
@@ -88,7 +93,7 @@ InspectorFrontendAPI = {
 
     showMainResourceForFrame: function(frameIdentifier)
     {
-        WebInspector.showSourceCodeForFrame(frameIdentifier, true);
+        WebInspector.showSourceCodeForFrame(frameIdentifier);
     },
 
     contextMenuItemSelected: function(id)

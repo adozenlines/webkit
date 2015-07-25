@@ -30,6 +30,7 @@ namespace JSC {
 EncodedJSValue JSC_HOST_CALL objectConstructorGetOwnPropertyDescriptor(ExecState*);
 EncodedJSValue JSC_HOST_CALL objectConstructorGetOwnPropertySymbols(ExecState*);
 EncodedJSValue JSC_HOST_CALL objectConstructorKeys(ExecState*);
+EncodedJSValue JSC_HOST_CALL ownEnumerablePropertyKeys(ExecState*);
 
 class ObjectPrototype;
 
@@ -88,6 +89,8 @@ inline JSObject* constructEmptyObject(ExecState* exec)
 {
     return constructEmptyObject(exec, exec->lexicalGlobalObject()->objectPrototype());
 }
+
+JSObject* objectConstructorFreeze(ExecState*, JSObject*);
 
 } // namespace JSC
 

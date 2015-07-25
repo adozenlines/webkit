@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2014-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -125,6 +125,7 @@ TestController::TestController(int argc, const char* argv[])
     , m_shouldUseAcceleratedDrawing(false)
     , m_shouldUseRemoteLayerTree(false)
     , m_shouldLogHistoryClientCallbacks(false)
+    , m_shouldShowWebView(false)
 {
     initialize(argc, argv);
     controller = this;
@@ -212,9 +213,9 @@ WKPageRef TestController::createOtherPage(WKPageRef oldPage, WKURLRequestRef, WK
         0, // takeFocus
         focus,
         unfocus,
-        0, // runJavaScriptAlert
-        0, // runJavaScriptConfirm
-        0, // runJavaScriptPrompt
+        0, // runJavaScriptAlert_deprecatedForUseWithV0
+        0, // runJavaScriptAlert_deprecatedForUseWithV0
+        0, // runJavaScriptAlert_deprecatedForUseWithV0
         0, // setStatusText
         0, // mouseDidMoveOverElement_deprecatedForUseWithV0
         0, // missingPluginButtonClicked
@@ -259,6 +260,10 @@ WKPageRef TestController::createOtherPage(WKPageRef oldPage, WKURLRequestRef, WK
         0, // isPlayingAudioDidChange
         decidePolicyForUserMediaPermissionRequest,
         0, // didClickAutofillButton
+        0, // runJavaScriptAlert
+        0, // runJavaScriptConfirm
+        0, // runJavaScriptPrompt
+        0, // mediaSessionMetadataDidChange
     };
     WKPageSetPageUIClient(newPage, &otherPageUIClient.base);
     
@@ -328,6 +333,7 @@ void TestController::initialize(int argc, const char* argv[])
     m_shouldUseRemoteLayerTree = options.shouldUseRemoteLayerTree;
     m_paths = options.paths;
     m_allowedHosts = options.allowedHosts;
+    m_shouldShowWebView = options.shouldShowWebView;
 
     if (options.printSupportedFeatures) {
         // FIXME: On Windows, DumpRenderTree uses this to expose whether it supports 3d
@@ -356,6 +362,8 @@ void TestController::initialize(int argc, const char* argv[])
 
         const char separator = '/';
 
+        WKContextConfigurationSetApplicationCacheDirectory(configuration.get(), toWK(temporaryFolder + separator + "ApplicationCache").get());
+        WKContextConfigurationSetDiskCacheDirectory(configuration.get(), toWK(temporaryFolder + separator + "Cache").get());
         WKContextConfigurationSetIndexedDBDatabaseDirectory(configuration.get(), toWK(temporaryFolder + separator + "Databases" + separator + "IndexedDB").get());
         WKContextConfigurationSetLocalStorageDirectory(configuration.get(), toWK(temporaryFolder + separator + "LocalStorage").get());
         WKContextConfigurationSetWebSQLDatabaseDirectory(configuration.get(), toWK(temporaryFolder + separator + "Databases" + separator + "WebSQL").get());
@@ -373,12 +381,7 @@ void TestController::initialize(int argc, const char* argv[])
     if (const char* dumpRenderTreeTemp = libraryPathForTesting()) {
         String temporaryFolder = String::fromUTF8(dumpRenderTreeTemp);
 
-        const char separator = '/';
-
-        // FIXME: These should be migrated to WKContextConfigurationRef.
-        WKContextSetApplicationCacheDirectory(m_context.get(), toWK(temporaryFolder + separator + "ApplicationCache").get());
-        WKContextSetDiskCacheDirectory(m_context.get(), toWK(temporaryFolder + separator + "Cache").get());
-        WKContextSetCookieStorageDirectory(m_context.get(), toWK(temporaryFolder + separator + "Cookies").get());
+        // FIXME: This should be migrated to WKContextConfigurationRef.
         // Disable icon database to avoid fetching <http://127.0.0.1:8000/favicon.ico> and making tests flaky.
         // Invividual tests can enable it using testRunner.setIconDatabaseEnabled, although it's not currently supported in WebKitTestRunner.
         WKContextSetIconDatabasePath(m_context.get(), toWK(emptyString()).get());
@@ -437,6 +440,14 @@ void TestController::initialize(int argc, const char* argv[])
         WKDictionarySetItem(viewOptions.get(), useRemoteLayerTreeKey.get(), useRemoteLayerTreeValue.get());
     }
 
+    if (m_shouldShowWebView) {
+        if (!viewOptions)
+            viewOptions = adoptWK(WKMutableDictionaryCreate());
+        WKRetainPtr<WKStringRef> shouldShowWebViewKey = adoptWK(WKStringCreateWithUTF8CString("ShouldShowWebView"));
+        WKRetainPtr<WKBooleanRef> shouldShowWebViewValue = adoptWK(WKBooleanCreate(m_shouldShowWebView));
+        WKDictionarySetItem(viewOptions.get(), shouldShowWebViewKey.get(), shouldShowWebViewValue.get());
+    }
+
     createWebViewWithOptions(viewOptions.get());
 }
 
@@ -451,9 +462,9 @@ void TestController::createWebViewWithOptions(WKDictionaryRef options)
         0, // takeFocus
         focus,
         unfocus,
-        0, // runJavaScriptAlert
-        0, // runJavaScriptConfirm
-        0, // runJavaScriptPrompt
+        0, // runJavaScriptAlert_deprecatedForUseWithV0
+        0, // runJavaScriptAlert_deprecatedForUseWithV0
+        0, // runJavaScriptAlert_deprecatedForUseWithV0
         0, // setStatusText
         0, // mouseDidMoveOverElement_deprecatedForUseWithV0
         0, // missingPluginButtonClicked
@@ -498,6 +509,10 @@ void TestController::createWebViewWithOptions(WKDictionaryRef options)
         0, // isPlayingAudioDidChange
         decidePolicyForUserMediaPermissionRequest,
         0, // didClickAutofillButton
+        0, // runJavaScriptAlert
+        0, // runJavaScriptConfirm
+        0, // runJavaScriptPrompt
+        0, // mediaSessionMetadataDidChange
     };
     WKPageSetPageUIClient(m_mainWebView->page(), &pageUIClient.base);
 
@@ -660,6 +675,8 @@ bool TestController::resetStateToConsistentValues()
     // Re-set to the default backing scale factor by setting the custom scale factor to 0.
     WKPageSetCustomBackingScaleFactor(m_mainWebView->page(), 0);
 
+    WKPageClearWheelEventTestTrigger(m_mainWebView->page());
+
 #if PLATFORM(EFL)
     // EFL use a real window while other ports such as Qt don't.
     // In EFL, we need to resize the window to the original size after calls to window.resizeTo.
@@ -785,7 +802,7 @@ void TestController::updateLayoutTypeForTest(const TestInvocation& test)
     ensureViewSupportsOptions(viewOptions.get());
 }
 
-#if !PLATFORM(COCOA)
+#if !PLATFORM(COCOA) && !PLATFORM(GTK)
 void TestController::platformConfigureViewForTest(const TestInvocation&)
 {
 }

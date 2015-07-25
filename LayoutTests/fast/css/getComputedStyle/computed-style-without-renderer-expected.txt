@@ -36,6 +36,7 @@ caption-side: top
 clear: none
 clip: auto
 color: rgb(0, 0, 0)
+content: 
 cursor: auto
 direction: ltr
 display: block
@@ -43,6 +44,7 @@ empty-cells: show
 float: none
 font-size: 16px
 font-style: normal
+font-synthesis: style weight
 font-variant: normal
 font-weight: normal
 height: 100px
@@ -139,18 +141,19 @@ zoom: 1
 -webkit-column-break-inside: auto
 -webkit-column-axis: auto
 column-count: auto
+column-fill: balance
 column-gap: normal
 column-rule-color: rgb(0, 0, 0)
 column-rule-style: none
 column-rule-width: 0px
 column-span: none
 column-width: auto
-align-content: stretch
+align-content: auto
 align-items: auto
 align-self: auto
 flex-direction: row
 flex-wrap: nowrap
-justify-content: flex-start
+justify-content: auto
 justify-self: auto
 justify-items: auto
 -webkit-font-kerning: auto
